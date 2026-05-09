@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../controller/onboarding_controller.dart';
-import '../../common/widgets/progress_dots.dart';
-import '../../common/widgets/primary_button.dart';
 import '../../routes/app_routes.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -26,132 +24,262 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFFBF6), Color(0xFFF3ECE2)],
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1B5E20),
+                  Color(0xFF2E7D32),
+                  Color(0xFF388E3C),
+                ],
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'VLXD Mart',
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontWeight: FontWeight.w600,
+          // Vòng trang trí trên trái
+          Positioned(
+            top: -80,
+            left: -80,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.06),
+              ),
+            ),
+          ),
+          // Vòng trang trí dưới phải
+          Positioned(
+            bottom: -100,
+            right: -100,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.06),
+              ),
+            ),
+          ),
+          // Vòng trang trí giữa phải
+          Positioned(
+            top: size.height * 0.35,
+            right: -40,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.04),
+              ),
+            ),
+          ),
+          // Nội dung chính
+          SafeArea(
+            child: Column(
+              children: [
+                // Topbar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                        ),
+                        child: const Text(
+                          'V24h',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                    ),
-                    const Spacer(),
-                    TextButton(onPressed: _goToHome, child: const Text('Bỏ qua')),
-                  ],
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _goToHome,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Bỏ qua',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: PageView.builder(
-                  controller: controller.pageController,
-                  itemCount: controller.onboardingPages.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      controller.onPageChanged(index);
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final page = controller.onboardingPages[index];
-                    return SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
+                // PageView
+                Expanded(
+                  child: PageView.builder(
+                    controller: controller.pageController,
+                    itemCount: controller.onboardingPages.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        controller.onPageChanged(index);
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final page = controller.onboardingPages[index];
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            // Card ảnh
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.all(20),
+                              padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(32),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.06),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 8),
+                                    color: Colors.black.withOpacity(0.18),
+                                    blurRadius: 40,
+                                    spreadRadius: 2,
+                                    offset: const Offset(0, 12),
                                   ),
                                 ],
                               ),
                               child: Image.asset(
                                 page.imagePath,
-                                height: 220,
+                                height: size.height * 0.28,
                                 fit: BoxFit.contain,
                               ),
                             ),
-                            const SizedBox(height: 30),
+                            const SizedBox(height: 36),
+                            // Tiêu đề
                             Text(
                               page.title,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                                height: 1.3,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
+                            // Đường kẻ trang trí
+                            Container(
+                              width: 48,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Mô tả
                             Text(
                               page.description,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                height: 1.4,
-                                color: Color(0xFF5F6368),
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.85),
+                                fontSize: 14,
+                                height: 1.6,
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-              ProgressDots(
-                currentIndex: controller.currentPage,
-                total: controller.onboardingPages.length,
-              ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: controller.isLastPage()
-                    ? PrimaryButton(title: 'Bắt đầu', onPressed: _goToHome)
-                    : PrimaryButton(
-                        title: 'Tiếp theo',
-                        onPressed: () {
-                          controller.pageController.nextPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        },
+                const SizedBox(height: 24),
+                // Progress dots (trắng)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    controller.onboardingPages.length,
+                    (index) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: controller.currentPage == index ? 24 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: controller.currentPage == index
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-              ),
-              const SizedBox(height: 32),
-            ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Nút bấm
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: controller.isLastPage()
+                          ? _goToHome
+                          : () {
+                              controller.pageController.nextPage(
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF2E7D32),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Text(
+                        controller.isLastPage() ? 'Bắt đầu ngay' : 'Tiếp theo',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 36),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

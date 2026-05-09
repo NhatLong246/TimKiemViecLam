@@ -244,9 +244,14 @@ Widget _buildGuestProfile(BuildContext context) {
           color: AppColors.primaryBlue,
           child: Column(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 40,
-                child: Icon(Icons.person, size: 40),
+                backgroundColor: Colors.white,
+                child: Image.asset(
+                  'assets/images/icons/icons8-profile-48.png',
+                  width: 40,
+                  height: 40,
+                ),
               ),
               const SizedBox(height: 16),
               const Text(

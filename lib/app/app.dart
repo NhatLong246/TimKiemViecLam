@@ -7,10 +7,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color primaryColor = Color(0xFF8B5E34);
-    const Color secondaryColor = Color(0xFFD4A373);
-    const Color surfaceColor = Color(0xFFF6F3EE);
-    const Color textColor = Color(0xFF1F2933);
+    const Color primaryColor = Color(0xFF2E7D32);
+    const Color secondaryColor = Color(0xFF66BB6A);
+    const Color surfaceColor = Color(0xFFF5F5F5);
+    const Color textColor = Color(0xFF1A1A1A);
 
     final ColorScheme colorScheme = ColorScheme.fromSeed(
       seedColor: primaryColor,
@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
     );
 
     return GetMaterialApp(
-      title: 'VLXD Mart',
+      title: 'V24h - Tìm Việc Làm 24h',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
