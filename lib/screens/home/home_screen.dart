@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../notification/notification_screen.dart';
 
 const Color _primary = Color(0xFF2E7D32);
 const Color _primaryDark = Color(0xFF1B5E20);
@@ -124,7 +125,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Row(
                         children: const [
-                          Icon(Icons.location_on, color: Colors.white, size: 14),
+                          Icon(
+                            Icons.location_on,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Quận 1, TP.HCM',
@@ -155,10 +160,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.white.withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.notifications_none,
-                    color: Colors.white,
-                    size: 20,
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationScreen(),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_none,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],
@@ -240,10 +253,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildQuickTools() {
     final tools = [
-      {'asset': 'assets/images/icons/icons8-price-48.png', 'label': 'Tham khảo'},
+      {
+        'asset': 'assets/images/icons/icons8-price-48.png',
+        'label': 'Tham khảo',
+      },
       {'asset': 'assets/images/icons/icons8-chart-50.png', 'label': 'Thống kê'},
       {'asset': 'assets/images/icons/icons8-avatar-48.png', 'label': 'Hồ sơ'},
-      {'asset': 'assets/images/icons/icons8-calendar-48.png', 'label': 'Lịch làm'},
+      {
+        'asset': 'assets/images/icons/icons8-calendar-48.png',
+        'label': 'Lịch làm',
+      },
     ];
 
     return Padding(
@@ -369,7 +388,9 @@ class _HomeScreenState extends State<HomeScreen> {
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
                 child: Image.asset(
                   job['image'] ?? 'assets/images/banners/default_image.png',
                   height: 100,
@@ -378,7 +399,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
                 child: Container(
                   height: 100,
                   decoration: const BoxDecoration(
@@ -394,7 +417,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 bottom: 8,
                 left: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: _primary,
                     borderRadius: BorderRadius.circular(6),
@@ -432,12 +458,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 11, color: Color(0xFF9E9E9E)),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 11,
+                        color: Color(0xFF9E9E9E),
+                      ),
                       const SizedBox(width: 2),
                       Expanded(
                         child: Text(
                           job['location']!,
-                          style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF9E9E9E),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -445,14 +478,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF5F5F5),
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(
                       job['type']!,
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF757575)),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF757575),
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -465,10 +504,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         backgroundColor: _primary,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         padding: EdgeInsets.zero,
                       ),
-                      child: const Text('Ứng tuyển', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Ứng tuyển',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -479,6 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
   void _requireLogin() {
     showModalBottomSheet(
       context: context,
@@ -571,4 +619,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-        
