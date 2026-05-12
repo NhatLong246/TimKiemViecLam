@@ -139,7 +139,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     // Chống tràn
-                    value: _selectedCity,
+                    initialValue: _selectedCity,
                     hint: const Text("Select Province/City"),
                     decoration: _inputDecoration(Icons.location_city_outlined),
                     items: _cities
@@ -163,7 +163,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     // Chống tràn
-                    value: _selectedWard,
+                    initialValue: _selectedWard,
                     hint: const Text("Select Ward/Commune"),
                     decoration: _inputDecoration(Icons.map_outlined),
                     items: _wards
@@ -212,7 +212,7 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
                   child: SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _isDefault,
-                    activeColor: Colors.blue,
+                    activeThumbColor: Colors.blue,
                     title: const Text(
                       'Set as default address',
                       style: TextStyle(fontSize: 15),

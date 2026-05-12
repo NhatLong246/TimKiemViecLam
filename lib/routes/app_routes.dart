@@ -14,6 +14,8 @@ import 'package:viecnow/screens/profile/change_name_screen.dart';
 // import 'package:app_vlxd/screens/profile/change_password_screen.dart';
 import 'package:viecnow/screens/profile/change_phonenumber_screen.dart';
 import 'package:viecnow/screens/profile/change_username_screen.dart';
+import 'package:viecnow/screens/profile/job_criteria_screen.dart';
+import 'package:viecnow/screens/profile/my_profile_screen.dart';
 import 'package:viecnow/screens/profile/update_account_screen.dart';
 import 'package:viecnow/screens/shipping_address/my_shipping_address_screen.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +35,7 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String publisher = '/publisher';
   static const String updateAccount = '/update-account';
+  static const String myProfile = '/my-profile';
   static const String changeName = '/change-name';
   static const String changeUsername = '/change-username';
   static const String changePassword = '/change-password';
@@ -45,6 +48,7 @@ class AppRoutes {
   static const String myOrderview = '/my-order';
   static const String myShippingAddressview = '/my_shipping_address';
   static const String myBankAccountview = '/my_bank_account';
+  static const String jobCriteria = '/job-criteria';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -52,9 +56,8 @@ class AppRoutes {
     register: (context) => const RegisterScreen(),
     login: (context) => const LoginScreen(),
     forgetPassword: (context) => ForgetPasswordScreen(),
-    forgetPassword: (context) => ForgetPasswordScreen(),
-    home: (context) => const MainNavigationScreen(),
     updateAccount: (context) => const UpdateAccountScreen(),
+    myProfile: (context) => const MyProfileScreen(),
     changeName: (context) => const ChangeNameScreen(),
     changeUsername: (context) => const ChangeUsernameScreen(),
     // changePassword: (context) => const ChangePasswordScreen(),
@@ -62,6 +65,7 @@ class AppRoutes {
     changePhoneNumber: (context) => const ChangePhoneNumberScreen(),
     changeGender: (context) => const ChangeGenderScreen(),
     changeDateofBirth: (context) => const ChangeDateOfBirthScreen(),
+    jobCriteria: (context) => const JobCriteriaScreen(),
     myShippingAddressview: (context) => MyShippingAddressScreen(),
     myBankAccountview: (context) => MyBankAccountScreen(),
     verifyEmail: (context) {

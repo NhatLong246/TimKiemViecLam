@@ -183,7 +183,7 @@ class _EditBankAccountScreenState extends State<EditBankAccountScreen> {
               DropdownButtonFormField<dynamic>(
                 isExpanded: true,
                 // Ép dropdown không được vượt quá chiều ngang màn hình
-                value: _selectedBank,
+                initialValue: _selectedBank,
                 icon: const Icon(Icons.keyboard_arrow_down),
                 decoration: InputDecoration(
                   contentPadding: const EdgeInsets.symmetric(
