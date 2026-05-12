@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import '../data/services/register_auth_service.dart';
 import '../data/models/user_model.dart';
 
@@ -31,6 +32,19 @@ class RegisterController {
       );
       await _authService.registerUser(userModel: userModel, password: password);
       return null;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'email-already-in-use':
+          return 'Email này đã được đăng ký. Vui lòng dùng email khác hoặc đăng nhập.';
+        case 'invalid-email':
+          return 'Địa chỉ email không hợp lệ.';
+        case 'weak-password':
+          return 'Mật khẩu quá yếu. Vui lòng chọn mật khẩu mạnh hơn.';
+        case 'operation-not-allowed':
+          return 'Phương thức đăng ký này chưa được kích hoạt.';
+        default:
+          return 'Đăng ký thất bại. Vui lòng thử lại.';
+      }
     } catch (e) {
       return e.toString().replaceFirst('Exception: ', '');
     }

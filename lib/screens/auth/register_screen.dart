@@ -109,7 +109,10 @@ class _RegisterScreenState extends State<RegisterScreen>
         _showError(error);
       } else {
         Navigator.pushNamed(context, AppRoutes.verifyEmail,
-            arguments: _emailCtrl.text.trim());
+            arguments: {
+              'email': _emailCtrl.text.trim(),
+              'role': role,
+            });
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -366,20 +369,20 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       const SizedBox(height: 14),
                                       _field(
                                         ctrl: _companyCtrl,
-                                        label: 'Tên công ty',
+                                        label: 'Tên doanh nghiệp',
                                         icon: Icons.business_outlined,
                                         validator: (v) =>
                                             Validators.validateRequired(
-                                                v ?? '', 'Tên công ty'),
+                                                v ?? '', 'Tên doanh nghiệp'),
                                       ),
                                       const SizedBox(height: 14),
                                       _field(
                                         ctrl: _addressCtrl,
-                                        label: 'Địa chỉ công ty',
+                                        label: 'Địa chỉ doanh nghiệp',
                                         icon: Icons.location_on_outlined,
                                         validator: (v) =>
                                             Validators.validateRequired(
-                                                v ?? '', 'Địa chỉ công ty'),
+                                                v ?? '', 'Địa chỉ doanh nghiệp'),
                                       ),
                                     ])
                                   : const SizedBox.shrink(),

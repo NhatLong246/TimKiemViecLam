@@ -77,19 +77,25 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  void _navigateByRole(String role) {
+    final route = role == 'employer'
+        ? AppRoutes.employerHome
+        : AppRoutes.home;
+    Navigator.pushNamedAndRemoveUntil(context, route, (r) => false);
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await _authController.login(
+      final user = await _authController.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
       await PreferencesHelper.saveRememberMe(
           _rememberMe, _emailController.text.trim());
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-            context, AppRoutes.home, (r) => false);
+        _navigateByRole(user.role);
       }
     } catch (e) {
       if (mounted) {
@@ -107,10 +113,9 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleGoogleLogin() async {
     setState(() => _isLoading = true);
     try {
-      await _authController.loginWithGoogle();
+      final user = await _authController.loginWithGoogle();
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-            context, AppRoutes.home, (r) => false);
+        _navigateByRole(user.role);
       }
     } catch (e) {
       if (mounted) {
@@ -124,10 +129,9 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleFacebookLogin() async {
     setState(() => _isLoading = true);
     try {
-      await _authController.loginWithFacebook();
+      final user = await _authController.loginWithFacebook();
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-            context, AppRoutes.home, (r) => false);
+        _navigateByRole(user.role);
       }
     } catch (e) {
       if (mounted) {

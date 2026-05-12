@@ -6,10 +6,11 @@ class AuthController extends GetxController {
   final LoginAuthService _authService = LoginAuthService();
   UserModel? currentUser;
 
-  Future<void> login(String email, String password) async {
+  Future<UserModel> login(String email, String password) async {
     final user = await _authService.loginWithEmailPassword(email, password);
     currentUser = user;
     update();
+    return user;
   }
 
   Future<UserModel> loginWithGoogle() async {

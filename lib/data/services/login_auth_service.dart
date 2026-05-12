@@ -78,7 +78,9 @@ class LoginAuthService {
 
   Future<UserModel> loginWithFacebook() async {
     try {
-      final LoginResult result = await FacebookAuth.instance.login();
+      final LoginResult result = await FacebookAuth.instance.login(
+        permissions: ['public_profile', 'email'],
+      );
       if (result.status != LoginStatus.success) {
         throw Exception('Đăng nhập Facebook bị hủy hoặc thất bại');
       }
@@ -112,7 +114,26 @@ class LoginAuthService {
 
       return await _fetchAndCacheUser(firebaseUser.uid);
     } on FirebaseAuthException catch (e) {
-      throw Exception(_mapAuthError(e.code));
+      if (e.code == 'account-exists-with-different-credential') {
+        // Email đã tồn tại → thử link qua Google
+        try {
+          final googleUser = await _googleSignIn.signIn();
+          if (googleUser == null) throw Exception('Đăng nhập Google bị hủy');
+          final googleAuth = await googleUser.authentication;
+          final googleCredential = GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+            idToken: googleAuth.idToken,
+          );
+          final userCred = await _auth.signInWithCredential(googleCredential);
+          if (e.credential != null) {
+            await userCred.user!.linkWithCredential(e.credential!);
+          }
+          return await _fetchAndCacheUser(userCred.user!.uid);
+        } catch (_) {
+          throw Exception('Email này đã được đăng ký bằng phương thức khác. Vui lòng đăng nhập bằng Google hoặc Email/Mật khẩu.');
+        }
+      }
+      throw Exception('[${e.code}] ${_mapAuthError(e.code)}');
     }
   }
 
@@ -158,6 +179,7 @@ class LoginAuthService {
       case 'user-disabled': return 'Tài khoản đã bị vô hiệu hóa';
       case 'invalid-credential': return 'Thông tin đăng nhập không đúng';
       case 'too-many-requests': return 'Quá nhiều lần thử, vui lòng thử lại sau';
+      case 'account-exists-with-different-credential': return 'Email này đã được đăng ký bằng phương thức khác (Google hoặc Email). Vui lòng đăng nhập bằng phương thức đó.';
       default: return 'Đăng nhập thất bại';
     }
   }

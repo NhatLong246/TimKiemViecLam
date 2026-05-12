@@ -58,7 +58,7 @@
 
 | # | Tính năng | Screen/File (dự kiến) | Status | Ghi chú |
 |---|---|---|---|---|
-| E1 | Dashboard Employer | `screens/employer/employer_home_screen.dart` | ❌ | |
+| E1 | Dashboard Employer | `screens/employer/employer_home_screen.dart` | ✅ | Giao diện quản lý, mock data, bottom nav employer |
 | E2 | Đăng tin tuyển dụng | `screens/employer/post_job_screen.dart` | ❌ | Cần check budget trong ví |
 | E3 | Xem/Sửa/Xóa tin đăng | `screens/employer/manage_jobs_screen.dart` | ❌ | |
 | E4 | Xem danh sách ứng viên | `screens/employer/applicants_screen.dart` | ❌ | |

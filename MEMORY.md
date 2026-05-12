@@ -43,4 +43,4 @@
 ## Session Log (cập nhật mỗi lần hoàn thành feature)
 | Ngày | Feature hoàn thành | Thay đổi chính |
 |---|---|---|
-| 2026-05-08 | Thiết kế hệ thống MD files | Tạo: `project_overview.md`, `database_schema.md`, `feature_map.md`. Cập nhật: `MEMORY.md`, `system_rules.md`, `backend_data_rules.md`, `frontend_ui_rules.md` |
+| 2026-05-11 | E1 — Employer Home / Quản lý | Tạo `screens/employer/employer_home_screen.dart`, `employer_main_navigation_screen.dart`. Thêm route `employerHome` vào `app_routes.dart` |

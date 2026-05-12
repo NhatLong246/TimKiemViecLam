@@ -1,4 +1,5 @@
 import 'package:viecnow/screens/auth/forget_password_screen.dart';
+import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
 import 'package:viecnow/screens/auth/login_screen.dart';
 import 'package:viecnow/screens/auth/register_screen.dart';
 import 'package:viecnow/screens/auth/register_success_screen.dart';
@@ -45,6 +46,7 @@ class AppRoutes {
   static const String myOrderview = '/my-order';
   static const String myShippingAddressview = '/my_shipping_address';
   static const String myBankAccountview = '/my_bank_account';
+  static const String employerHome = '/employer-home';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -64,9 +66,18 @@ class AppRoutes {
     changeDateofBirth: (context) => const ChangeDateOfBirthScreen(),
     myShippingAddressview: (context) => MyShippingAddressScreen(),
     myBankAccountview: (context) => MyBankAccountScreen(),
+    employerHome: (context) => const EmployerMainNavigationScreen(),
     verifyEmail: (context) {
-      final String email = ModalRoute.of(context)!.settings.arguments as String;
-      return VerifyEmailScreen(email: email);
+      final args = ModalRoute.of(context)!.settings.arguments;
+      String email = '';
+      String role = 'candidate';
+      if (args is Map) {
+        email = args['email'] as String? ?? '';
+        role = args['role'] as String? ?? 'candidate';
+      } else if (args is String) {
+        email = args;
+      }
+      return VerifyEmailScreen(email: email, role: role);
     },
     registerSuccess: (context) => const RegisterSuccessScreen(),
     resetEmailSent: (context) {
