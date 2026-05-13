@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'employer_home_screen.dart';
+import '../menu_employer/employer_menu_screen.dart';
 
 // ── Màu employer ───────────────────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -15,7 +16,7 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
   int _currentIndex = 1; // home là trung tâm (index 1)
 
   final List<Widget> _screens = [
-    const _PlaceholderScreen('Danh mục'),
+    const EmployerMenuScreen(),
     const EmployerHomeScreen(),
     const _PlaceholderScreen('Cá nhân'),
   ];

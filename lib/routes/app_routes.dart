@@ -2,6 +2,14 @@ import 'package:viecnow/screens/auth/forget_password_screen.dart';
 import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
 import 'package:viecnow/screens/post/post_management_screen.dart';
 import 'package:viecnow/screens/post/create_post_screen.dart';
+import 'package:viecnow/screens/menu_employer/employer_menu_screen.dart';
+import 'package:viecnow/screens/menu_employer/employer_messages_screen.dart';
+import 'package:viecnow/screens/menu_employer/attendance_tool_screen.dart';
+import 'package:viecnow/screens/menu_employer/schedule_tool_screen.dart';
+import 'package:viecnow/screens/menu_employer/rating_tool_screen.dart';
+import 'package:viecnow/screens/menu_employer/employer_report_screen.dart';
+import 'package:viecnow/screens/menu_employer/employer_groups_screen.dart';
+import 'package:viecnow/screens/menu_employer/employer_wallet_screen.dart';
 import 'package:viecnow/screens/auth/login_screen.dart';
 import 'package:viecnow/screens/auth/register_screen.dart';
 import 'package:viecnow/screens/auth/register_success_screen.dart';
@@ -51,6 +59,13 @@ class AppRoutes {
   static const String employerHome = '/employer-home';
   static const String postManagement = '/post-management';
   static const String createPost = '/create-post';
+  static const String employerMessages = '/employer-messages';
+  static const String attendanceTool = '/attendance-tool';
+  static const String scheduleTool = '/schedule-tool';
+  static const String ratingTool = '/rating-tool';
+  static const String employerReport = '/employer-report';
+  static const String employerGroups = '/employer-groups';
+  static const String employerWallet = '/employer-wallet';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -73,6 +88,13 @@ class AppRoutes {
     employerHome: (context) => const EmployerMainNavigationScreen(),
     postManagement: (context) => const PostManagementScreen(),
     createPost: (context) => const CreatePostScreen(),
+    employerMessages: (context) => const EmployerMessagesScreen(),
+    attendanceTool: (context) => const AttendanceToolScreen(),
+    scheduleTool: (context) => const ScheduleToolScreen(),
+    ratingTool: (context) => const RatingToolScreen(),
+    employerReport: (context) => const EmployerReportScreen(),
+    employerGroups: (context) => const EmployerGroupsScreen(),
+    employerWallet: (context) => const EmployerWalletScreen(),
     verifyEmail: (context) {
       final args = ModalRoute.of(context)!.settings.arguments;
       String email = '';
