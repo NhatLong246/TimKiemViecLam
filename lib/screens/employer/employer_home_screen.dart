@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../routes/app_routes.dart';
 
 // ── Màu employer (tím → xanh) ──────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -228,9 +230,16 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   Widget _buildToolItem(Map<String, dynamic> tool) {
-    return SizedBox(
-      width: 72,
-      child: Column(
+    final label = tool['label'] as String;
+    return GestureDetector(
+      onTap: () {
+        if (label == 'B\u00e0i \u0111\u0103ng') {
+          Get.toNamed(AppRoutes.postManagement);
+        }
+      },
+      child: SizedBox(
+        width: 72,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -272,6 +281,7 @@ class EmployerHomeScreen extends StatelessWidget {
           ),
         ),
       ],
+        ),
       ),
     );
   }

@@ -44,3 +44,4 @@
 | Ngày | Feature hoàn thành | Thay đổi chính |
 |---|---|---|
 | 2026-05-11 | E1 — Employer Home / Quản lý | Tạo `screens/employer/employer_home_screen.dart`, `employer_main_navigation_screen.dart`. Thêm route `employerHome` vào `app_routes.dart` |
+| 2026-05-13 | E2 — Quản lý Bài đăng | Tạo `data/models/job_post_model.dart`, `data/services/job_post_service.dart`, `controller/job_post_controller.dart`, `screens/post/post_management_screen.dart`, `screens/post/create_post_screen.dart`. Thêm route `postManagement`, `createPost`. Kết nối nút "Bài đăng" trong employer_home_screen. |

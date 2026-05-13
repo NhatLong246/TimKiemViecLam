@@ -1,5 +1,7 @@
 import 'package:viecnow/screens/auth/forget_password_screen.dart';
 import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
+import 'package:viecnow/screens/post/post_management_screen.dart';
+import 'package:viecnow/screens/post/create_post_screen.dart';
 import 'package:viecnow/screens/auth/login_screen.dart';
 import 'package:viecnow/screens/auth/register_screen.dart';
 import 'package:viecnow/screens/auth/register_success_screen.dart';
@@ -47,6 +49,8 @@ class AppRoutes {
   static const String myShippingAddressview = '/my_shipping_address';
   static const String myBankAccountview = '/my_bank_account';
   static const String employerHome = '/employer-home';
+  static const String postManagement = '/post-management';
+  static const String createPost = '/create-post';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -67,6 +71,8 @@ class AppRoutes {
     myShippingAddressview: (context) => MyShippingAddressScreen(),
     myBankAccountview: (context) => MyBankAccountScreen(),
     employerHome: (context) => const EmployerMainNavigationScreen(),
+    postManagement: (context) => const PostManagementScreen(),
+    createPost: (context) => const CreatePostScreen(),
     verifyEmail: (context) {
       final args = ModalRoute.of(context)!.settings.arguments;
       String email = '';
