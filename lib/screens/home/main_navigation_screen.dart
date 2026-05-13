@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import '../profile/profile_screen.dart';
+import '../chatbot/chatbot_screen.dart';
+import '../../widgets/floating_chat_button.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -24,7 +26,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: Stack(
+        children: [_screens[_currentIndex], const FloatingChatButton()],
+      ),
       extendBody: true,
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -194,6 +198,12 @@ class _DashboardPlaceholder extends StatelessWidget {
       Color(0xFFD81B60),
       Color(0xFFFCE4EC),
     ),
+    _MenuItem(
+      Icons.smart_toy_outlined,
+      'Trợ lý AI',
+      Color(0xFF00838F),
+      Color(0xFFE0F7FA),
+    ),
   ];
 
   @override
@@ -222,7 +232,9 @@ class _DashboardPlaceholder extends StatelessWidget {
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 14,
                 childAspectRatio: 1.55,
-                children: _items.map((item) => _buildCard(item)).toList(),
+                children: _items
+                    .map((item) => _buildCard(context, item))
+                    .toList(),
               ),
             ],
           ),
@@ -231,42 +243,50 @@ class _DashboardPlaceholder extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(_MenuItem item) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: item.bgColor,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: item.iconColor.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+  Widget _buildCard(BuildContext context, _MenuItem item) {
+    return GestureDetector(
+      onTap: item.label == 'Trợ lý AI'
+          ? () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+            )
+          : null,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: item.bgColor,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: item.iconColor.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Icon(item.icon, size: 22, color: item.iconColor),
             ),
-            child: Icon(item.icon, size: 22, color: item.iconColor),
-          ),
-          Text(
-            item.label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: item.iconColor,
+            Text(
+              item.label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: item.iconColor,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
