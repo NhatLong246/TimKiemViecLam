@@ -1,5 +1,10 @@
+import 'package:viecnow/screens/employer/employer_reviews_screen.dart';
+import 'package:viecnow/screens/employer/employer_login_history_screen.dart';
+import 'package:viecnow/screens/employer/employer_candidates_screen.dart';
 import 'package:viecnow/screens/auth/forget_password_screen.dart';
 import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
+import 'package:viecnow/screens/reference/employer_market_rate_screen.dart';
+import 'package:viecnow/screens/stats/employer_stats_screen.dart';
 import 'package:viecnow/screens/auth/login_screen.dart';
 import 'package:viecnow/screens/auth/register_screen.dart';
 import 'package:viecnow/screens/auth/register_success_screen.dart';
@@ -47,6 +52,11 @@ class AppRoutes {
   static const String myShippingAddressview = '/my_shipping_address';
   static const String myBankAccountview = '/my_bank_account';
   static const String employerHome = '/employer-home';
+  static const String employerReference = '/employer-reference';
+  static const String employerStats = '/employer-stats';
+  static const String employerReviews = '/employer-reviews';
+  static const String employerLoginHistory = '/employer-login-history';
+  static const String employerCandidates = '/employer-candidates';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -67,6 +77,11 @@ class AppRoutes {
     myShippingAddressview: (context) => MyShippingAddressScreen(),
     myBankAccountview: (context) => MyBankAccountScreen(),
     employerHome: (context) => const EmployerMainNavigationScreen(),
+    employerReference: (context) => const EmployerMarketRateScreen(),
+    employerStats: (context) => const EmployerStatsScreen(),
+    employerReviews: (context) => const EmployerReviewsScreen(),
+    employerLoginHistory: (context) => const EmployerLoginHistoryScreen(),
+    employerCandidates: (context) => const EmployerCandidatesScreen(),
     verifyEmail: (context) {
       final args = ModalRoute.of(context)!.settings.arguments;
       String email = '';

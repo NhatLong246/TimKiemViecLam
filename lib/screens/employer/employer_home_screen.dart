@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:viecnow/routes/app_routes.dart';
 
 // ── Màu employer (tím → xanh) ──────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -10,10 +12,10 @@ class EmployerHomeScreen extends StatelessWidget {
 
   // ── Mock data ──────────────────────────────────────────────────────────────
   static const _quickTools = [
-    {'asset': 'assets/images/icons/icons8-open-book-100 (1).png', 'label': 'Tham khảo'},
-    {'asset': 'assets/images/icons/icons8-column-chart-100.png', 'label': 'Thống kê'},
-    {'asset': 'assets/images/icons/icons8-cv-100.png', 'label': 'Ứng viên'},
-    {'asset': 'assets/images/icons/icons8-create-post-64.png', 'label': 'Bài đăng'},
+    {'asset': 'assets/images/icons/icons8-open-book-100 (1).png', 'label': 'Tham khảo', 'route': AppRoutes.employerReference},
+    {'asset': 'assets/images/icons/icons8-column-chart-100.png', 'label': 'Thống kê', 'route': AppRoutes.employerStats},
+    {'asset': 'assets/images/icons/icons8-cv-100.png', 'label': 'Ứng viên', 'route': AppRoutes.employerCandidates},
+    {'asset': 'assets/images/icons/icons8-create-post-64.png', 'label': 'Bài đăng', 'route': ''},
   ];
 
   static final _myJobs = [
@@ -228,7 +230,10 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   Widget _buildToolItem(Map<String, dynamic> tool) {
-    return SizedBox(
+    final route = tool['route'] as String? ?? '';
+    return GestureDetector(
+      onTap: route.isNotEmpty ? () => Get.toNamed(route) : null,
+      child: SizedBox(
       width: 72,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -272,6 +277,7 @@ class EmployerHomeScreen extends StatelessWidget {
           ),
         ),
       ],
+      ),
       ),
     );
   }

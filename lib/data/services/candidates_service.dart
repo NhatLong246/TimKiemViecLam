@@ -1,0 +1,133 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/application_model.dart';
+import '../models/job_post_model.dart';
+
+class CandidatesService {
+  final _db = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
+
+  // ── Fetch tất cả job theo loại + đơn ứng tuyển của employer ──────────────
+  /// Trả về danh sách job (theo jobType) kèm đơn ứng tuyển đã join với thông
+  /// tin ứng viên. Thực hiện 3 round-trip (jobs → applications → users).
+  Future<List<JobWithApplications>> fetchByJobType(String jobType) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return [];
+
+    // 1. Lấy job của employer theo loại (active/approved/closed)
+    final jobsSnap = await _db
+        .collection('jobPosts')
+        .where('employerId', isEqualTo: uid)
+        .where('jobType', isEqualTo: jobType)
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    if (jobsSnap.docs.isEmpty) return [];
+
+    final jobs = jobsSnap.docs
+        .map((d) => JobPostModel.fromMap(d.data()))
+        .toList();
+
+    final jobIds = jobs.map((j) => j.jobId).toList();
+
+    // 2. Lấy tất cả đơn ứng tuyển cho các job này (batch 30 do Firestore limit)
+    final List<ApplicationModel> allApps = [];
+    for (var i = 0; i < jobIds.length; i += 30) {
+      final end = (i + 30).clamp(0, jobIds.length);
+      final batch = jobIds.sublist(i, end);
+      final snap = await _db
+          .collection('applications')
+          .where('jobId', whereIn: batch)
+          .get();
+      allApps.addAll(snap.docs.map((d) => ApplicationModel.fromMap(d.data())));
+    }
+
+    if (allApps.isEmpty) {
+      return jobs
+          .map((j) => JobWithApplications(job: j, entries: []))
+          .toList();
+    }
+
+    // 3. Lấy thông tin ứng viên (batch 30)
+    final candidateIds = allApps.map((a) => a.candidateId).toSet().toList();
+    final Map<String, CandidateSnapshot> candidateMap = {};
+    for (var i = 0; i < candidateIds.length; i += 30) {
+      final end = (i + 30).clamp(0, candidateIds.length);
+      final batch = candidateIds.sublist(i, end);
+      final snap = await _db
+          .collection('users')
+          .where(FieldPath.documentId, whereIn: batch)
+          .get();
+      for (final doc in snap.docs) {
+        candidateMap[doc.id] =
+            CandidateSnapshot.fromMap(doc.id, doc.data());
+      }
+    }
+
+    // 4. Group đơn theo jobId
+    final Map<String, List<ApplicationEntry>> appsByJob = {};
+    for (final app in allApps) {
+      final candidate = candidateMap[app.candidateId];
+      if (candidate == null) continue; // bỏ qua nếu user đã bị xóa
+      appsByJob
+          .putIfAbsent(app.jobId, () => [])
+          .add(ApplicationEntry(application: app, candidate: candidate));
+    }
+
+    // 5. Sort entries: pending → accepted → rejected → withdrawn
+    const _statusOrder = {
+      'pending': 0,
+      'accepted': 1,
+      'rejected': 2,
+      'withdrawn': 3
+    };
+    appsByJob.forEach((_, entries) {
+      entries.sort((a, b) =>
+          (_statusOrder[a.application.status] ?? 4)
+              .compareTo(_statusOrder[b.application.status] ?? 4));
+    });
+
+    return jobs.map((job) {
+      return JobWithApplications(
+        job: job,
+        entries: appsByJob[job.jobId] ?? [],
+      );
+    }).toList();
+  }
+
+  // ── Duyệt đơn: set status='accepted' + tăng filledSlots ─────────────────
+  Future<void> acceptApplication(String appId, String jobId) async {
+    final batch = _db.batch();
+    batch.update(_db.collection('applications').doc(appId), {
+      'status': 'accepted',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(_db.collection('jobPosts').doc(jobId), {
+      'filledSlots': FieldValue.increment(1),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  // ── Từ chối đơn ─────────────────────────────────────────────────────────
+  Future<void> rejectApplication(String appId) async {
+    await _db.collection('applications').doc(appId).update({
+      'status': 'rejected',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ── Huỷ duyệt (accepted → pending), giảm filledSlots ────────────────────
+  Future<void> revokeAcceptance(String appId, String jobId) async {
+    final batch = _db.batch();
+    batch.update(_db.collection('applications').doc(appId), {
+      'status': 'pending',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(_db.collection('jobPosts').doc(jobId), {
+      'filledSlots': FieldValue.increment(-1),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+  }
+}
