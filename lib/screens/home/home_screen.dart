@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../notification/notification_screen.dart';
+import '../../widgets/weather_widget.dart';
 
 const Color _primary = Color(0xFF2E7D32);
 const Color _primaryDark = Color(0xFF1B5E20);
@@ -153,26 +154,33 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationScreen(),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const WeatherWidget(),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationScreen(),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.notifications_none,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                    child: const Icon(
-                      Icons.notifications_none,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),

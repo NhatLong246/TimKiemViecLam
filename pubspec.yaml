@@ -44,6 +44,7 @@ dependencies:
   flutter_facebook_auth: ^7.1.1
   sqflite: ^2.4.2
   path: ^1.9.1
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
