@@ -19,14 +19,21 @@ class CandidatesService {
         .collection('jobPosts')
         .where('employerId', isEqualTo: uid)
         .where('jobType', isEqualTo: jobType)
-        .orderBy('createdAt', descending: true)
         .get();
 
     if (jobsSnap.docs.isEmpty) return [];
 
     final jobs = jobsSnap.docs
         .map((d) => JobPostModel.fromMap(d.data()))
-        .toList();
+        .toList()
+      ..sort((a, b) {
+        final aTime = a.createdAt;
+        final bTime = b.createdAt;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
 
     final jobIds = jobs.map((j) => j.jobId).toList();
 
