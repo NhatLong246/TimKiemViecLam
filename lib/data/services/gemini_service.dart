@@ -4,7 +4,7 @@ import '../models/chat_message.dart';
 
 class GeminiService {
   // Lấy API key miễn phí tại https://openrouter.ai/keys
-  static const String _apiKey = '';
+  static const String _apiKey = String.fromEnvironment('OPENROUTER_API_KEY');
   static const String _model = 'z-ai/glm-4.5-air:free';
   static const String _baseUrl =
       'https://openrouter.ai/api/v1/chat/completions';
@@ -38,11 +38,12 @@ GIỚI HẠN:
 
   Future<String> sendMessage(
     List<ChatMessage> history,
-    String newMessage,
-  ) async {
+    String newMessage, {
+    ChatAttachment? attachment,
+  }) async {
     final uri = Uri.parse(_baseUrl);
 
-    final messages = <Map<String, String>>[
+    final messages = <Map<String, dynamic>>[
       {'role': 'system', 'content': _systemPrompt},
     ];
 
@@ -52,14 +53,11 @@ GIỚI HẠN:
     if (firstUserIdx >= 0) {
       for (final msg in history.sublist(firstUserIdx)) {
         if (msg.isTyping) continue;
-        messages.add({
-          'role': msg.role == MessageRole.user ? 'user' : 'assistant',
-          'content': msg.text,
-        });
+        messages.add(_buildMessagePayload(msg));
       }
     }
 
-    messages.add({'role': 'user', 'content': newMessage});
+    messages.add(_buildUserPayload(newMessage, attachment));
 
     final body = jsonEncode({
       'model': _model,
@@ -123,5 +121,49 @@ GIỚI HẠN:
       } catch (_) {}
       throw Exception('Lỗi kết nối (${response.statusCode}). $detail');
     }
+  }
+
+  Map<String, dynamic> _buildMessagePayload(ChatMessage msg) {
+    if (msg.role == MessageRole.bot || msg.attachment == null) {
+      return {
+        'role': msg.role == MessageRole.user ? 'user' : 'assistant',
+        'content': msg.text,
+      };
+    }
+
+    return _buildUserPayload(msg.text, msg.attachment);
+  }
+
+  Map<String, dynamic> _buildUserPayload(
+    String text,
+    ChatAttachment? attachment,
+  ) {
+    if (attachment == null) {
+      return {'role': 'user', 'content': text};
+    }
+
+    if (attachment.type == ChatAttachmentType.image &&
+        attachment.base64Data != null) {
+      return {
+        'role': 'user',
+        'content': [
+          {'type': 'text', 'text': text},
+          {
+            'type': 'image_url',
+            'image_url': {
+              'url':
+                  'data:${attachment.mimeType ?? 'image/jpeg'};base64,${attachment.base64Data}',
+            },
+          },
+        ],
+      };
+    }
+
+    final fileText = attachment.textContent ?? '';
+    return {
+      'role': 'user',
+      'content':
+          '$text\n\nNội dung file "${attachment.name}":\n```\n$fileText\n```',
+    };
   }
 }

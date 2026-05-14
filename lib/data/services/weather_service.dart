@@ -4,7 +4,7 @@ import '../models/weather_model.dart';
 
 class WeatherService {
   // ⚠️ Thay YOUR_API_KEY bằng API key của bạn từ https://openweathermap.org/api
-  static const String _apiKey = '6e111b9deaa647f1a84135085a33042f';
+  static const String _apiKey = String.fromEnvironment('OPENWEATHER_API_KEY');
   static const String _baseUrl =
       'https://api.openweathermap.org/data/2.5/weather';
 
