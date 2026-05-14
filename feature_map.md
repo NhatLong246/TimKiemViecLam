@@ -66,14 +66,14 @@
 | E6 | Quản lý nhân viên đang làm | `screens/employer/manage_employees_screen.dart` | ❌ | Tính lương, theo dõi |
 | E7 | Điểm danh | `screens/employer/attendance_screen.dart` | ❌ | Theo giờ setup, check trễ/đúng |
 | E8 | Lịch làm việc | `screens/employer/employer_schedule_screen.dart` | ❌ | Thêm lịch vào group chat |
-| E9 | Thống kê chi tiêu | `screens/employer/employer_stats_screen.dart` | ❌ | |
+| E9 | Thống kê chi tiêu | `screens/stats/employer_stats_screen.dart` | ✅ | Bar+Line+Area charts, filter Ngày/Tuần/Tháng/Năm, date range picker, 6 stat cards |
 | E10 | Xác nhận hoàn thành job | `controller/job_completion_controller.dart` | ❌ | 2 bên xác nhận |
 | E11 | Thanh toán lương | `controller/payment_controller.dart` | ❌ | Từ ví → tài khoản Candidate |
 | E12 | Xử lý tranh chấp | `screens/employer/dispute_screen.dart` | ❌ | Xác nhận từ Candidates khác |
 | E13 | Nạp tiền vào ví | `screens/wallet/deposit_screen.dart` | ❌ | |
 | E14 | Lịch sử giao dịch | `screens/wallet/transaction_history_screen.dart` | ❌ | |
 | E15 | Rút tiền | `screens/wallet/withdrawal_screen.dart` | ❌ | |
-| E16 | Tham khảo giá thị trường | `screens/reference/market_rate_screen.dart` | ❌ | Dùng chung với Candidate |
+| E16 | Tham khảo giá thị trường | `screens/reference/employer_market_rate_screen.dart` | ✅ | Employer: xem mặt bằng lương theo category + khu vực. Route: `/employer-reference` |
 | E17 | Đánh giá Candidate | `controller/review_controller.dart` | ❌ | |
 
 ---

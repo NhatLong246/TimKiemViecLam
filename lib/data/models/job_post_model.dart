@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 
 class JobPostModel {
   final String jobId;
@@ -47,6 +47,40 @@ class JobPostModel {
     this.updatedAt,
   });
 
+  int get remainingSlots => (slots - filledSlots).clamp(0, slots);
+  bool get isFull => remainingSlots == 0;
+
+  String get locationDisplay {
+    final district = location['district'] as String? ?? '';
+    final city = location['city'] as String? ?? '';
+    if (district.isNotEmpty && city.isNotEmpty) return '$district, $city';
+    return city.isNotEmpty ? city : (location['address'] as String? ?? '');
+  }
+
+  String get salaryDisplay {
+    final formatted = _formatNumber(salary.toInt());
+    switch (salaryType) {
+      case 'per_hour':
+        return '$formatted₫/giờ';
+      case 'per_day':
+        return '$formatted₫/ngày';
+      case 'per_month':
+        return '$formatted₫/tháng';
+      default:
+        return '$formatted₫';
+    }
+  }
+
+  static String _formatNumber(int n) {
+    final s = n.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(s[i]);
+    }
+    return buffer.toString();
+  }
+
   factory JobPostModel.fromMap(Map<String, dynamic> map) {
     DateTime _toDateTime(dynamic v) {
       if (v is Timestamp) return v.toDate();
@@ -93,45 +127,63 @@ class JobPostModel {
       'slots': slots,
       'filledSlots': filledSlots,
       'startDate': Timestamp.fromDate(startDate),
-      'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
-      'workHoursPerDay': workHoursPerDay,
-      'startTime': startTime,
-      'requirements': requirements,
+      if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
+      if (workHoursPerDay != null) 'workHoursPerDay': workHoursPerDay,
+      if (startTime != null) 'startTime': startTime,
+      if (requirements != null) 'requirements': requirements,
       'status': status,
       'totalBudget': totalBudget,
-      'groupChatId': groupChatId,
+      if (groupChatId != null) 'groupChatId': groupChatId,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
   JobPostModel copyWith({
-    String? status,
-    String? groupChatId,
+    String? jobId,
+    String? employerId,
+    String? title,
+    String? description,
+    String? category,
+    String? jobType,
+    Map<String, dynamic>? location,
+    double? salary,
+    String? salaryType,
+    int? slots,
     int? filledSlots,
+    DateTime? startDate,
+    DateTime? endDate,
+    double? workHoursPerDay,
+    String? startTime,
+    String? requirements,
+    String? status,
+    double? totalBudget,
+    String? groupChatId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return JobPostModel(
-      jobId: jobId,
-      employerId: employerId,
-      title: title,
-      description: description,
-      category: category,
-      jobType: jobType,
-      location: location,
-      salary: salary,
-      salaryType: salaryType,
-      slots: slots,
+      jobId: jobId ?? this.jobId,
+      employerId: employerId ?? this.employerId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      jobType: jobType ?? this.jobType,
+      location: location ?? this.location,
+      salary: salary ?? this.salary,
+      salaryType: salaryType ?? this.salaryType,
+      slots: slots ?? this.slots,
       filledSlots: filledSlots ?? this.filledSlots,
-      startDate: startDate,
-      endDate: endDate,
-      workHoursPerDay: workHoursPerDay,
-      startTime: startTime,
-      requirements: requirements,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      workHoursPerDay: workHoursPerDay ?? this.workHoursPerDay,
+      startTime: startTime ?? this.startTime,
+      requirements: requirements ?? this.requirements,
       status: status ?? this.status,
-      totalBudget: totalBudget,
+      totalBudget: totalBudget ?? this.totalBudget,
       groupChatId: groupChatId ?? this.groupChatId,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

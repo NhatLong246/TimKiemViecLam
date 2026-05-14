@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../routes/app_routes.dart';
+import 'package:viecnow/routes/app_routes.dart';
 
 // ── Màu employer (tím → xanh) ──────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -12,10 +12,10 @@ class EmployerHomeScreen extends StatelessWidget {
 
   // ── Mock data ──────────────────────────────────────────────────────────────
   static const _quickTools = [
-    {'asset': 'assets/images/icons/icons8-open-book-100 (1).png', 'label': 'Tham khảo'},
-    {'asset': 'assets/images/icons/icons8-column-chart-100.png', 'label': 'Thống kê'},
-    {'asset': 'assets/images/icons/icons8-cv-100.png', 'label': 'Ứng viên'},
-    {'asset': 'assets/images/icons/icons8-create-post-64.png', 'label': 'Bài đăng'},
+    {'asset': 'assets/images/icons/icons8-open-book-100 (1).png', 'label': 'Tham khảo', 'route': AppRoutes.employerReference},
+    {'asset': 'assets/images/icons/icons8-column-chart-100.png', 'label': 'Thống kê', 'route': AppRoutes.employerStats},
+    {'asset': 'assets/images/icons/icons8-cv-100.png', 'label': 'Ứng viên', 'route': AppRoutes.employerCandidates},
+    {'asset': 'assets/images/icons/icons8-create-post-64.png', 'label': 'Bài đăng', 'route': AppRoutes.postManagement},
   ];
 
   static final _myJobs = [
@@ -230,57 +230,53 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   Widget _buildToolItem(Map<String, dynamic> tool) {
-    final label = tool['label'] as String;
+    final route = tool['route'] as String? ?? '';
     return GestureDetector(
-      onTap: () {
-        if (label == 'B\u00e0i \u0111\u0103ng') {
-          Get.toNamed(AppRoutes.postManagement);
-        }
-      },
+      onTap: route.isNotEmpty ? () => Get.toNamed(route) : null,
       child: SizedBox(
         width: 72,
         child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: _gradientBegin,
-              end: _gradientEnd,
-              colors: _gradientColors,
-            ),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7B1FA2).withOpacity(0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: _gradientBegin,
+                end: _gradientEnd,
+                colors: _gradientColors,
               ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(11),
-            child: Image.asset(
-              tool['asset'] as String,
-              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7B1FA2).withOpacity(0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(11),
+              child: Image.asset(
+                tool['asset'] as String,
+                color: Colors.white,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 32,
-          child: Text(
-            tool['label'] as String,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF424242)),
-            maxLines: 2,
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 32,
+            child: Text(
+              tool['label'] as String,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF424242)),
+              maxLines: 2,
+            ),
           ),
-        ),
-      ],
+        ],
         ),
       ),
     );

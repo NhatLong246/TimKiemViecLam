@@ -13,9 +13,24 @@ class UserModel {
 	final String? avatarUrl;
 	final String? gender;
 	final DateTime? dateOfBirth;
+	final String? cccd;
+	final String? cccdImageUrl;   // mặt trước CCCD
+	final String? cccdBackImageUrl; // mặt sau CCCD
 	// Employer-only fields
 	final String? companyName;
 	final String? companyAddress;
+	final String? companyLogoUrl;
+	final String? companyPhone;
+	final String? companyWebsite;
+	final String? companyTaxCode;
+	final String? companySize;     // "1-9" | "10-49" | "50-199" | "200+"
+	final String? businessType;   // "individual" | "company" | "cooperative"
+	final String? companyDescription;
+	final double walletBalance;
+	final double totalSpent;
+	// Candidate-only fields
+	final double averageRating;
+	final int totalJobsDone;
 	final DateTime? createdAt;
 	final DateTime? updatedAt;
 
@@ -32,8 +47,22 @@ class UserModel {
 		this.avatarUrl,
 		this.gender,
 		this.dateOfBirth,
+		this.cccd,
+		this.cccdImageUrl,
+		this.cccdBackImageUrl,
 		this.companyName,
 		this.companyAddress,
+		this.companyLogoUrl,
+		this.companyPhone,
+		this.companyWebsite,
+		this.companyTaxCode,
+		this.companySize,
+		this.businessType,
+		this.companyDescription,
+		this.walletBalance = 0.0,
+		this.totalSpent = 0.0,
+		this.averageRating = 0.0,
+		this.totalJobsDone = 0,
 		this.createdAt,
 		this.updatedAt,
 	});
@@ -53,8 +82,22 @@ class UserModel {
 		String? avatarUrl,
 		String? gender,
 		DateTime? dateOfBirth,
+		String? cccd,
+		String? cccdImageUrl,
+		String? cccdBackImageUrl,
 		String? companyName,
 		String? companyAddress,
+		String? companyLogoUrl,
+		String? companyPhone,
+		String? companyWebsite,
+		String? companyTaxCode,
+		String? companySize,
+		String? businessType,
+		String? companyDescription,
+		double? walletBalance,
+		double? totalSpent,
+		double? averageRating,
+		int? totalJobsDone,
 		DateTime? createdAt,
 		DateTime? updatedAt,
 	}) {
@@ -71,8 +114,22 @@ class UserModel {
 			avatarUrl: avatarUrl ?? this.avatarUrl,
 			gender: gender ?? this.gender,
 			dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+			cccd: cccd ?? this.cccd,
+			cccdImageUrl: cccdImageUrl ?? this.cccdImageUrl,
+			cccdBackImageUrl: cccdBackImageUrl ?? this.cccdBackImageUrl,
 			companyName: companyName ?? this.companyName,
 			companyAddress: companyAddress ?? this.companyAddress,
+			companyLogoUrl: companyLogoUrl ?? this.companyLogoUrl,
+			companyPhone: companyPhone ?? this.companyPhone,
+			companyWebsite: companyWebsite ?? this.companyWebsite,
+			companyTaxCode: companyTaxCode ?? this.companyTaxCode,
+			companySize: companySize ?? this.companySize,
+			businessType: businessType ?? this.businessType,
+			companyDescription: companyDescription ?? this.companyDescription,
+			walletBalance: walletBalance ?? this.walletBalance,
+			totalSpent: totalSpent ?? this.totalSpent,
+			averageRating: averageRating ?? this.averageRating,
+			totalJobsDone: totalJobsDone ?? this.totalJobsDone,
 			createdAt: createdAt ?? this.createdAt,
 			updatedAt: updatedAt ?? this.updatedAt,
 		);
@@ -92,8 +149,20 @@ class UserModel {
 			'avatarUrl': avatarUrl,
 			'gender': gender,
 			'dateOfBirth': dateOfBirth,
+			if (cccd != null) 'cccd': cccd,
+			if (cccdImageUrl != null) 'cccdImageUrl': cccdImageUrl,
+			if (cccdBackImageUrl != null) 'cccdBackImageUrl': cccdBackImageUrl,
 			if (companyName != null) 'companyName': companyName,
 			if (companyAddress != null) 'companyAddress': companyAddress,
+			if (companyLogoUrl != null) 'companyLogoUrl': companyLogoUrl,
+			if (companyPhone != null) 'companyPhone': companyPhone,
+			if (companyWebsite != null) 'companyWebsite': companyWebsite,
+			if (companyTaxCode != null) 'companyTaxCode': companyTaxCode,
+			if (companySize != null) 'companySize': companySize,
+			if (businessType != null) 'businessType': businessType,
+			if (companyDescription != null) 'companyDescription': companyDescription,
+			'walletBalance': walletBalance,
+			'totalSpent': totalSpent,
 			'createdAt': createdAt ?? FieldValue.serverTimestamp(),
 			'updatedAt': FieldValue.serverTimestamp(),
 		};
@@ -113,8 +182,22 @@ class UserModel {
 			avatarUrl: map['avatarUrl']?.toString(),
 			gender: map['gender']?.toString(),
 			dateOfBirth: _parseDate(map['dateOfBirth']),
+			cccd: map['cccd']?.toString(),
+			cccdImageUrl: map['cccdImageUrl']?.toString(),
+			cccdBackImageUrl: map['cccdBackImageUrl']?.toString(),
 			companyName: map['companyName']?.toString(),
 			companyAddress: map['companyAddress']?.toString(),
+			companyLogoUrl: map['companyLogoUrl']?.toString(),
+			companyPhone: map['companyPhone']?.toString(),
+			companyWebsite: map['companyWebsite']?.toString(),
+			companyTaxCode: map['companyTaxCode']?.toString(),
+			companySize: map['companySize']?.toString(),
+			businessType: map['businessType']?.toString(),
+			companyDescription: map['companyDescription']?.toString(),
+			walletBalance: (map['walletBalance'] as num?)?.toDouble() ?? 0.0,
+			totalSpent: (map['totalSpent'] as num?)?.toDouble() ?? 0.0,
+			averageRating: (map['averageRating'] as num?)?.toDouble() ?? 0.0,
+			totalJobsDone: (map['totalJobsDone'] as num?)?.toInt() ?? 0,
 			createdAt: _parseDate(map['createdAt']),
 			updatedAt: _parseDate(map['updatedAt']),
 		);

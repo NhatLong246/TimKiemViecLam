@@ -4,11 +4,13 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../models/user_model.dart';
 import 'sqlite_cache_service.dart';
+import 'login_history_service.dart';
 
 class LoginAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final LoginHistoryService _history = LoginHistoryService();
 
   // ─── Email / Password ──────────────────────────────────────
 
@@ -21,7 +23,9 @@ class LoginAuthService {
       final User? firebaseUser = credential.user;
       if (firebaseUser == null) throw Exception('Không tìm thấy người dùng');
       if (!firebaseUser.emailVerified) throw Exception('Email not verified');
-      return await _fetchAndCacheUser(firebaseUser.uid);
+      final user = await _fetchAndCacheUser(firebaseUser.uid);
+      _history.recordLogin(method: 'email').ignore();
+      return user;
     } on FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e.code));
     }
@@ -67,7 +71,9 @@ class LoginAuthService {
         await docRef.set(newUser.toMap());
       }
 
-      return await _fetchAndCacheUser(firebaseUser.uid);
+      final user = await _fetchAndCacheUser(firebaseUser.uid);
+      _history.recordLogin(method: 'google').ignore();
+      return user;
     } on FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e.code));
     }
@@ -112,7 +118,9 @@ class LoginAuthService {
         await docRef.set(newUser.toMap());
       }
 
-      return await _fetchAndCacheUser(firebaseUser.uid);
+      final fbUser = await _fetchAndCacheUser(firebaseUser.uid);
+      _history.recordLogin(method: 'facebook').ignore();
+      return fbUser;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'account-exists-with-different-credential') {
         // Email đã tồn tại → thử link qua Google

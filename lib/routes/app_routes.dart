@@ -1,3 +1,6 @@
+import 'package:viecnow/screens/employer/employer_reviews_screen.dart';
+import 'package:viecnow/screens/employer/employer_login_history_screen.dart';
+import 'package:viecnow/screens/employer/employer_candidates_screen.dart';
 import 'package:viecnow/screens/auth/forget_password_screen.dart';
 import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
 import 'package:viecnow/screens/post/post_management_screen.dart';
@@ -10,6 +13,8 @@ import 'package:viecnow/screens/menu_employer/rating_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_report_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_groups_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_wallet_screen.dart';
+import 'package:viecnow/screens/reference/employer_market_rate_screen.dart';
+import 'package:viecnow/screens/stats/employer_stats_screen.dart';
 import 'package:viecnow/screens/auth/login_screen.dart';
 import 'package:viecnow/screens/auth/register_screen.dart';
 import 'package:viecnow/screens/auth/register_success_screen.dart';
@@ -66,6 +71,11 @@ class AppRoutes {
   static const String employerReport = '/employer-report';
   static const String employerGroups = '/employer-groups';
   static const String employerWallet = '/employer-wallet';
+  static const String employerReference = '/employer-reference';
+  static const String employerStats = '/employer-stats';
+  static const String employerReviews = '/employer-reviews';
+  static const String employerLoginHistory = '/employer-login-history';
+  static const String employerCandidates = '/employer-candidates';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -95,6 +105,11 @@ class AppRoutes {
     employerReport: (context) => const EmployerReportScreen(),
     employerGroups: (context) => const EmployerGroupsScreen(),
     employerWallet: (context) => const EmployerWalletScreen(),
+    employerReference: (context) => const EmployerMarketRateScreen(),
+    employerStats: (context) => const EmployerStatsScreen(),
+    employerReviews: (context) => const EmployerReviewsScreen(),
+    employerLoginHistory: (context) => const EmployerLoginHistoryScreen(),
+    employerCandidates: (context) => const EmployerCandidatesScreen(),
     verifyEmail: (context) {
       final args = ModalRoute.of(context)!.settings.arguments;
       String email = '';

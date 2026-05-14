@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'employer_home_screen.dart';
 import '../menu_employer/employer_menu_screen.dart';
+import 'employer_profile_screen.dart';
 
 // ── Màu employer ───────────────────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -18,7 +19,7 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
   final List<Widget> _screens = [
     const EmployerMenuScreen(),
     const EmployerHomeScreen(),
-    const _PlaceholderScreen('Cá nhân'),
+    const EmployerProfileScreen(),
   ];
 
   @override
@@ -61,7 +62,7 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
                   Opacity(
                     opacity: _currentIndex == 0 ? 1.0 : 0.35,
                     child: Image.asset(
-                      'assets/images/icons/icons8-dashboard-layout-48 (1).png',
+                      'assets/images/icons/icons8-dashboard-layout-48-1.png',
                       width: 26,
                       height: 26,
                     ),
@@ -125,7 +126,7 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
                   Opacity(
                     opacity: _currentIndex == 2 ? 1.0 : 0.35,
                     child: Image.asset(
-                      'assets/images/icons/icons8-avatar-48.png',
+                      'assets/images/icons/icons8-profile-48 (1).png',
                       width: 26,
                       height: 26,
                     ),

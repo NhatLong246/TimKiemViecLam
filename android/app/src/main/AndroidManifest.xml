@@ -1,5 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Đọc ảnh từ thư viện (Android < 13) -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- Đọc ảnh từ thư viện (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <!-- Cho phép truy vấn ý định chọn ảnh (Android 11+) -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.PICK_IMAGES" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="image/*" />
+        </intent>
+    </queries>
     <application
         android:label="viecnow"
         android:name="${applicationName}"
