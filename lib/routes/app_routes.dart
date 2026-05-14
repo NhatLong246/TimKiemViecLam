@@ -26,8 +26,14 @@ import 'package:viecnow/screens/profile/change_dateofbirth_screen.dart';
 import 'package:viecnow/screens/profile/change_email_screen.dart';
 import 'package:viecnow/screens/profile/change_gender_screen.dart';
 import 'package:viecnow/screens/profile/change_name_screen.dart';
-
-// import 'package:app_vlxd/screens/profile/change_password_screen.dart';
+import 'package:viecnow/screens/search/search_screen.dart';
+import 'package:viecnow/screens/search/search_results_screen.dart';
+import 'package:viecnow/screens/stats/candidate_stats_screen.dart';
+import 'package:viecnow/screens/profile/profile_screen.dart';
+import 'package:viecnow/screens/reference/market_rate_screen.dart';
+import 'package:viecnow/screens/schedule/candidate_schedule_screen.dart';
+import 'package:viecnow/screens/job/job_detail_screen.dart';
+import 'package:app_vlxd/screens/profile/change_password_screen.dart';
 import 'package:viecnow/screens/profile/change_phonenumber_screen.dart';
 import 'package:viecnow/screens/profile/change_username_screen.dart';
 import 'package:viecnow/screens/profile/job_criteria_screen.dart';
@@ -49,6 +55,12 @@ class AppRoutes {
   static const String registerSuccess = '/register-success';
   static const String home = '/home';
   static const String profile = '/profile';
+  static const String search = '/search';
+  static const String searchResults = '/search_results';
+  static const String reference = '/reference';
+  static const String jobDetail = '/job-detail';
+  static const String stats = '/stats';
+  static const String schedule = '/schedule';
   static const String publisher = '/publisher';
   static const String updateAccount = '/update-account';
   static const String myProfile = '/my-profile';
@@ -84,6 +96,13 @@ class AppRoutes {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
     home: (context) => const MainNavigationScreen(),
+    search: (context) => const SearchScreen(),
+    searchResults: (context) => const SearchResultsScreen(),
+    reference: (context) => const MarketRateScreen(),
+    jobDetail: (context) => const JobDetailScreen(),
+    stats: (context) => const CandidateStatsScreen(),
+    schedule: (context) => const CandidateScheduleScreen(),
+    profile: (context) => const ProfileScreen(),
     register: (context) => const RegisterScreen(),
     login: (context) => const LoginScreen(),
     forgetPassword: (context) => ForgetPasswordScreen(),
