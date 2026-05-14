@@ -68,8 +68,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     'Danh mục',
                     style: TextStyle(
                       fontSize: 10,
-                      color: _currentIndex == 0 ? _primary : Colors.grey.shade400,
-                      fontWeight: _currentIndex == 0 ? FontWeight.w600 : FontWeight.normal,
+                      color: _currentIndex == 0
+                          ? _primary
+                          : Colors.grey.shade400,
+                      fontWeight: _currentIndex == 0
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -131,8 +135,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     'Cá nhân',
                     style: TextStyle(
                       fontSize: 10,
-                      color: _currentIndex == 2 ? _primary : Colors.grey.shade400,
-                      fontWeight: _currentIndex == 2 ? FontWeight.w600 : FontWeight.normal,
+                      color: _currentIndex == 2
+                          ? _primary
+                          : Colors.grey.shade400,
+                      fontWeight: _currentIndex == 2
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -151,9 +159,7 @@ class _DashboardPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: Text('Danh mục', style: TextStyle(fontSize: 20)),
-      ),
+      body: Center(child: Text('Danh mục', style: TextStyle(fontSize: 20))),
     );
   }
 }
