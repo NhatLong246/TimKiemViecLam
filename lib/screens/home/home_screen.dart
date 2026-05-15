@@ -63,31 +63,45 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
+  Future<void> _onRefresh() async {
+    // Giả lập thời gian load data, sau này sẽ thay bằng gọi API fetch data mới
+    await Future.delayed(const Duration(seconds: 1));
+    setState(() {
+      // Cập nhật lại UI nếu cần
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(child: _buildQuickTools()),
-          SliverToBoxAdapter(child: _buildSectionHeader()),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            sliver: SliverGrid(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildJobCard(_jobs[index]),
-                childCount: _jobs.length,
-              ),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.62,
+      body: RefreshIndicator(
+        color: _primary,
+        onRefresh: _onRefresh,
+        child: CustomScrollView(
+          physics:
+              const AlwaysScrollableScrollPhysics(), // Đảm bảo luôn cuộn được để pull-to-refresh hoạt động ngay cả khi ít dữ liệu
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(child: _buildQuickTools()),
+            SliverToBoxAdapter(child: _buildSectionHeader()),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildJobCard(_jobs[index]),
+                  childCount: _jobs.length,
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.62,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
