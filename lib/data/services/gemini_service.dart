@@ -4,7 +4,7 @@ import '../models/chat_message.dart';
 
 class GeminiService {
   // Lấy API key miễn phí tại https://openrouter.ai/keys
-  static const String _apiKey = String.fromEnvironment('OPENROUTER_API_KEY');
+  static const String _apiKey = '';
   static const String _model = 'z-ai/glm-4.5-air:free';
   static const String _baseUrl =
       'https://openrouter.ai/api/v1/chat/completions';
