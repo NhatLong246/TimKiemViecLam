@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:viecnow/controller/employer_reference_controller.dart';
 
 class MarketRateScreen extends StatefulWidget {
   const MarketRateScreen({super.key});
@@ -9,75 +11,9 @@ class MarketRateScreen extends StatefulWidget {
 
 class _MarketRateScreenState extends State<MarketRateScreen> {
   final Color _primary = const Color(0xFF2E7D32);
-  String _selectedLocation = 'TP. Hồ Chí Minh';
-  String _searchQuery = '';
-
-  final List<Map<String, dynamic>> _mockRates = [
-    {
-      'title': 'Nhân viên phục vụ',
-      'category': 'Nhà hàng / Khách sạn',
-      'avg': '22.000đ',
-      'min': '18.000đ',
-      'max': '30.000đ',
-      'unit': '/ giờ',
-      'trend': 1.5, // Tăng 1.5%
-    },
-    {
-      'title': 'Pha chế (Barista)',
-      'category': 'Nhà hàng / Khách sạn',
-      'avg': '25.000đ',
-      'min': '20.000đ',
-      'max': '35.000đ',
-      'unit': '/ giờ',
-      'trend': 2.0,
-    },
-    {
-      'title': 'Bốc vác kho hàng',
-      'category': 'Lao động phổ thông',
-      'avg': '350.000đ',
-      'min': '250.000đ',
-      'max': '500.000đ',
-      'unit': '/ ngày',
-      'trend': 0.0,
-    },
-    {
-      'title': 'Giao hàng (Shipper)',
-      'category': 'Vận tải / Giao nhận',
-      'avg': '8.000đ',
-      'min': '5.000đ',
-      'max': '15.000đ',
-      'unit': '/ đơn',
-      'trend': -0.5, // Giảm 0.5%
-    },
-    {
-      'title': 'Tạp vụ / Giúp việc',
-      'category': 'Lao động phổ thông',
-      'avg': '50.000đ',
-      'min': '40.000đ',
-      'max': '70.000đ',
-      'unit': '/ giờ',
-      'trend': 1.2,
-    },
-    {
-      'title': 'Bảo vệ',
-      'category': 'An ninh / Bảo vệ',
-      'avg': '20.000đ',
-      'min': '17.000đ',
-      'max': '25.000đ',
-      'unit': '/ giờ',
-      'trend': 0.8,
-    },
-  ];
-
-  List<Map<String, dynamic>> get _filteredRates {
-    if (_searchQuery.isEmpty) return _mockRates;
-    return _mockRates.where((rate) {
-      final title = rate['title'].toString().toLowerCase();
-      final cat = rate['category'].toString().toLowerCase();
-      final query = _searchQuery.toLowerCase();
-      return title.contains(query) || cat.contains(query);
-    }).toList();
-  }
+  final EmployerReferenceController controller = Get.put(
+    EmployerReferenceController(),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -97,12 +33,16 @@ class _MarketRateScreenState extends State<MarketRateScreen> {
         iconTheme: const IconThemeData(color: Colors.black87),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildSearchBar(),
-          Expanded(child: _buildRatesList()),
-        ],
+      body: RefreshIndicator(
+        color: _primary,
+        onRefresh: controller.refresh,
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildSearchBar(),
+            Expanded(child: _buildRatesList()),
+          ],
+        ),
       ),
     );
   }
@@ -122,40 +62,42 @@ class _MarketRateScreenState extends State<MarketRateScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedLocation,
-                isDense: true,
-                icon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w600,
-                ),
-                items: ['Toàn quốc', 'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng']
-                    .map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    })
-                    .toList(),
-                onChanged: (newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedLocation = newValue;
-                    });
-                  }
-                },
+          Obx(() {
+            final cities = controller.availableCities;
+            // Map 'all' thành 'Toàn quốc'
+            final items = cities.map((city) {
+              return DropdownMenuItem<String>(
+                value: city,
+                child: Text(city == 'all' ? 'Toàn quốc' : city),
+              );
+            }).toList();
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
               ),
-            ),
-          ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: controller.filterCity.value,
+                  isDense: true,
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  items: items,
+                  onChanged: (newValue) {
+                    if (newValue != null) {
+                      controller.filterCity.value = newValue;
+                    }
+                  },
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -178,106 +120,127 @@ class _MarketRateScreenState extends State<MarketRateScreen> {
           ),
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
         ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
+        onChanged: controller.setSearchQuery,
       ),
     );
   }
 
-  Widget _buildRatesList() {
-    final rates = _filteredRates;
-    if (rates.isEmpty) {
-      return Center(
-        child: Text(
-          'Không tìm thấy công việc nào',
-          style: TextStyle(color: Colors.grey.shade500),
-        ),
-      );
+  String _formatVnd(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(amount % 1000000 == 0 ? 0 : 1)}tr';
     }
+    if (amount >= 1000) {
+      final k = (amount / 1000).round();
+      return '$k.000đ';
+    }
+    return '${amount.toStringAsFixed(0)}đ';
+  }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: rates.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final rate = rates[index];
-        final trend = rate['trend'] as double;
-        final isUp = trend > 0;
-        final isDown = trend < 0;
+  Widget _buildRatesList() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return Center(child: CircularProgressIndicator(color: _primary));
+      }
 
-        Color trendColor = Colors.grey.shade600;
-        IconData trendIcon = Icons.remove;
-
-        if (isUp) {
-          trendColor = Colors.green;
-          trendIcon = Icons.trending_up;
-        } else if (isDown) {
-          trendColor = Colors.red;
-          trendIcon = Icons.trending_down;
-        }
-
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+      if (controller.hasError.value) {
+        return Center(
+          child: Text(
+            controller.errorMessage.value,
+            style: const TextStyle(color: Colors.red),
           ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          rate['title'],
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+        );
+      }
+
+      final rates = controller.filteredItems;
+      if (rates.isEmpty) {
+        return Center(
+          child: Text(
+            'Không tìm thấy dữ liệu',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
+        );
+      }
+
+      return ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: rates.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final rate = rates[index];
+
+          Color trendColor;
+          IconData trendIcon;
+
+          if (rate.demandLevel == 'high') {
+            trendColor = Colors.green;
+            trendIcon = Icons.trending_up;
+          } else if (rate.demandLevel == 'medium') {
+            trendColor = Colors.orange;
+            trendIcon = Icons.trending_flat;
+          } else {
+            trendColor = Colors.red;
+            trendIcon = Icons.trending_down;
+          }
+
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            rate.categoryLabel,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          rate['category'],
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
+                          const SizedBox(height: 4),
+                          Text(
+                            rate.locationLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: trendColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(trendIcon, size: 14, color: trendColor),
-                        if (trend != 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: trendColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(trendIcon, size: 14, color: trendColor),
                           const SizedBox(width: 4),
                           Text(
-                            '${trend.abs()}%',
+                            rate.demandLabel,
                             style: TextStyle(
                               fontSize: 12,
                               color: trendColor,
@@ -285,101 +248,101 @@ class _MarketRateScreenState extends State<MarketRateScreen> {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(height: 1),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Thấp nhất',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatVnd(rate.minSalary),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(height: 1),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Thấp nhất',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        rate['min'],
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Trung bình',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            rate['avg'],
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: _primary,
-                            ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Trung bình',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _primary,
+                            fontWeight: FontWeight.w600,
                           ),
-                          Text(
-                            rate['unit'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _primary.withOpacity(0.7),
-                              fontWeight: FontWeight.w500,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              _formatVnd(rate.avgSalary),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _primary,
+                              ),
                             ),
+                            Text(
+                              rate.salaryTypeLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _primary.withOpacity(0.7),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Cao nhất',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Cao nhất',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        rate['max'],
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatVnd(rate.maxSalary),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    });
   }
 }
