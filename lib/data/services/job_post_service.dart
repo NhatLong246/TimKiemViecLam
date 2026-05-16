@@ -67,6 +67,32 @@ class JobPostService {
         });
   }
 
+  // ── Lấy danh sách việc làm mới nhất (cho ứng viên) ───────────────────────
+  Future<List<JobPostModel>> getLatestActiveJobs() async {
+    // Lấy các bài đăng ở trạng thái approved hoặc active
+    // Fetch riêng 2 query để tránh lỗi index
+    final futures = await Future.wait([
+      _db.collection(_collection).where('status', isEqualTo: 'approved').get(),
+      _db.collection(_collection).where('status', isEqualTo: 'active').get(),
+    ]);
+
+    final allDocs = [...futures[0].docs, ...futures[1].docs];
+    if (allDocs.isEmpty) return [];
+
+    final jobs = allDocs
+        .map((doc) => JobPostModel.fromMap(doc.data()))
+        .toList();
+
+    // Sắp xếp mới nhất trước
+    jobs.sort((a, b) {
+      final aTime = a.createdAt ?? DateTime(2000);
+      final bTime = b.createdAt ?? DateTime(2000);
+      return bTime.compareTo(aTime);
+    });
+
+    return jobs;
+  }
+
   // ── Cập nhật trạng thái bài đăng ─────────────────────────────────────────
   Future<void> updateStatus(String jobId, String status) async {
     await _db.collection(_collection).doc(jobId).update({
@@ -93,31 +119,5 @@ class JobPostService {
     final doc = await _db.collection(_collection).doc(jobId).get();
     if (!doc.exists) return null;
     return JobPostModel.fromMap(doc.data()!);
-  }
-
-  // ── Lấy danh sách việc làm mới nhất (cho ứng viên) ───────────────────────
-  Future<List<JobPostModel>> getLatestActiveJobs() async {
-    // Lấy các bài đăng ở trạng thái approved hoặc active
-    // Fetch riêng 2 query để tránh lỗi index
-    final futures = await Future.wait([
-      _db.collection(_collection).where('status', isEqualTo: 'approved').get(),
-      _db.collection(_collection).where('status', isEqualTo: 'active').get(),
-    ]);
-
-    final allDocs = [...futures[0].docs, ...futures[1].docs];
-    if (allDocs.isEmpty) return [];
-
-    final jobs = allDocs
-        .map((doc) => JobPostModel.fromMap(doc.data()))
-        .toList();
-
-    // Sắp xếp mới nhất trước
-    jobs.sort((a, b) {
-      final aTime = a.createdAt ?? DateTime(2000);
-      final bTime = b.createdAt ?? DateTime(2000);
-      return bTime.compareTo(aTime);
-    });
-
-    return jobs;
   }
 }

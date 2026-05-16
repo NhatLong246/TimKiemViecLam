@@ -38,7 +38,7 @@
 | # | Tính năng | Screen/File (dự kiến) | Status | Ghi chú |
 |---|---|---|---|---|
 | C1 | Feed công việc (Home) | `screens/job/job_feed_screen.dart` | ❌ | |
-| C2 | Tìm kiếm việc làm | `screens/job/job_search_screen.dart` | ❌ | Tìm theo category, lương, địa điểm |
+| C2 | Tìm kiếm việc làm | `screens/search/search_screen.dart` | ✅ | Tìm theo keyword, mức lương, khoảng cách (thành phố) |
 | C3 | Xem chi tiết công việc | `screens/job/job_detail_screen.dart` | ❌ | |
 | C4 | Ứng tuyển (part-time: đề xuất) | `controller/application_controller.dart` | ❌ | Kiểm tra duplicate `candidateId+jobId` |
 | C5 | Nộp CV (full-time) | `screens/job/apply_fulltime_screen.dart` | ❌ | Upload CV lên Firebase Storage |
