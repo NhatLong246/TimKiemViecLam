@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../controller/login_controller.dart';
+import '../../data/services/applications_service.dart';
+import '../messaging/conversation_list_screen.dart';
 
 class JobDetailScreen extends StatelessWidget {
   const JobDetailScreen({super.key});
@@ -205,16 +208,17 @@ class JobDetailScreen extends StatelessWidget {
                         border: Border.all(color: primaryColor),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.chat_bubble_outline, color: primaryColor),
+                      child: IconButton(
+                        icon: Icon(Icons.chat_bubble_outline, color: primaryColor),
+                        onPressed: () => _openMessages(context),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: SizedBox(
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // Gọi hàm ứng tuyển
-                          },
+                          onPressed: () => _apply(context, job),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                             shape: RoundedRectangleBorder(
@@ -237,6 +241,62 @@ class JobDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static void _openMessages(BuildContext context) {
+    final auth = Get.find<AuthController>();
+    if (auth.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để nhắn tin')),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ConversationListScreen()),
+    );
+  }
+
+  static Future<void> _apply(
+    BuildContext context,
+    Map<String, dynamic> job,
+  ) async {
+    final auth = Get.find<AuthController>();
+    if (auth.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để ứng tuyển')),
+      );
+      return;
+    }
+
+    final jobId = job['jobId']?.toString() ?? job['id']?.toString();
+    final employerId = job['employerId']?.toString();
+    if (jobId == null || jobId.isEmpty || employerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Thiếu mã tin tuyển dụng. Mở tin từ danh sách việc làm.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ApplicationsService().applyToJob(
+        jobId: jobId,
+        employerId: employerId,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã gửi đơn ứng tuyển')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    }
   }
 
   Widget _buildSection({required String title, required String content}) {

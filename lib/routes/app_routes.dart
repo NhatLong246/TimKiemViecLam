@@ -33,7 +33,7 @@ import 'package:viecnow/screens/profile/profile_screen.dart';
 import 'package:viecnow/screens/reference/market_rate_screen.dart';
 import 'package:viecnow/screens/schedule/candidate_schedule_screen.dart';
 import 'package:viecnow/screens/job/job_detail_screen.dart';
-// import 'package:viecnow/screens/profile/change_password_screen.dart';
+import 'package:viecnow/screens/profile/change_password_screen.dart';
 import 'package:viecnow/screens/profile/change_phonenumber_screen.dart';
 import 'package:viecnow/screens/profile/change_username_screen.dart';
 import 'package:viecnow/screens/profile/job_criteria_screen.dart';
@@ -110,7 +110,7 @@ class AppRoutes {
     myProfile: (context) => const MyProfileScreen(),
     changeName: (context) => const ChangeNameScreen(),
     changeUsername: (context) => const ChangeUsernameScreen(),
-    // changePassword: (context) => const ChangePasswordScreen(),
+    changePassword: (context) => const ChangePasswordScreen(),
     changeEmail: (context) => const ChangeEmailScreen(),
     changePhoneNumber: (context) => const ChangePhoneNumberScreen(),
     changeGender: (context) => const ChangeGenderScreen(),

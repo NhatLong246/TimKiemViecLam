@@ -10,6 +10,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  Get.put(AuthController());
+  final authController = Get.put(AuthController());
+  await authController.prepareSessionOnStartup();
   runApp(MyApp());
 }

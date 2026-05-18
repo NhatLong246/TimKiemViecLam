@@ -93,7 +93,9 @@ class _LoginScreenState extends State<LoginScreen>
         _passwordController.text.trim(),
       );
       await PreferencesHelper.saveRememberMe(
-          _rememberMe, _emailController.text.trim());
+        _rememberMe,
+        _emailController.text.trim(),
+      );
       if (mounted) {
         _navigateByRole(user.role);
       }
@@ -114,6 +116,7 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
     try {
       final user = await _authController.loginWithGoogle();
+      await PreferencesHelper.saveRememberMe(_rememberMe, user.email);
       if (mounted) {
         _navigateByRole(user.role);
       }
@@ -130,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
     try {
       final user = await _authController.loginWithFacebook();
+      await PreferencesHelper.saveRememberMe(_rememberMe, user.email);
       if (mounted) {
         _navigateByRole(user.role);
       }

@@ -7,7 +7,7 @@ class PreferencesHelper {
   static Future<void> saveRememberMe(bool rememberMe, String email) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool(rememberMeKey, rememberMe);
-    if (rememberMe) {
+    if (rememberMe && email.isNotEmpty) {
       await prefs.setString(emailKey, email);
     } else {
       await prefs.remove(emailKey);

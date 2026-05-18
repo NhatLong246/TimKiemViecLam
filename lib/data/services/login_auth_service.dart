@@ -7,9 +7,16 @@ import 'sqlite_cache_service.dart';
 import 'login_history_service.dart';
 
 class LoginAuthService {
+  /// Web client ID (client_type 3) — bắt buộc để Firebase nhận idToken trên Android.
+  static const String googleWebClientId =
+      '630246371829-h6gobgkjqc6re38hnas9tpat38b1363p.apps.googleusercontent.com';
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId: googleWebClientId,
+  );
   final LoginHistoryService _history = LoginHistoryService();
 
   // ─── Email / Password ──────────────────────────────────────
@@ -39,7 +46,15 @@ class LoginAuthService {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) throw Exception('Đăng nhập Google bị hủy');
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        throw Exception(
+          'Không lấy được token Google. Kiểm tra SHA-1 debug trong Firebase '
+          'và bật đăng nhập Google trong Authentication.',
+        );
+      }
+
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -48,34 +63,24 @@ class LoginAuthService {
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
       final User? firebaseUser = userCredential.user;
-      if (firebaseUser == null) throw Exception('Không thể đăng nhập với Google');
-
-      // Nếu là user mới → tạo document trong Firestore
-      final docRef = _firestore.collection('users').doc(firebaseUser.uid);
-      final docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        final displayName = firebaseUser.displayName ?? '';
-        final parts = displayName.split(' ');
-        final newUser = UserModel(
-          id: firebaseUser.uid,
-          role: 'candidate',
-          firstName: parts.isNotEmpty ? parts.last : '',
-          lastName: parts.length > 1 ? parts.sublist(0, parts.length - 1).join(' ') : '',
-          username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
-          email: firebaseUser.email ?? '',
-          phone: '',
-          isVerified: true,
-          isActive: true,
-          avatarUrl: firebaseUser.photoURL,
-        );
-        await docRef.set(newUser.toMap());
+      if (firebaseUser == null) {
+        throw Exception('Không thể đăng nhập với Google');
       }
 
-      final user = await _fetchAndCacheUser(firebaseUser.uid);
+      await firebaseUser.reload();
+      final activeUser = _auth.currentUser ?? firebaseUser;
+      await _ensureFirestoreUser(activeUser);
+
+      final user = await _fetchAndCacheUser(activeUser.uid);
       _history.recordLogin(method: 'google').ignore();
       return user;
     } on FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e.code));
+    } catch (e) {
+      final recovered = await restoreSessionFromFirebase();
+      if (recovered != null) return recovered;
+      if (e is Exception) rethrow;
+      throw Exception(e.toString());
     }
   }
 
@@ -143,6 +148,67 @@ class LoginAuthService {
       }
       throw Exception('[${e.code}] ${_mapAuthError(e.code)}');
     }
+  }
+
+  /// Khôi phục [UserModel] từ Firebase Auth + Firestore (sau khi mở lại app).
+  Future<UserModel?> restoreSessionFromFirebase() async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) return null;
+    try {
+      await _ensureFirestoreUser(firebaseUser);
+      return await _fetchAndCacheUser(firebaseUser.uid);
+    } catch (_) {
+      return _minimalUserFromFirebase(firebaseUser);
+    }
+  }
+
+  Future<void> _ensureFirestoreUser(User firebaseUser) async {
+    final docRef = _firestore.collection('users').doc(firebaseUser.uid);
+    final docSnap = await docRef.get();
+    if (docSnap.exists) {
+      final data = docSnap.data();
+      if (data != null && (data['uid'] ?? '').toString().isEmpty) {
+        await docRef.set({'uid': firebaseUser.uid}, SetOptions(merge: true));
+      }
+      return;
+    }
+
+    final displayName = firebaseUser.displayName ?? '';
+    final parts = displayName.split(' ').where((p) => p.isNotEmpty).toList();
+    final newUser = UserModel(
+      id: firebaseUser.uid,
+      role: 'candidate',
+      firstName: parts.isNotEmpty ? parts.last : '',
+      lastName: parts.length > 1
+          ? parts.sublist(0, parts.length - 1).join(' ')
+          : '',
+      username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
+      email: firebaseUser.email ?? '',
+      phone: '',
+      isVerified: true,
+      isActive: true,
+      avatarUrl: firebaseUser.photoURL,
+    );
+    await docRef.set(newUser.toMap(), SetOptions(merge: true));
+  }
+
+  UserModel _minimalUserFromFirebase(User firebaseUser) {
+    final displayName = firebaseUser.displayName ?? '';
+    final parts = displayName.split(' ').where((p) => p.isNotEmpty).toList();
+    return UserModel(
+      id: firebaseUser.uid,
+      role: 'candidate',
+      firstName: parts.isNotEmpty ? parts.last : 'Người',
+      lastName: parts.length > 1
+          ? parts.sublist(0, parts.length - 1).join(' ')
+          : 'dùng',
+      username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
+      email: firebaseUser.email ?? '',
+      phone: firebaseUser.phoneNumber ?? '',
+      isVerified: true,
+      isActive: true,
+      avatarUrl: firebaseUser.photoURL,
+    );
   }
 
   // ─── Logout ────────────────────────────────────────────────

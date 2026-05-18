@@ -19,6 +19,13 @@ class _EmployerMenuScreenState extends State<EmployerMenuScreen>
 
   static const _messageTools = [
     _MenuItem(
+      icon: Icons.inbox_outlined,
+      iconColor: Color(0xFF1565C0),
+      title: 'Hộp thư tin nhắn',
+      subtitle: 'Chat với ứng viên đã được nhận',
+      route: AppRoutes.employerMessages,
+    ),
+    _MenuItem(
       icon: Icons.how_to_reg_outlined,
       iconColor: Color(0xFF7B1FA2),
       title: 'Công cụ điểm danh',

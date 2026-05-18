@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:viecnow/controller/login_controller.dart';
+import 'package:viecnow/routes/app_routes.dart';
+import '../chatbot/chatbot_screen.dart';
+import '../messaging/conversation_list_screen.dart';
+import '../menu_candidate/candidate_benefits_screen.dart';
+import '../menu_candidate/candidate_groups_screen.dart';
+import '../menu_candidate/candidate_reviews_screen.dart';
 import 'home_screen.dart';
 import '../profile/profile_screen.dart';
-import '../chatbot/chatbot_screen.dart';
 import '../../widgets/floating_chat_button.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -51,7 +58,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       child: Row(
         children: [
-          // Tab 0: Danh mục
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -91,7 +97,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
           ),
-          // Tab 1: Home (floating center button)
           GestureDetector(
             onTap: () => setState(() => _currentIndex = 1),
             child: Transform.translate(
@@ -125,7 +130,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
           ),
-          // Tab 2: Profile
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -167,42 +171,50 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 class _DashboardPlaceholder extends StatelessWidget {
   const _DashboardPlaceholder();
 
+  static const Color _primary = Color(0xFF2E7D32);
+
   static const _items = [
     _MenuItem(
       Icons.message_outlined,
       'Message',
       Color(0xFF5C6BC0),
       Color(0xFFEDE7F6),
+      requiresAuth: true,
     ),
     _MenuItem(
       Icons.volunteer_activism_outlined,
       'Thụ hưởng',
       Color(0xFFEF6C00),
       Color(0xFFFFF3E0),
+      requiresAuth: true,
     ),
     _MenuItem(
       Icons.bar_chart_rounded,
       'Báo cáo',
       Color(0xFF00897B),
       Color(0xFFE0F2F1),
+      requiresAuth: true,
     ),
     _MenuItem(
       Icons.group_rounded,
       'Nhóm của bạn',
       Color(0xFF1E88E5),
       Color(0xFFE3F2FD),
+      requiresAuth: true,
     ),
     _MenuItem(
       Icons.star_rounded,
       'Đánh giá',
       Color(0xFFD81B60),
       Color(0xFFFCE4EC),
+      requiresAuth: true,
     ),
     _MenuItem(
       Icons.smart_toy_outlined,
       'Trợ lý AI',
       Color(0xFF00838F),
       Color(0xFFE0F7FA),
+      requiresAuth: false,
     ),
   ];
 
@@ -245,12 +257,7 @@ class _DashboardPlaceholder extends StatelessWidget {
 
   Widget _buildCard(BuildContext context, _MenuItem item) {
     return GestureDetector(
-      onTap: item.label == 'Trợ lý AI'
-          ? () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ChatbotScreen()),
-            )
-          : null,
+      onTap: item.tappable ? () => _onTap(context, item) : null,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -290,6 +297,104 @@ class _DashboardPlaceholder extends StatelessWidget {
       ),
     );
   }
+
+  void _onTap(BuildContext context, _MenuItem item) {
+    final auth = Get.find<AuthController>();
+    if (item.requiresAuth && auth.currentUser == null) {
+      _requireLogin(context);
+      return;
+    }
+
+    final Widget screen;
+    switch (item.label) {
+      case 'Message':
+        screen = const ConversationListScreen();
+        break;
+      case 'Thụ hưởng':
+        screen = const CandidateBenefitsScreen();
+        break;
+      case 'Báo cáo':
+        Navigator.pushNamed(context, AppRoutes.stats);
+        return;
+      case 'Nhóm của bạn':
+        screen = const CandidateGroupsScreen();
+        break;
+      case 'Đánh giá':
+        screen = const CandidateReviewsScreen();
+        break;
+      case 'Trợ lý AI':
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+        );
+        return;
+      default:
+        return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    );
+  }
+
+  void _requireLogin(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Icon(Icons.lock_outline, color: _primary, size: 48),
+            const SizedBox(height: 16),
+            const Text(
+              'Đăng nhập để tiếp tục',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bạn cần đăng nhập để dùng tính năng này.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF757575), fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(context, AppRoutes.login);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('Đăng nhập'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _MenuItem {
@@ -297,6 +402,15 @@ class _MenuItem {
   final String label;
   final Color iconColor;
   final Color bgColor;
+  final bool requiresAuth;
+  final bool tappable;
 
-  const _MenuItem(this.icon, this.label, this.iconColor, this.bgColor);
+  const _MenuItem(
+    this.icon,
+    this.label,
+    this.iconColor,
+    this.bgColor, {
+    this.requiresAuth = false,
+    this.tappable = true,
+  });
 }
