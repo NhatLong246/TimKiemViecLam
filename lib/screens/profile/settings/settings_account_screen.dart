@@ -21,6 +21,16 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
   static const Color _delete = Color(0xFFE53935);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await Get.find<UpdateAccountController>().syncEmailAfterVerification();
+      } catch (_) {}
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final controller = Get.put(UpdateAccountController());
 
@@ -106,9 +116,14 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
                       ),
                       const Divider(height: 1, color: Color(0xFFEDEDED)),
                       const SizedBox(height: 4),
-                      _infoRow(
+                      _updatableRow(
                         icon: Icons.person_outline,
                         value: displayName,
+                        verified: displayName != 'Chưa cập nhật',
+                        onUpdate: () => Navigator.pushNamed(
+                          context,
+                          AppRoutes.changeName,
+                        ),
                       ),
                       const Divider(height: 1, color: Color(0xFFEDEDED)),
                       _updatableRow(

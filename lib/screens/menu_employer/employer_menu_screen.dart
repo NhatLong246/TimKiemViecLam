@@ -44,7 +44,7 @@ class _EmployerMenuScreenState extends State<EmployerMenuScreen>
       iconColor: Color(0xFFF57F17),
       title: 'Công cụ đánh giá',
       subtitle: 'Đánh giá nhân viên sau ca làm',
-      route: AppRoutes.ratingTool,
+      route: AppRoutes.employerReviews,
     ),
   ];
 
@@ -54,7 +54,7 @@ class _EmployerMenuScreenState extends State<EmployerMenuScreen>
       iconColor: Color(0xFF2E7D32),
       title: 'Báo cáo',
       subtitle: 'Xem báo cáo tuyển dụng và chi phí',
-      route: AppRoutes.employerReport,
+      route: AppRoutes.employerStats,
     ),
     _MenuItem(
       icon: Icons.group_outlined,

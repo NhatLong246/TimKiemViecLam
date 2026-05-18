@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/routes/app_routes.dart';
+import 'package:viecnow/screens/notification/notification_screen.dart';
 
 // ── Màu employer (tím → xanh) ──────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -51,7 +52,7 @@ class EmployerHomeScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF2F4F8),
       body: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
+          SliverToBoxAdapter(child: _buildHeader(context)),
           SliverToBoxAdapter(child: _buildQuickTools()),
           SliverToBoxAdapter(child: _buildQuickStats()),
           SliverToBoxAdapter(child: _buildSectionTitle('Bài đăng tuyển dụng của bạn')),
@@ -70,7 +71,7 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
       decoration: const BoxDecoration(
@@ -103,34 +104,31 @@ class EmployerHomeScreen extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 22),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationScreen(),
                     ),
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF5252),
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
-                        child: const Center(
-                          child: Text('3', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                        child: const Icon(
+                          Icons.notifications_rounded,
+                          color: Colors.white,
+                          size: 22,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

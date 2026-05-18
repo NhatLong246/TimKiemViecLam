@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/job_post_model.dart';
 import 'messaging_service.dart';
+import 'notification_service.dart';
 
 class CandidatesService {
   final _db = FirebaseFirestore.instance;
@@ -132,6 +133,10 @@ class CandidatesService {
         employerId: employerId,
         candidateId: candidateId,
         applicationId: appId,
+      );
+      await NotificationService.notifyApplicationAccepted(
+        candidateId: candidateId,
+        jobTitle: jobTitle,
       );
     }
   }

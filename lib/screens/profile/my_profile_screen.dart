@@ -12,6 +12,7 @@ import 'project_screen.dart';
 import 'self_introduction_screen.dart';
 import 'skills_screen.dart';
 import 'work_experience_screen.dart';
+import 'settings/settings_account_screen.dart';
 
 class MyProfileScreen extends StatelessWidget {
   const MyProfileScreen({super.key});
@@ -136,7 +137,12 @@ class MyProfileScreen extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SettingsAccountScreen(),
+                  ),
+                ),
                 icon: const Icon(
                   Icons.edit_outlined,
                   color: Color(0xFF666666),

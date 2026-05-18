@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
+import 'notification_service.dart';
 
 class ApplicationsService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -48,6 +49,15 @@ class ApplicationsService {
     );
 
     await ref.set(model.toMap());
+
+    final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
+    final jobTitle = (jobSnap.data()?['title'] ?? 'Công việc').toString();
+    await NotificationService.notifyNewApplication(
+      employerId: employerId,
+      jobTitle: jobTitle,
+      candidateName: 'Ứng viên',
+    );
+
     return ref.id;
   }
 }

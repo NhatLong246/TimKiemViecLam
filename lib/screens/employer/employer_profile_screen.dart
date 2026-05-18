@@ -805,9 +805,7 @@ class _AccountSection extends StatelessWidget {
           icon: Icons.lock_outline,
           label: 'Đổi mật khẩu',
           iconColor: AppColors.employerPrimary,
-          onTap: () {
-            // TODO: navigate to change password
-          },
+          onTap: () => Get.toNamed(AppRoutes.changePassword),
         ),
         _MenuTile(
           icon: Icons.manage_history_outlined,

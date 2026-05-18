@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../data/services/notification_service.dart';
 
-/// Cài đặt nhận thông báo (lưu cục bộ).
+/// Cài đặt nhận thông báo — đồng bộ Firestore + cache cục bộ.
 class SettingsNotificationScreen extends StatefulWidget {
   const SettingsNotificationScreen({super.key});
 
@@ -15,6 +16,8 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
   static const _keySystem = 'notify_system';
   static const _keyPromo = 'notify_promo';
   static const _keyProfile = 'notify_profile';
+
+  final _service = NotificationService();
 
   bool _job = true;
   bool _system = true;
@@ -30,18 +33,33 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    Map<String, bool> remote = {};
+    try {
+      remote = await _service.loadPrefs();
+    } catch (_) {}
+
     setState(() {
-      _job = prefs.getBool(_keyJob) ?? true;
-      _system = prefs.getBool(_keySystem) ?? true;
-      _promo = prefs.getBool(_keyPromo) ?? false;
-      _profile = prefs.getBool(_keyProfile) ?? true;
+      _job = remote['job'] ?? prefs.getBool(_keyJob) ?? true;
+      _system = remote['system'] ?? prefs.getBool(_keySystem) ?? true;
+      _promo = remote['promo'] ?? prefs.getBool(_keyPromo) ?? false;
+      _profile = remote['profile'] ?? prefs.getBool(_keyProfile) ?? true;
       _loading = false;
     });
   }
 
-  Future<void> _set(String key, bool value) async {
+  Future<void> _saveAll() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
+    await prefs.setBool(_keyJob, _job);
+    await prefs.setBool(_keySystem, _system);
+    await prefs.setBool(_keyPromo, _promo);
+    await prefs.setBool(_keyProfile, _profile);
+
+    await _service.savePrefs({
+      'job': _job,
+      'system': _system,
+      'promo': _promo,
+      'profile': _profile,
+    });
   }
 
   @override
@@ -68,51 +86,67 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-              child: _SettingsCard(
-                child: Column(
-                  children: [
-                    _buildSwitch(
-                      title: 'Việc làm & ứng tuyển',
-                      subtitle: 'Cập nhật trạng thái hồ sơ, lời mời phỏng vấn',
-                      value: _job,
-                      onChanged: (v) async {
-                        setState(() => _job = v);
-                        await _set(_keyJob, v);
-                      },
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tùy chọn được lưu trên tài khoản. Thông báo trong app (hộp thư) '
+                    'hiển thị theo loại bạn bật.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                      height: 1.4,
                     ),
-                    const _SettingsDivider(),
-                    _buildSwitch(
-                      title: 'Hệ thống',
-                      subtitle: 'Bảo mật tài khoản, cập nhật ứng dụng',
-                      value: _system,
-                      onChanged: (v) async {
-                        setState(() => _system = v);
-                        await _set(_keySystem, v);
-                      },
+                  ),
+                  const SizedBox(height: 16),
+                  _SettingsCard(
+                    child: Column(
+                      children: [
+                        _buildSwitch(
+                          title: 'Việc làm & ứng tuyển',
+                          subtitle:
+                              'Trạng thái đơn, chấp nhận, nhắc nhở ca làm',
+                          value: _job,
+                          onChanged: (v) async {
+                            setState(() => _job = v);
+                            await _saveAll();
+                          },
+                        ),
+                        const _SettingsDivider(),
+                        _buildSwitch(
+                          title: 'Hệ thống',
+                          subtitle: 'Bảo mật, cập nhật ứng dụng',
+                          value: _system,
+                          onChanged: (v) async {
+                            setState(() => _system = v);
+                            await _saveAll();
+                          },
+                        ),
+                        const _SettingsDivider(),
+                        _buildSwitch(
+                          title: 'Khuyến mãi',
+                          subtitle: 'Ưu đãi và sự kiện từ ViecNow',
+                          value: _promo,
+                          onChanged: (v) async {
+                            setState(() => _promo = v);
+                            await _saveAll();
+                          },
+                        ),
+                        const _SettingsDivider(),
+                        _buildSwitch(
+                          title: 'Hồ sơ',
+                          subtitle: 'Gợi ý hoàn thiện hồ sơ',
+                          value: _profile,
+                          onChanged: (v) async {
+                            setState(() => _profile = v);
+                            await _saveAll();
+                          },
+                        ),
+                      ],
                     ),
-                    const _SettingsDivider(),
-                    _buildSwitch(
-                      title: 'Khuyến mãi',
-                      subtitle: 'Ưu đãi và sự kiện từ ViecNow',
-                      value: _promo,
-                      onChanged: (v) async {
-                        setState(() => _promo = v);
-                        await _set(_keyPromo, v);
-                      },
-                    ),
-                    const _SettingsDivider(),
-                    _buildSwitch(
-                      title: 'Hồ sơ',
-                      subtitle: 'Gợi ý hoàn thiện hồ sơ',
-                      value: _profile,
-                      onChanged: (v) async {
-                        setState(() => _profile = v);
-                        await _set(_keyProfile, v);
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
     );
