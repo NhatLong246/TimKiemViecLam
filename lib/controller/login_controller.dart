@@ -10,6 +10,15 @@ class AuthController extends GetxController {
 
   /// Mở app: chỉ giữ đăng nhập nếu đã tick **Ghi nhớ đăng nhập** lần trước.
   Future<void> prepareSessionOnStartup() async {
+    try {
+      await _prepareSessionOnStartupImpl().timeout(const Duration(seconds: 12));
+    } catch (_) {
+      currentUser = null;
+      update();
+    }
+  }
+
+  Future<void> _prepareSessionOnStartupImpl() async {
     final rememberMe = await PreferencesHelper.getRememberMe();
     if (!rememberMe) {
       if (FirebaseAuth.instance.currentUser != null) {

@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/job_post_model.dart';
+import 'sqlite_cache_service.dart';
 
 class JobPostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const _collection = 'jobPosts';
+  static const Duration _queryTimeout = Duration(seconds: 10);
 
   // ── Tạo bài đăng mới ───────────────────────────────────────────────────────
   Future<String> createJobPost(JobPostModel post) async {
@@ -69,21 +74,48 @@ class JobPostService {
 
   // ── Lấy danh sách việc làm mới nhất (cho ứng viên) ───────────────────────
   Future<List<JobPostModel>> getLatestActiveJobs() async {
-    // Lấy các bài đăng ở trạng thái approved hoặc active
-    // Fetch riêng 2 query để tránh lỗi index
+    try {
+      final jobs = await _fetchLatestFromFirestore();
+      if (jobs.isNotEmpty) {
+        await _cacheJobs(jobs);
+      }
+      return jobs;
+    } on TimeoutException {
+      final cached = await _fetchLatestFromSqlite();
+      if (cached.isNotEmpty) return cached;
+      throw Exception(
+        'Không kết nối được máy chủ (quá 10 giây). '
+        'Kiểm tra mạng trên emulator rồi kéo xuống để tải lại.',
+      );
+    } catch (_) {
+      final cached = await _fetchLatestFromSqlite();
+      if (cached.isNotEmpty) return cached;
+      throw Exception(
+        'Không tải được danh sách việc làm. Kiểm tra kết nối mạng và thử lại.',
+      );
+    }
+  }
+
+  Future<List<JobPostModel>> _fetchLatestFromFirestore() async {
+    const opts = GetOptions(source: Source.serverAndCache);
     final futures = await Future.wait([
-      _db.collection(_collection).where('status', isEqualTo: 'approved').get(),
-      _db.collection(_collection).where('status', isEqualTo: 'active').get(),
-    ]);
+      _db
+          .collection(_collection)
+          .where('status', isEqualTo: 'approved')
+          .get(opts),
+      _db
+          .collection(_collection)
+          .where('status', isEqualTo: 'active')
+          .get(opts),
+    ]).timeout(_queryTimeout);
 
     final allDocs = [...futures[0].docs, ...futures[1].docs];
     if (allDocs.isEmpty) return [];
 
     final jobs = allDocs
-        .map((doc) => JobPostModel.fromMap(doc.data()))
+        .map((doc) => JobPostModel.fromMap({...doc.data(), 'jobId': doc.id}))
         .toList();
 
-    // Sắp xếp mới nhất trước
     jobs.sort((a, b) {
       final aTime = a.createdAt ?? DateTime(2000);
       final bTime = b.createdAt ?? DateTime(2000);
@@ -91,6 +123,71 @@ class JobPostService {
     });
 
     return jobs;
+  }
+
+  Future<void> _cacheJobs(List<JobPostModel> jobs) async {
+    for (final job in jobs) {
+      await SqliteCacheService.upsertJob({
+        'jobId': job.jobId,
+        'employerId': job.employerId,
+        'title': job.title,
+        'category': job.category,
+        'jobType': job.jobType,
+        'location': jsonEncode(job.location),
+        'salary': job.salary,
+        'salaryType': job.salaryType,
+        'slots': job.slots,
+        'startDate': job.startDate.millisecondsSinceEpoch,
+        'status': job.status,
+      });
+    }
+  }
+
+  Future<List<JobPostModel>> _fetchLatestFromSqlite() async {
+    final rows = await SqliteCacheService.getCachedJobs();
+    final jobs = rows
+        .where((r) {
+          final s = r['status'] as String? ?? '';
+          return s == 'approved' || s == 'active';
+        })
+        .map(_jobFromCacheRow)
+        .toList();
+    jobs.sort((a, b) {
+      final aTime = a.createdAt ?? a.startDate;
+      final bTime = b.createdAt ?? b.startDate;
+      return bTime.compareTo(aTime);
+    });
+    return jobs;
+  }
+
+  JobPostModel _jobFromCacheRow(Map<String, dynamic> row) {
+    Map<String, dynamic> location = {};
+    final rawLocation = row['location'];
+    if (rawLocation is String && rawLocation.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawLocation);
+        if (decoded is Map<String, dynamic>) location = decoded;
+      } catch (_) {}
+    }
+
+    final startMs = row['startDate'] as int?;
+    return JobPostModel(
+      jobId: row['jobId'] as String? ?? '',
+      employerId: row['employerId'] as String? ?? '',
+      title: row['title'] as String? ?? '',
+      description: '',
+      category: row['category'] as String? ?? '',
+      jobType: row['jobType'] as String? ?? 'part_time',
+      location: location,
+      salary: (row['salary'] as num?)?.toDouble() ?? 0,
+      salaryType: row['salaryType'] as String? ?? 'per_day',
+      slots: (row['slots'] as num?)?.toInt() ?? 1,
+      startDate: startMs != null
+          ? DateTime.fromMillisecondsSinceEpoch(startMs)
+          : DateTime.now(),
+      status: row['status'] as String? ?? 'active',
+      totalBudget: 0,
+    );
   }
 
   // ── Cập nhật trạng thái bài đăng ─────────────────────────────────────────

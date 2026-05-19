@@ -22,19 +22,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 1;
   int _previousIndex = 1;
 
-  final List<Widget> _screens = [
-    const _DashboardPlaceholder(),
-    HomeScreen(),
-    const ProfileScreen(),
-  ];
-
   static const Color _primary = Color(0xFF2E7D32);
+
+  Widget _screenForIndex(int index) {
+    switch (index) {
+      case 0:
+        return const _DashboardPlaceholder();
+      case 1:
+        return const HomeScreen();
+      case 2:
+        return const ProfileScreen();
+      default:
+        return const HomeScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
-        children: [_screens[_currentIndex], const FloatingChatButton()],
+        children: [
+          _screenForIndex(_currentIndex),
+          const FloatingChatButton(),
+        ],
       ),
       extendBody: true,
       bottomNavigationBar: _buildBottomNav(),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -11,6 +13,9 @@ class LoginAuthService {
   static const String googleWebClientId =
       '630246371829-h6gobgkjqc6re38hnas9tpat38b1363p.apps.googleusercontent.com';
 
+  static const Duration _firestoreTimeout = Duration(seconds: 8);
+  static const Duration _authTimeout = Duration(seconds: 20);
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -23,18 +28,49 @@ class LoginAuthService {
 
   Future<UserModel> loginWithEmailPassword(String email, String password) async {
     try {
-      final UserCredential credential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential credential = await _auth
+          .signInWithEmailAndPassword(email: email, password: password)
+          .timeout(_authTimeout);
       final User? firebaseUser = credential.user;
       if (firebaseUser == null) throw Exception('Không tìm thấy người dùng');
-      if (!firebaseUser.emailVerified) throw Exception('Email not verified');
-      final user = await _fetchAndCacheUser(firebaseUser.uid);
+      await firebaseUser.reload();
+      final activeUser = _auth.currentUser ?? firebaseUser;
+      if (!activeUser.emailVerified) {
+        throw Exception('Email not verified');
+      }
+      final user = await _loadUserProfileAfterSignIn(activeUser);
       _history.recordLogin(method: 'email').ignore();
       return user;
+    } on TimeoutException {
+      throw Exception(
+        'Đăng nhập quá lâu. Kiểm tra mạng trên emulator (Wi‑Fi) và thử lại.',
+      );
     } on FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e.code));
+    }
+  }
+
+  /// Sau khi Auth thành công: lấy profile Firestore, fallback cache / tối thiểu.
+  Future<UserModel> _loadUserProfileAfterSignIn(User firebaseUser) async {
+    try {
+      return await _fetchAndCacheUser(firebaseUser.uid);
+    } catch (_) {
+      final cached = await SqliteCacheService.getCachedProfile(firebaseUser.uid);
+      if (cached != null) {
+        return UserModel(
+          id: firebaseUser.uid,
+          role: cached['role'] as String? ?? 'candidate',
+          firstName: cached['firstName'] as String? ?? '',
+          lastName: cached['lastName'] as String? ?? '',
+          username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
+          email: cached['email'] as String? ?? firebaseUser.email ?? '',
+          phone: cached['phone'] as String? ?? '',
+          isVerified: true,
+          isActive: true,
+          avatarUrl: cached['avatarUrl'] as String? ?? firebaseUser.photoURL,
+        );
+      }
+      return _minimalUserFromFirebase(firebaseUser);
     }
   }
 
@@ -158,13 +194,36 @@ class LoginAuthService {
       await _ensureFirestoreUser(firebaseUser);
       return await _fetchAndCacheUser(firebaseUser.uid);
     } catch (_) {
+      final cached = await SqliteCacheService.getCachedProfile(firebaseUser.uid);
+      if (cached != null) {
+        return UserModel(
+          id: firebaseUser.uid,
+          role: cached['role'] as String? ?? 'candidate',
+          firstName: cached['firstName'] as String? ?? '',
+          lastName: cached['lastName'] as String? ?? '',
+          username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
+          email: cached['email'] as String? ?? firebaseUser.email ?? '',
+          phone: cached['phone'] as String? ?? '',
+          isVerified: true,
+          isActive: true,
+          avatarUrl: cached['avatarUrl'] as String? ?? firebaseUser.photoURL,
+        );
+      }
       return _minimalUserFromFirebase(firebaseUser);
     }
   }
 
+  Future<DocumentSnapshot<Map<String, dynamic>>> _getUserDoc(String uid) {
+    return _firestore
+        .collection('users')
+        .doc(uid)
+        .get()
+        .timeout(_firestoreTimeout);
+  }
+
   Future<void> _ensureFirestoreUser(User firebaseUser) async {
     final docRef = _firestore.collection('users').doc(firebaseUser.uid);
-    final docSnap = await docRef.get();
+    final docSnap = await docRef.get().timeout(_firestoreTimeout);
     if (docSnap.exists) {
       final data = docSnap.data();
       if (data != null && (data['uid'] ?? '').toString().isEmpty) {
@@ -224,8 +283,7 @@ class LoginAuthService {
 
   /// Fetch Firestore doc, cache vào SQLite, trả về UserModel
   Future<UserModel> _fetchAndCacheUser(String uid) async {
-    final DocumentSnapshot doc =
-        await _firestore.collection('users').doc(uid).get();
+    final DocumentSnapshot doc = await _getUserDoc(uid);
     if (!doc.exists) throw Exception('Không tìm thấy dữ liệu người dùng');
 
     final data = doc.data() as Map<String, dynamic>;

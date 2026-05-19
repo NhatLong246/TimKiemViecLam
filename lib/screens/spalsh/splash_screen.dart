@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../routes/app_routes.dart';
+import '../../utils/preferences_helper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,13 +14,18 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigateToOnboarding();
+    _navigateNext();
   }
 
-  void _navigateToOnboarding() {
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pushReplacementNamed(context, '/onboarding');
-    });
+  Future<void> _navigateNext() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    final onboardingDone = await PreferencesHelper.getOnboardingCompleted();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      onboardingDone ? AppRoutes.home : AppRoutes.onboarding,
+    );
   }
 
   @override

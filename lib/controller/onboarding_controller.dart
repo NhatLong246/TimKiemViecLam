@@ -40,4 +40,10 @@ class OnboardingController extends ChangeNotifier {
   bool isLastPage() {
     return currentPage == onboardingPages.length - 1;
   }
+
+  @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
+  }
 }

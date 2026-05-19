@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../controller/onboarding_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/preferences_helper.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -10,26 +11,61 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  late OnboardingController controller;
+  late final OnboardingController controller;
+  bool _isNavigating = false;
 
   @override
   void initState() {
     super.initState();
     controller = OnboardingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _precacheImages());
   }
 
-  void _goToHome() {
+  Future<void> _precacheImages() async {
+    if (!mounted || controller.onboardingPages.isEmpty) return;
+    await precacheImage(
+      AssetImage(controller.onboardingPages.first.imagePath),
+      context,
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _goToHome() async {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+    await PreferencesHelper.setOnboardingCompleted(true);
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, AppRoutes.home);
+  }
+
+  Future<void> _onNextPressed() async {
+    if (_isNavigating) return;
+    if (controller.isLastPage()) {
+      await _goToHome();
+      return;
+    }
+    if (!controller.pageController.hasClients) return;
+    await controller.pageController.nextPage(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final imageHeight = size.height * 0.22;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheH = (imageHeight * dpr).round().clamp(180, 360);
 
     return Scaffold(
       body: Stack(
         children: [
-          // Background gradient
           Container(
             width: double.infinity,
             height: double.infinity,
@@ -45,122 +81,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
           ),
-          // Vòng trang trí trên trái
-          Positioned(
-            top: -80,
-            left: -80,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.06),
-              ),
+          IgnorePointer(
+            child: Stack(
+              children: [
+                Positioned(top: -80, left: -80, child: _decorCircle(260)),
+                Positioned(
+                  bottom: -100,
+                  right: -100,
+                  child: _decorCircle(320),
+                ),
+                Positioned(
+                  top: size.height * 0.35,
+                  right: -40,
+                  child: _decorCircle(120),
+                ),
+              ],
             ),
           ),
-          // Vòng trang trí dưới phải
-          Positioned(
-            bottom: -100,
-            right: -100,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.06),
-              ),
-            ),
-          ),
-          // Vòng trang trí giữa phải
-          Positioned(
-            top: size.height * 0.35,
-            right: -40,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.04),
-              ),
-            ),
-          ),
-          // Nội dung chính
           SafeArea(
             child: Column(
               children: [
-                // Topbar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                          ),
-                        ),
-                        child: const Text(
-                          'V24h',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
+                      _chip('V24h'),
                       const Spacer(),
                       GestureDetector(
-                        onTap: _goToHome,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Text(
-                            'Bỏ qua',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
+                        onTap: _isNavigating ? null : _goToHome,
+                        behavior: HitTestBehavior.opaque,
+                        child: _chip('Bỏ qua'),
                       ),
                     ],
                   ),
                 ),
-                // PageView
                 Expanded(
                   child: PageView.builder(
                     controller: controller.pageController,
                     itemCount: controller.onboardingPages.length,
                     onPageChanged: (index) {
-                      setState(() {
-                        controller.onPageChanged(index);
-                      });
+                      setState(() => controller.onPageChanged(index));
                     },
                     itemBuilder: (context, index) {
                       final page = controller.onboardingPages[index];
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Card ảnh
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(32),
@@ -173,27 +144,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   ),
                                 ],
                               ),
-                              child: Image.asset(
-                                page.imagePath,
-                                height: size.height * 0.28,
-                                fit: BoxFit.contain,
+                              child: RepaintBoundary(
+                                child: Image.asset(
+                                  page.imagePath,
+                                  height: imageHeight,
+                                  fit: BoxFit.contain,
+                                  cacheHeight: cacheH,
+                                  filterQuality: FilterQuality.medium,
+                                  gaplessPlayback: true,
+                                  errorBuilder: (_, __, ___) => SizedBox(
+                                    height: imageHeight,
+                                    child: const Icon(
+                                      Icons.image_not_supported_outlined,
+                                      size: 48,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 36),
-                            // Tiêu đề
+                            const SizedBox(height: 28),
                             Text(
                               page.title,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 24,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: 0.3,
                                 height: 1.3,
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            // Đường kẻ trang trí
+                            const SizedBox(height: 12),
                             Container(
                               width: 48,
                               height: 3,
@@ -202,16 +183,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 borderRadius: BorderRadius.circular(2),
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            // Mô tả
+                            const SizedBox(height: 12),
                             Text(
                               page.description,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.85),
                                 fontSize: 14,
-                                height: 1.6,
-                                fontWeight: FontWeight.w400,
+                                height: 1.55,
                               ),
                             ),
                           ],
@@ -220,8 +199,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     },
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Progress dots (trắng)
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
@@ -240,46 +218,79 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 28),
-                // Nút bấm
+                const SizedBox(height: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: controller.isLastPage()
-                          ? _goToHome
-                          : () {
-                              controller.pageController.nextPage(
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                              );
-                            },
+                      onPressed: _isNavigating ? null : _onNextPressed,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF2E7D32),
+                        disabledBackgroundColor: Colors.white70,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: Text(
-                        controller.isLastPage() ? 'Bắt đầu ngay' : 'Tiếp theo',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
+                      child: _isNavigating
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            )
+                          : Text(
+                              controller.isLastPage()
+                                  ? 'Bắt đầu ngay'
+                                  : 'Tiếp theo',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 28),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _decorCircle(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.06),
+      ),
+    );
+  }
+
+  Widget _chip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
       ),
     );
   }

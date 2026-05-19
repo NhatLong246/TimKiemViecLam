@@ -22,7 +22,8 @@ class HomeController extends GetxController {
       final jobs = await _jobPostService.getLatestActiveJobs();
       latestJobs.value = jobs;
     } catch (e) {
-      errorMessage.value = e.toString();
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      errorMessage.value = msg;
     } finally {
       isLoading.value = false;
     }
