@@ -3,6 +3,8 @@ import '../notification/notification_screen.dart';
 import '../../widgets/weather_widget.dart';
 import 'package:get/get.dart';
 import '../../controller/login_controller.dart';
+import '../../controller/home_controller.dart';
+import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
 
 const Color _primary = Color(0xFF2E7D32);
@@ -18,76 +20,85 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final AuthController _authController = Get.find<AuthController>();
-  final List<Map<String, String>> _jobs = [
-    {
-      'title': 'Nhân viên phục vụ nhà hàng',
-      'salary': '250k/ngày',
-      'location': 'Quận 1, TP.HCM',
-      'type': 'Part-time',
-      'image': 'assets/images/banners/default_image.png',
-    },
-    {
-      'title': 'Bốc vác kho hàng',
-      'salary': '300k/ngày',
-      'location': 'Quận 12, TP.HCM',
-      'type': 'Part-time',
-      'image': 'assets/images/banners/default_image.png',
-    },
-    {
-      'title': 'Pha chế cà phê',
-      'salary': '250k/ngày',
-      'location': 'Quận 3, TP.HCM',
-      'type': 'Full-time',
-      'image': 'assets/images/banners/default_image.png',
-    },
-    {
-      'title': 'Nhân viên bán hàng thời trang',
-      'salary': '200k/ngày',
-      'location': 'Quận 1, TP.HCM',
-      'type': 'Part-time',
-      'image': 'assets/images/banners/default_image.png',
-    },
-    {
-      'title': 'Giao hàng nhanh',
-      'salary': '350k/ngày',
-      'location': 'Quận 7, TP.HCM',
-      'type': 'Freelance',
-      'image': 'assets/images/banners/default_image.png',
-    },
-    {
-      'title': 'Nhân viên kho siêu thị',
-      'salary': '280k/ngày',
-      'location': 'Bình Thạnh, TP.HCM',
-      'type': 'Full-time',
-      'image': 'assets/images/banners/default_image.png',
-    },
-  ];
+  final HomeController _homeController = Get.put(HomeController());
+
+  Future<void> _onRefresh() async {
+    await _homeController.refreshJobs();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(child: _buildQuickTools()),
-          SliverToBoxAdapter(child: _buildSectionHeader()),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            sliver: SliverGrid(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildJobCard(_jobs[index]),
-                childCount: _jobs.length,
-              ),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.62,
-              ),
-            ),
-          ),
-        ],
+      body: RefreshIndicator(
+        color: _primary,
+        onRefresh: _onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(child: _buildQuickTools()),
+            SliverToBoxAdapter(child: _buildSectionHeader()),
+            Obx(() {
+              if (_homeController.isLoading.value) {
+                return const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: CircularProgressIndicator(color: _primary),
+                    ),
+                  ),
+                );
+              }
+
+              if (_homeController.errorMessage.value.isNotEmpty) {
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        'Có lỗi xảy ra: ${_homeController.errorMessage.value}',
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              final jobs = _homeController.latestJobs;
+              if (jobs.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        'Chưa có công việc nào',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildJobCard(jobs[index]),
+                    childCount: jobs.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.62,
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -411,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildJobCard(Map<String, String> job) {
+  Widget _buildJobCard(JobPostModel job) {
     return GestureDetector(
       onTap: () {
         Get.toNamed(AppRoutes.jobDetail, arguments: job);
@@ -439,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     top: Radius.circular(16),
                   ),
                   child: Image.asset(
-                    job['image'] ?? 'assets/images/banners/default_image.png',
+                    'assets/images/banners/default_image.png',
                     height: 100,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -473,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      job['salary']!,
+                      job.salaryDisplay,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
@@ -492,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      job['title']!,
+                      job.title,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -513,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
-                            job['location']!,
+                            job.locationDisplay,
                             style: const TextStyle(
                               fontSize: 10,
                               color: Color(0xFF9E9E9E),
@@ -534,7 +545,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
-                        job['type']!,
+                        job.jobType == 'part_time' ? 'Part-time' : 'Full-time',
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xFF757575),
@@ -547,8 +558,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 32,
                       child: ElevatedButton(
                         onPressed: () {
-                          // Bấm vào nút Ứng tuyển trực tiếp cũng sang trang chi tiết,
-                          // hoặc có thể gọi popup ứng tuyển
                           Get.toNamed(AppRoutes.jobDetail, arguments: job);
                         },
                         style: ElevatedButton.styleFrom(
