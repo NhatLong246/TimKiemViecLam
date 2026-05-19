@@ -1,29 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../data/models/app_notification_model.dart';
+import '../../data/services/notification_service.dart';
 
 enum _SortOrder { newestFirst, oldestFirst }
 
 enum _FilterType { all, unread, read }
-
-class NotificationItem {
-  final String id;
-  final String title;
-  final String body;
-  final DateTime createdAt;
-  final NotificationCategory category;
-  bool isRead;
-
-  NotificationItem({
-    required this.id,
-    required this.title,
-    required this.body,
-    required this.createdAt,
-    required this.category,
-    this.isRead = false,
-  });
-}
-
-enum NotificationCategory { job, system, promo, profile }
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -33,16 +15,16 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
+  final _service = NotificationService();
+
   _SortOrder _sortOrder = _SortOrder.newestFirst;
   _FilterType _filter = _FilterType.all;
 
   static const Color _primary = Color(0xFF2E7D32);
   static const Color _unreadBg = Color(0xFFF0F7FF);
 
-  final List<NotificationItem> _notifications = [];
-
-  List<NotificationItem> get _filtered {
-    List<NotificationItem> list = List.of(_notifications);
+  List<AppNotificationItem> _filterList(List<AppNotificationItem> notifications) {
+    List<AppNotificationItem> list = List.of(notifications);
     if (_filter == _FilterType.unread) {
       list = list.where((n) => !n.isRead).toList();
     } else if (_filter == _FilterType.read) {
@@ -56,22 +38,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return list;
   }
 
-  int get _unreadCount => _notifications.where((n) => !n.isRead).length;
-
-  void _markAllRead() {
-    setState(() {
-      for (final n in _notifications) {
-        n.isRead = true;
-      }
-    });
+  Future<void> _markAllRead() async {
+    await _service.markAllRead();
   }
 
-  void _markRead(NotificationItem item) {
-    setState(() => item.isRead = true);
+  Future<void> _markRead(AppNotificationItem item) async {
+    if (!item.isRead) await _service.markRead(item.id);
   }
 
-  void _deleteNotification(NotificationItem item) {
-    setState(() => _notifications.removeWhere((n) => n.id == item.id));
+  Future<void> _deleteNotification(AppNotificationItem item) async {
+    await _service.deleteNotification(item.id);
   }
 
   void _deleteAll() {
@@ -96,9 +72,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() => _notifications.clear());
-              Navigator.pop(ctx);
+            onPressed: () async {
+              await _service.deleteAll();
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
@@ -126,29 +102,45 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _filtered;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          _buildSortBar(),
-          Expanded(
-            child: items.isEmpty
-                ? _buildEmpty()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) => _buildCard(items[i]),
-                  ),
+    return StreamBuilder<List<AppNotificationItem>>(
+      stream: _service.streamNotifications(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Thông báo')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final notifications = snapshot.data ?? [];
+        final items = _filterList(notifications);
+        final unreadCount = notifications.where((n) => !n.isRead).length;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF4F6F9),
+          appBar: _buildAppBar(unreadCount, notifications.isNotEmpty),
+          body: Column(
+            children: [
+              _buildFilterBar(),
+              _buildSortBar(),
+              Expanded(
+                child: items.isEmpty
+                    ? _buildEmpty()
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        itemCount: items.length,
+                        itemBuilder: (_, i) => _buildCard(items[i]),
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(int unreadCount, bool hasAny) {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -168,7 +160,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          if (_unreadCount > 0) ...[
+          if (unreadCount > 0) ...[
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -177,7 +169,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                '$_unreadCount',
+                '$unreadCount',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -189,7 +181,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ],
       ),
       actions: [
-        if (_unreadCount > 0)
+        if (unreadCount > 0)
           TextButton(
             onPressed: _markAllRead,
             child: const Text(
@@ -201,7 +193,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ),
             ),
           ),
-        if (_notifications.isNotEmpty)
+        if (hasAny)
           IconButton(
             onPressed: _deleteAll,
             icon: const Icon(
@@ -312,7 +304,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildCard(NotificationItem item) {
+  Widget _buildCard(AppNotificationItem item) {
     final cat = _categoryMeta(item.category);
     return Dismissible(
       key: ValueKey(item.id),

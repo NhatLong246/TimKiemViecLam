@@ -5,6 +5,7 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/group_chat_controller.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../routes/app_routes.dart';
+import '../messaging/conversation_list_screen.dart';
 
 class EmployerMessagesScreen extends StatelessWidget {
   const EmployerMessagesScreen({super.key});
@@ -57,7 +58,7 @@ class EmployerMessagesScreen extends StatelessWidget {
         body: const TabBarView(
           children: [
             _GroupChatTab(),
-            _DirectChatTab(),
+            ConversationListScreen(isEmployer: true),
           ],
         ),
       ),
@@ -71,7 +72,6 @@ class _GroupChatTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dùng find nếu đã tồn tại, put nếu chưa — tránh tạo instance trùng
     final ctrl = Get.isRegistered<GroupChatController>()
         ? Get.find<GroupChatController>()
         : Get.put(GroupChatController());
@@ -206,51 +206,6 @@ class _GroupChatCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Tab 2: Chat cá nhân (placeholder) ───────────────────────────────────────
-class _DirectChatTab extends StatelessWidget {
-  const _DirectChatTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              gradient: AppColors.employerGradient,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.forum_outlined,
-                color: Colors.white, size: 40),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Chat cá nhân',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF212121),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tính năng đang được phát triển\nSẽ ra mắt sớm!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-              height: 1.5,
-            ),
-          ),
-        ],
       ),
     );
   }

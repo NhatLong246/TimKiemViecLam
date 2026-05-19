@@ -49,6 +49,9 @@ google-services.json
 **/GoogleService-Info.plist
 lib/firebase_options.dart
 
+# Local API keys
+api_keys.json
+
 # Android local properties (chứa đường dẫn SDK local)
 android/local.properties
 

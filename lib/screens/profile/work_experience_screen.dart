@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:viecnow/controller/update_account_controller.dart';
+import 'package:viecnow/data/models/work_experience_model.dart';
 
 class WorkExperienceScreen extends StatefulWidget {
-  const WorkExperienceScreen({super.key});
+  const WorkExperienceScreen({super.key, this.experience});
+
+  final WorkExperienceModel? experience;
 
   @override
   State<WorkExperienceScreen> createState() => _WorkExperienceScreenState();
@@ -14,13 +19,30 @@ class _WorkExperienceScreenState extends State<WorkExperienceScreen> {
   final _descriptionController = TextEditingController();
 
   bool _currentlyWorking = false;
+  bool _saving = false;
   String _startDate = '';
   String _endDate = '';
+
+  bool get _isEditing => widget.experience != null;
 
   static const Color _primary = Color(0xFF5E35B1);
   static const Color _required = Color(0xFFE64A4A);
   static const Color _border = Color(0xFFD0D0D0);
   static const Color _hintColor = Color(0xFFB0B0B0);
+
+  @override
+  void initState() {
+    super.initState();
+    final exp = widget.experience;
+    if (exp != null) {
+      _companyController.text = exp.company;
+      _positionController.text = exp.position;
+      _descriptionController.text = exp.description;
+      _startDate = exp.startDate;
+      _endDate = exp.endDate ?? '';
+      _currentlyWorking = exp.currentlyWorking;
+    }
+  }
 
   @override
   void dispose() {
@@ -54,7 +76,8 @@ class _WorkExperienceScreenState extends State<WorkExperienceScreen> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     if (_startDate.isEmpty) {
       _showError('Vui lòng chọn ngày bắt đầu');
@@ -64,7 +87,49 @@ class _WorkExperienceScreenState extends State<WorkExperienceScreen> {
       _showError('Vui lòng chọn ngày kết thúc');
       return;
     }
-    Navigator.pop(context);
+
+    setState(() => _saving = true);
+    try {
+      final controller = Get.put(UpdateAccountController());
+      if (_isEditing) {
+        await controller.updateWorkExperience(
+          id: widget.experience!.id,
+          company: _companyController.text,
+          position: _positionController.text,
+          description: _descriptionController.text,
+          startDate: _startDate,
+          endDate: _currentlyWorking ? null : _endDate,
+          currentlyWorking: _currentlyWorking,
+        );
+      } else {
+        await controller.addWorkExperience(
+          company: _companyController.text,
+          position: _positionController.text,
+          description: _descriptionController.text,
+          startDate: _startDate,
+          endDate: _currentlyWorking ? null : _endDate,
+          currentlyWorking: _currentlyWorking,
+        );
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isEditing
+                ? 'Đã cập nhật kinh nghiệm làm việc'
+                : 'Đã thêm kinh nghiệm làm việc vào hồ sơ',
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        _showError('Không thể lưu kinh nghiệm. Vui lòng thử lại.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   void _showError(String msg) {
@@ -85,9 +150,9 @@ class _WorkExperienceScreenState extends State<WorkExperienceScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Kinh nghiệm làm việc',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? 'Chỉnh sửa kinh nghiệm' : 'Kinh nghiệm làm việc',
+          style: const TextStyle(
             color: Color(0xFF222222),
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -241,7 +306,7 @@ class _WorkExperienceScreenState extends State<WorkExperienceScreen> {
           child: SizedBox(
             height: 54,
             child: ElevatedButton(
-              onPressed: _save,
+              onPressed: _saving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
                 foregroundColor: Colors.white,
@@ -250,10 +315,22 @@ class _WorkExperienceScreenState extends State<WorkExperienceScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
-                'Lưu thông tin',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      _isEditing ? 'Cập nhật' : 'Lưu thông tin',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ),

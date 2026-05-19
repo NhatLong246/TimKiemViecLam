@@ -2,10 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/job_post_model.dart';
+import 'messaging_service.dart';
+import 'notification_service.dart';
 
 class CandidatesService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final _messaging = MessagingService();
 
   // ── Fetch tất cả job theo loại + đơn ứng tuyển của employer ──────────────
   /// Trả về danh sách job (theo jobType) kèm đơn ứng tuyển đã join với thông
@@ -104,6 +107,9 @@ class CandidatesService {
 
   // ── Duyệt đơn: set status='accepted' + tăng filledSlots ─────────────────
   Future<void> acceptApplication(String appId, String jobId) async {
+    final appDoc = await _db.collection('applications').doc(appId).get();
+    final appData = appDoc.data() ?? {};
+
     final batch = _db.batch();
     batch.update(_db.collection('applications').doc(appId), {
       'status': 'accepted',
@@ -114,6 +120,25 @@ class CandidatesService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();
+
+    final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
+    final jobTitle = (jobSnap.data()?['title'] ?? 'Công việc').toString();
+    final candidateId = (appData['candidateId'] ?? '').toString();
+    final employerId = (appData['employerId'] ?? '').toString();
+
+    if (candidateId.isNotEmpty && employerId.isNotEmpty) {
+      await _messaging.getOrCreateDirectChat(
+        jobId: jobId,
+        jobTitle: jobTitle,
+        employerId: employerId,
+        candidateId: candidateId,
+        applicationId: appId,
+      );
+      await NotificationService.notifyApplicationAccepted(
+        candidateId: candidateId,
+        jobTitle: jobTitle,
+      );
+    }
   }
 
   // ── Từ chối đơn ─────────────────────────────────────────────────────────

@@ -166,20 +166,20 @@ class EmployerNotificationController extends GetxController {
   }
 
   // ── Public actions ──────────────────────────────────────────────────────────
-  Future<void> markRead(String notifId) => _svc.markRead(notifId);
+  Future<void> markRead(String notifId) => _svc.markLegacyRead(notifId);
 
   Future<void> markAllRead() async {
     final uid = _uid;
     if (uid == null) return;
-    await _svc.markAllRead(uid);
+    await _svc.markAllReadForRecipient(uid);
   }
 
-  Future<void> deleteNotif(String notifId) => _svc.delete(notifId);
+  Future<void> deleteNotif(String notifId) => _svc.deleteLegacy(notifId);
 
   Future<void> clearRead() async {
     final uid = _uid;
     if (uid == null) return;
-    await _svc.clearRead(uid);
+    await _svc.clearLegacyRead(uid);
   }
 
   // ── Tạo thông báo tin nhắn thủ công (gọi khi có unread messages) ──────────
