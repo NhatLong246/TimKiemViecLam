@@ -1,3 +1,5 @@
+import 'package:viecnow/screens/employer/employer_notifications_screen.dart';
+import 'package:viecnow/screens/employer/employer_search_screen.dart';
 import 'package:viecnow/screens/employer/employer_reviews_screen.dart';
 import 'package:viecnow/screens/employer/employer_login_history_screen.dart';
 import 'package:viecnow/screens/employer/employer_candidates_screen.dart';
@@ -11,7 +13,13 @@ import 'package:viecnow/screens/menu_employer/attendance_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/schedule_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/rating_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_report_screen.dart';
-import 'package:viecnow/screens/menu_employer/employer_groups_screen.dart';
+import 'package:viecnow/screens/chat/employer_groups_screen.dart';
+import 'package:viecnow/screens/chat/group_chat_screen.dart';
+import 'package:viecnow/screens/chat/group_management_screen.dart';
+import 'package:viecnow/screens/chat/work_schedule_screen.dart';
+import 'package:viecnow/screens/chat/complaint_screen.dart';
+import 'package:viecnow/screens/chat/search_messages_screen.dart';
+import 'package:viecnow/screens/employer/attendance_screen.dart' as att_screen;
 import 'package:viecnow/screens/menu_employer/employer_wallet_screen.dart';
 import 'package:viecnow/screens/reference/employer_market_rate_screen.dart';
 import 'package:viecnow/screens/stats/employer_stats_screen.dart';
@@ -33,7 +41,7 @@ import 'package:viecnow/screens/profile/profile_screen.dart';
 import 'package:viecnow/screens/reference/market_rate_screen.dart';
 import 'package:viecnow/screens/schedule/candidate_schedule_screen.dart';
 import 'package:viecnow/screens/job/job_detail_screen.dart';
-// import 'package:viecnow/screens/profile/change_password_screen.dart';
+import 'package:viecnow/screens/profile/change_password_screen.dart';
 import 'package:viecnow/screens/profile/change_phonenumber_screen.dart';
 import 'package:viecnow/screens/profile/change_username_screen.dart';
 import 'package:viecnow/screens/profile/job_criteria_screen.dart';
@@ -91,6 +99,14 @@ class AppRoutes {
   static const String employerReviews = '/employer-reviews';
   static const String employerLoginHistory = '/employer-login-history';
   static const String employerCandidates = '/employer-candidates';
+  static const String groupChat = '/group-chat';
+  static const String groupManagement = '/group-management';
+  static const String attendance = '/attendance';
+  static const String workSchedule = '/work-schedule';
+  static const String complaint = '/complaint';
+  static const String searchMessages = '/search-messages';
+  static const String employerNotifications = '/employer-notifications';
+  static const String employerSearch = '/employer-search';
   static const String jobCriteria = '/job-criteria';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
@@ -110,7 +126,7 @@ class AppRoutes {
     myProfile: (context) => const MyProfileScreen(),
     changeName: (context) => const ChangeNameScreen(),
     changeUsername: (context) => const ChangeUsernameScreen(),
-    // changePassword: (context) => const ChangePasswordScreen(),
+    changePassword: (context) => const ChangePasswordScreen(),
     changeEmail: (context) => const ChangeEmailScreen(),
     changePhoneNumber: (context) => const ChangePhoneNumberScreen(),
     changeGender: (context) => const ChangeGenderScreen(),
@@ -133,6 +149,15 @@ class AppRoutes {
     employerReviews: (context) => const EmployerReviewsScreen(),
     employerLoginHistory: (context) => const EmployerLoginHistoryScreen(),
     employerCandidates: (context) => const EmployerCandidatesScreen(),
+    AppRoutes.groupChat: (context) => const GroupChatScreen(),
+    AppRoutes.groupManagement: (context) => const GroupManagementScreen(),
+    AppRoutes.attendance: (context) => const att_screen.AttendanceScreen(),
+    AppRoutes.workSchedule: (context) => const WorkScheduleScreen(),
+    AppRoutes.complaint: (context) => const ComplaintScreen(),
+    AppRoutes.searchMessages: (context) => const SearchMessagesScreen(),
+    AppRoutes.employerNotifications: (context) =>
+        const EmployerNotificationsScreen(),
+    AppRoutes.employerSearch: (context) => const EmployerSearchScreen(),
     verifyEmail: (context) {
       final args = ModalRoute.of(context)!.settings.arguments;
       String email = '';

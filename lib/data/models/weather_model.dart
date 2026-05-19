@@ -5,6 +5,7 @@ class WeatherModel {
   final String description;
   final int conditionCode;
   final String cityName;
+  final String locationName;
   final double windSpeed;
 
   const WeatherModel({
@@ -14,17 +15,23 @@ class WeatherModel {
     required this.description,
     required this.conditionCode,
     required this.cityName,
+    required this.locationName,
     required this.windSpeed,
   });
 
-  factory WeatherModel.fromJson(Map<String, dynamic> json) {
+  factory WeatherModel.fromJson(
+    Map<String, dynamic> json, {
+    String? locationName,
+  }) {
+    final cityName = json['name'] as String;
     return WeatherModel(
       temperature: (json['main']['temp'] as num).toDouble(),
       feelsLike: (json['main']['feels_like'] as num).toDouble(),
       humidity: json['main']['humidity'] as int,
       description: json['weather'][0]['description'] as String,
       conditionCode: json['weather'][0]['id'] as int,
-      cityName: json['name'] as String,
+      cityName: cityName,
+      locationName: locationName?.isNotEmpty == true ? locationName! : cityName,
       windSpeed: (json['wind']['speed'] as num).toDouble(),
     );
   }

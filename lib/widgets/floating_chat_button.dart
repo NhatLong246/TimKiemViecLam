@@ -14,6 +14,8 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
   double _y = 0;
   bool _initialized = false;
   bool _showTooltip = true;
+  bool _isDragging = false;
+  bool _isHidden = false;
 
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulseAnim;
@@ -75,35 +77,100 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
     final size = MediaQuery.of(context).size;
     final isRightSide = _x > size.width / 2;
 
+    if (_isHidden) return const SizedBox.shrink();
+
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          if (_isDragging) _buildCloseTarget(size),
+          Positioned(
+            left: isRightSide ? null : _x,
+            right: isRightSide ? (size.width - _x - 56) : null,
+            top: _y,
+            child: GestureDetector(
+              onPanStart: (_) {
+                setState(() => _isDragging = true);
+                if (_showTooltip) _hideTooltip();
+              },
+              onPanUpdate: (details) {
+                setState(() {
+                  _x = (_x + details.delta.dx).clamp(0, size.width - 58);
+                  _y = (_y + details.delta.dy).clamp(0, size.height - 58);
+                });
+              },
+              onPanEnd: (_) {
+                final shouldHide = _y > size.height - 140;
+                setState(() {
+                  _isDragging = false;
+                  if (shouldHide) _isHidden = true;
+                });
+              },
+              onPanCancel: () => setState(() => _isDragging = false),
+              onTap: () {
+                if (_showTooltip) _hideTooltip();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+                );
+              },
+              child: Column(
+                crossAxisAlignment: isRightSide
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_showTooltip) _buildTooltip(),
+                  if (_showTooltip) const SizedBox(height: 6),
+                  _buildButton(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCloseTarget(Size size) {
+    final isVisible = _y > size.height - 220;
+    final isNearBottom = _y > size.height - 140;
+
     return Positioned(
-      left: isRightSide ? null : _x,
-      right: isRightSide ? (size.width - _x - 56) : null,
-      top: _y,
-      child: GestureDetector(
-        onPanUpdate: (details) {
-          setState(() {
-            _x = (_x + details.delta.dx).clamp(0, size.width - 58);
-            _y = (_y + details.delta.dy).clamp(0, size.height - 58);
-          });
-          if (_showTooltip) _hideTooltip();
-        },
-        onTap: () {
-          if (_showTooltip) _hideTooltip();
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ChatbotScreen()),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: isRightSide
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_showTooltip) _buildTooltip(),
-            if (_showTooltip) const SizedBox(height: 6),
-            _buildButton(),
-          ],
+      left: (size.width - 78) / 2,
+      bottom: 76,
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 120),
+          opacity: isVisible ? 1 : 0,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 160),
+            scale: isVisible ? (isNearBottom ? 1.12 : 1.0) : 0.85,
+            curve: Curves.easeOut,
+            child: Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isNearBottom
+                    ? const Color(0xFFE53935)
+                    : Colors.black.withValues(alpha: 0.68),
+                boxShadow: [
+                  BoxShadow(
+                    color: isNearBottom
+                        ? const Color(0xFFE53935).withValues(alpha: 0.38)
+                        : Colors.black.withValues(alpha: 0.18),
+                    blurRadius: isNearBottom ? 22 : 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: isNearBottom ? 34 : 28,
+              ),
+            ),
+          ),
         ),
       ),
     );

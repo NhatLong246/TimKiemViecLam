@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -84,29 +86,88 @@ class EmployerProfileController extends GetxController {
     }
   }
 
-  /// Upload ảnh đại diện từ thư viện ảnh
+  /// Upload ảnh đại diện — lưu dạng Base64 vào Firestore (không cần Firebase Storage)
   Future<void> uploadAvatar() async {
     try {
+      final source = await _pickAvatarSource();
+      if (source == null) return;
+
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
+        source: source,
+        imageQuality: 65,
+        maxWidth: 400,
+        maxHeight: 400,
       );
       if (picked == null) return;
+
+      final bytes = await File(picked.path).readAsBytes();
+      if (bytes.length > 500 * 1024) {
+        _showError('Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 500 KB.');
+        return;
+      }
+
       isSaving.value = true;
+      final b64 = base64Encode(bytes);
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      final url = await _service.uploadImage(
-        File(picked.path),
-        'users/$uid/avatar.jpg',
-      );
-      await _service.updateFields({'avatarUrl': url});
-      profile.value = profile.value?.copyWith(avatarUrl: url);
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({'avatarBase64': b64});
+
+      profile.value = profile.value?.copyWith(avatarBase64: b64);
+
+      // Cập nhật AuthController để UI toàn app phản ánh ngay
+      final authCtrl = Get.find<AuthController>();
+      if (authCtrl.currentUser != null) {
+        authCtrl.currentUser =
+            authCtrl.currentUser!.copyWith(avatarBase64: b64);
+        authCtrl.update();
+      }
+
       _showSuccess('Cập nhật ảnh đại diện thành công');
     } catch (e) {
       _showError('Tải ảnh thất bại: ${e.toString()}');
     } finally {
       isSaving.value = false;
     }
+  }
+
+  Future<ImageSource?> _pickAvatarSource() async {
+    return showModalBottomSheet<ImageSource>(
+      context: Get.context!,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded,
+                  color: Color(0xFF7B1FA2)),
+              title: const Text('Chụp ảnh'),
+              onTap: () => Navigator.pop(Get.context!, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded,
+                  color: Color(0xFF1565C0)),
+              title: const Text('Chọn từ thư viện'),
+              onTap: () => Navigator.pop(Get.context!, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Upload ảnh CCCD (side: 'front' hoặc 'back'), trả về URL

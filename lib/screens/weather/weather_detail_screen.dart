@@ -25,7 +25,12 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     setState(() => _refreshing = true);
     try {
       final w = await _service.fetchWeather();
-      if (mounted) setState(() { _weather = w; _refreshing = false; });
+      if (mounted) {
+        setState(() {
+          _weather = w;
+          _refreshing = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _refreshing = false);
     }
@@ -106,7 +111,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   ),
                 )
               : IconButton(
@@ -121,10 +128,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   Widget _buildMainCard() {
     return Column(
       children: [
-        Text(
-          _weather.emoji,
-          style: const TextStyle(fontSize: 80),
-        ),
+        Text(_weather.emoji, style: const TextStyle(fontSize: 80)),
         const SizedBox(height: 8),
         Text(
           _weather.tempDisplay,
@@ -163,12 +167,14 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
 
   Widget _buildDetailsGrid() {
     final items = [
-      _DetailItem(Icons.thermostat_outlined, 'Cảm giác như',
-          '${_weather.feelsLike.round()}°C'),
+      _DetailItem(
+        Icons.thermostat_outlined,
+        'Cảm giác như',
+        '${_weather.feelsLike.round()}°C',
+      ),
       _DetailItem(Icons.water_drop_outlined, 'Độ ẩm', '${_weather.humidity}%'),
       _DetailItem(Icons.air, 'Gió', '${_weather.windSpeed} m/s'),
-      _DetailItem(Icons.location_city_outlined, 'Thành phố',
-          _weather.cityName),
+      _DetailItem(Icons.location_city_outlined, 'Thành phố', _weather.cityName),
     ];
 
     return Container(
@@ -207,8 +213,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               children: [
                 Text(
                   item.label,
-                  style: const TextStyle(
-                      color: Colors.white60, fontSize: 11),
+                  style: const TextStyle(color: Colors.white60, fontSize: 11),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

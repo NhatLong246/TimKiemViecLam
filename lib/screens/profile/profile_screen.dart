@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../common/styles/app_colors.dart';
 import '../../routes/app_routes.dart';
 import 'job_criteria_screen.dart';
@@ -6,6 +9,9 @@ import 'my_profile_screen.dart';
 import 'work_experience_screen.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/controller/login_controller.dart';
+import 'package:viecnow/controller/update_account_controller.dart';
+import 'package:viecnow/data/models/job_criteria_model.dart';
+import 'package:viecnow/data/models/work_experience_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,9 +21,14 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _allowEmployerFind = false;
-  String _currentWorkStatus = 'Chưa đi làm';
-  String _jobSearchStatus = 'Sẵn sàng đi làm ngay';
+  static const Color _headerGreenTop = Color(0xFF81C784);
+  static const Color _headerGreenBottom = Color(0xFF2E7D32);
+
+  static const String _defaultWorkStatus = 'Chưa đi làm';
+  static const String _defaultJobSearchStatus = 'Sẵn sàng đi làm ngay';
+
+  bool _updatingVisibility = false;
+  bool _uploadingAvatar = false;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +43,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, AuthController authController) {
+  String _statusFromData(Map<String, dynamic> data, String key, String fallback) {
+    final value = data[key]?.toString().trim();
+    if (value == null || value.isEmpty) return fallback;
+    return value;
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    AuthController authController, {
+    required String currentWorkStatus,
+    required String jobSearchStatus,
+  }) {
     final user = authController.currentUser;
     final fullName = user?.fullName.isNotEmpty == true
         ? user!.fullName
@@ -40,14 +62,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final email = user?.email ?? '';
     final phone = user?.phone ?? '';
 
+    final topPadding = MediaQuery.paddingOf(context).top + 8;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 42, 20, 26),
+      padding: EdgeInsets.fromLTRB(20, topPadding, 20, 26),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF81C784), Color(0xFF2E7D32)],
+          colors: [_headerGreenTop, _headerGreenBottom],
         ),
       ),
       child: Column(
@@ -82,42 +106,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    radius: 35,
-                    backgroundColor: Colors.white,
-                    backgroundImage:
-                        user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                        ? NetworkImage(user.avatarUrl!)
-                        : null,
-                    child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
-                        ? const Icon(
-                            Icons.person,
-                            color: Color(0xFFE0E0E0),
-                            size: 54,
-                          )
-                        : null,
-                  ),
-                  Positioned(
-                    right: -2,
-                    bottom: 2,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF2E7D32)),
+              GestureDetector(
+                onTap: _uploadingAvatar
+                    ? null
+                    : () => _pickAndUploadAvatar(authController),
+                child: SizedBox(
+                  width: 70,
+                  height: 70,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 35,
+                        backgroundColor: Colors.white,
+                        backgroundImage:
+                            user?.avatarUrl != null &&
+                                user!.avatarUrl!.isNotEmpty
+                            ? NetworkImage(user.avatarUrl!)
+                            : null,
+                        child: user?.avatarUrl == null ||
+                                user!.avatarUrl!.isEmpty
+                            ? const Icon(
+                                Icons.person,
+                                color: Color(0xFFE0E0E0),
+                                size: 54,
+                              )
+                            : null,
                       ),
-                      child: const Icon(
-                        Icons.camera_alt_outlined,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
+                      if (_uploadingAvatar)
+                        Positioned.fill(
+                          child: ClipOval(
+                            child: ColoredBox(
+                              color: Colors.black45,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (!_uploadingAvatar)
+                        Positioned(
+                          right: -2,
+                          bottom: 2,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFF2E7D32),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_outlined,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -134,7 +190,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 10),
                     GestureDetector(
-                      onTap: () => _showJobStatusSheet(context),
+                      onTap: () => _showJobStatusSheet(
+                        context,
+                        currentWorkStatus: currentWorkStatus,
+                        jobSearchStatus: jobSearchStatus,
+                      ),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -144,18 +204,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              'Trạng thái tìm việc',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
+                            Flexible(
+                              child: Text(
+                                jobSearchStatus,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                            SizedBox(width: 4),
-                            Icon(
+                            const SizedBox(width: 4),
+                            const Icon(
                               Icons.keyboard_arrow_down,
                               color: Colors.white,
                               size: 20,
@@ -234,9 +298,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showJobStatusSheet(BuildContext context) {
-    var tempWorkStatus = _currentWorkStatus;
-    var tempSearchStatus = _jobSearchStatus;
+  void _showJobStatusSheet(
+    BuildContext context, {
+    required String currentWorkStatus,
+    required String jobSearchStatus,
+  }) {
+    var tempWorkStatus = currentWorkStatus;
+    var tempSearchStatus = jobSearchStatus;
+    var saving = false;
 
     showModalBottomSheet<void>(
       context: context,
@@ -386,13 +455,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: double.infinity,
                       height: 58,
                       child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _currentWorkStatus = tempWorkStatus;
-                            _jobSearchStatus = tempSearchStatus;
-                          });
-                          Navigator.pop(sheetContext);
-                        },
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                setSheetState(() => saving = true);
+                                try {
+                                  final controller =
+                                      Get.put(UpdateAccountController());
+                                  await controller.updateJobStatus(
+                                    currentWorkStatus: tempWorkStatus,
+                                    jobSearchStatus: tempSearchStatus,
+                                  );
+                                  if (sheetContext.mounted) {
+                                    Navigator.pop(sheetContext);
+                                  }
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Đã cập nhật trạng thái tìm việc',
+                                        ),
+                                        backgroundColor: Color(0xFF2E7D32),
+                                      ),
+                                    );
+                                  }
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Không thể lưu. Vui lòng thử lại.',
+                                        ),
+                                        backgroundColor: Colors.redAccent,
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (sheetContext.mounted) {
+                                    setSheetState(() => saving = false);
+                                  }
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF5E35B1),
                           foregroundColor: Colors.white,
@@ -401,13 +504,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Lưu thông tin',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        child: saving
+                            ? const SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Lưu thông tin',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -483,135 +595,319 @@ class _ProfileScreenState extends State<ProfileScreen> {
     BuildContext context,
     AuthController authController,
   ) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 92),
-            child: Column(
-              children: [
-                _buildHeader(context, authController),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 26, 20, 20),
-                  child: Column(
-                    children: [
-                      _buildOverviewCard(),
-                      const SizedBox(height: 22),
-                      _buildVisibilityCard(),
-                      const SizedBox(height: 22),
-                      _buildJobCriteriaCard(),
-                    ],
+    final updateController = Get.put(UpdateAccountController());
+
+    return StreamBuilder(
+      stream: updateController.getUserData(),
+      builder: (context, snapshot) {
+        final data = snapshot.hasData && snapshot.data!.exists
+            ? snapshot.data!.data() as Map<String, dynamic>
+            : <String, dynamic>{};
+        final currentWorkStatus = _statusFromData(
+          data,
+          'currentWorkStatus',
+          _defaultWorkStatus,
+        );
+        final jobSearchStatus = _statusFromData(
+          data,
+          'jobSearchStatus',
+          _defaultJobSearchStatus,
+        );
+
+        const bottomNavPadding = 92.0;
+        final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: RefreshIndicator(
+            color: Colors.white,
+            backgroundColor: _headerGreenBottom,
+            onRefresh: () => updateController.refreshProfile(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _buildHeader(
+                    context,
+                    authController,
+                    currentWorkStatus: currentWorkStatus,
+                    jobSearchStatus: jobSearchStatus,
+                  ),
+                ),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ColoredBox(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        26,
+                        20,
+                        20 + bottomNavPadding + bottomInset,
+                      ),
+                      child: Column(
+                        children: [
+                          _buildOverviewCard(),
+                          _buildVisibilityCard(),
+                          const SizedBox(height: 22),
+                          _buildJobCriteriaCard(),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildOverviewCard() {
-    return _ProfileCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Tổng quan hồ sơ',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF262626),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Nâng cao tỉ lệ kết nối với Nhà Tuyển Dụng\nbằng cách hoàn thiện các mục dưới đây.',
-            style: TextStyle(
-              fontSize: 16,
-              height: 1.35,
-              color: Color(0xFF4B4B4B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFE9E9E9)),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Icon(
-                Icons.business_center_outlined,
-                color: Color(0xFFA58A23),
-                size: 21,
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Kinh nghiệm làm việc',
-                  style: TextStyle(color: Color(0xFFA58A23), fontSize: 16),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WorkExperienceScreen(),
+    final controller = Get.put(UpdateAccountController());
+
+    return StreamBuilder(
+      stream: controller.getUserData(),
+      builder: (context, snapshot) {
+        final data = snapshot.hasData && snapshot.data!.exists
+            ? snapshot.data!.data() as Map<String, dynamic>
+            : <String, dynamic>{};
+        final hasExperience =
+            WorkExperienceModel.listFromUserData(data).isNotEmpty;
+        final declaredNo =
+            WorkExperienceModel.hasDeclaredNoExperience(data);
+
+        if (hasExperience || declaredNo) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ProfileCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tổng quan hồ sơ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF262626),
                     ),
-                  );
-                },
-                child: const Text('Thêm ngay', style: TextStyle(fontSize: 16)),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Nâng cao tỉ lệ kết nối với Nhà Tuyển Dụng\nbằng cách hoàn thiện các mục dưới đây.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.35,
+                      color: Color(0xFF4B4B4B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: Color(0xFFE9E9E9)),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.business_center_outlined,
+                        color: Color(0xFFA58A23),
+                        size: 21,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Kinh nghiệm làm việc',
+                          style: TextStyle(
+                            color: Color(0xFFA58A23),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _openWorkExperienceScreen(),
+                        child: const Text(
+                          'Thêm ngay',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+            const SizedBox(height: 22),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openWorkExperienceScreen() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const WorkExperienceScreen()),
     );
   }
 
   Widget _buildVisibilityCard() {
-    return _ProfileCard(
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final controller = Get.put(UpdateAccountController());
+
+    return StreamBuilder(
+      stream: controller.getUserData(),
+      builder: (context, snapshot) {
+        final data = snapshot.hasData && snapshot.data!.exists
+            ? snapshot.data!.data() as Map<String, dynamic>
+            : <String, dynamic>{};
+        final allowFind = data['allowEmployerDiscovery'] == true;
+
+        return _ProfileCard(
+          child: Column(
             children: [
-              _buildIconBox(Icons.groups_2_outlined),
-              const SizedBox(width: 14),
-              const Expanded(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildIconBox(Icons.groups_2_outlined),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Text(
+                      'Cho phép Nhà Tuyển Dụng\ntìm thấy bạn',
+                      style: TextStyle(
+                        fontSize: 17,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (_updatingVisibility)
+                    const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    Switch(
+                      value: allowFind,
+                      activeThumbColor: const Color(0xFF2E7D32),
+                      onChanged: (value) =>
+                          _onAllowEmployerDiscoveryChanged(controller, value),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
                 child: Text(
-                  'Cho phép Nhà Tuyển Dụng\ntìm thấy bạn',
-                  style: TextStyle(
-                    fontSize: 17,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
+                  allowFind
+                      ? 'Hồ sơ của bạn đang hiển thị với Nhà Tuyển Dụng.'
+                      : 'Bật tìm kiếm để tăng khả năng được liên hệ\nbởi NTD.',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.35,
+                    color: Color(0xFF9A9A9A),
                   ),
                 ),
               ),
-              Switch(
-                value: _allowEmployerFind,
-                activeThumbColor: const Color(0xFF2E7D32),
-                onChanged: (value) {
-                  setState(() => _allowEmployerFind = value);
-                },
-              ),
             ],
           ),
-          const SizedBox(height: 10),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Bật tìm kiếm để tăng khả năng được liên hệ\nbởi NTD.',
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.35,
-                color: Color(0xFF9A9A9A),
-              ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadAvatar(AuthController authController) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Chọn từ thư viện'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
-          ),
-        ],
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Chụp ảnh'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+          ],
+        ),
       ),
     );
+    if (source == null || !mounted) return;
+
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 80,
+      maxWidth: 1024,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final controller = Get.put(UpdateAccountController());
+      await controller.uploadAvatar(File(picked.path));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã cập nhật ảnh đại diện'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể tải ảnh. Vui lòng thử lại.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  Future<void> _onAllowEmployerDiscoveryChanged(
+    UpdateAccountController controller,
+    bool value,
+  ) async {
+    setState(() => _updatingVisibility = true);
+    try {
+      await controller.updateAllowEmployerDiscovery(value);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value
+                ? 'Đã bật — Nhà Tuyển Dụng có thể tìm thấy hồ sơ của bạn'
+                : 'Đã tắt — Hồ sơ của bạn không hiển thị với Nhà Tuyển Dụng',
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể cập nhật. Vui lòng thử lại.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingVisibility = false);
+    }
   }
 
   Widget _buildIconBox(IconData icon) {
@@ -626,48 +922,130 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _openJobCriteriaScreen() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const JobCriteriaScreen()),
+    );
+  }
+
   Widget _buildJobCriteriaCard() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const JobCriteriaScreen()),
-        );
-      },
-      child: _ProfileCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    final controller = Get.put(UpdateAccountController());
+
+    return StreamBuilder(
+      stream: controller.getUserData(),
+      builder: (context, snapshot) {
+        final data = snapshot.hasData && snapshot.data!.exists
+            ? snapshot.data!.data() as Map<String, dynamic>
+            : <String, dynamic>{};
+        final criteria = JobCriteriaModel.fromUserData(data);
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: _openJobCriteriaScreen,
+          child: _ProfileCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildIconBox(Icons.work_outline),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Tiêu chí tìm việc',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const JobCriteriaScreen(),
+                Row(
+                  children: [
+                    _buildIconBox(Icons.work_outline),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Tiêu chí tìm việc',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.edit_outlined,
-                    color: Color(0xFF6D6D6D),
-                    size: 27,
-                  ),
+                    ),
+                    IconButton(
+                      onPressed: _openJobCriteriaScreen,
+                      icon: Icon(
+                        criteria != null
+                            ? Icons.edit_outlined
+                            : Icons.add_circle_outline,
+                        color: const Color(0xFF6D6D6D),
+                        size: 27,
+                      ),
+                    ),
+                  ],
                 ),
+                if (criteria != null) ...[
+                  const SizedBox(height: 12),
+                  _buildCriteriaLine(
+                    Icons.work_outline,
+                    criteria.position,
+                    bold: true,
+                  ),
+                  if (criteria.locations.isNotEmpty)
+                    _buildCriteriaLine(
+                      Icons.location_on_outlined,
+                      criteria.locations.join(', '),
+                    ),
+                  if (criteria.careers.isNotEmpty)
+                    _buildCriteriaLine(
+                      Icons.category_outlined,
+                      criteria.careers.join(', '),
+                    ),
+                  if (criteria.salaryDisplay != null)
+                    _buildCriteriaLine(
+                      Icons.payments_outlined,
+                      criteria.salaryDisplay!,
+                    ),
+                  if (criteria.workTypes.isNotEmpty)
+                    _buildCriteriaLine(
+                      Icons.schedule_outlined,
+                      criteria.workTypes.join(', '),
+                    ),
+                  if (criteria.level != null && criteria.level!.isNotEmpty)
+                    _buildCriteriaLine(Icons.badge_outlined, criteria.level!),
+                  _buildCriteriaLine(
+                    Icons.history_edu_outlined,
+                    criteria.hasExperience
+                        ? 'Đã có kinh nghiệm làm việc'
+                        : 'Chưa có kinh nghiệm làm việc',
+                  ),
+                ] else ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Thêm tiêu chí để Nhà Tuyển Dụng biết bạn đang tìm việc gì.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.35,
+                      color: Color(0xFF888888),
+                    ),
+                  ),
+                ],
               ],
             ),
-          ],
-        ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCriteriaLine(IconData icon, String text, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF666666)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.3,
+                color: const Color(0xFF444444),
+                fontWeight: bold ? FontWeight.w700 : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../data/models/application_model.dart';
+import '../data/models/job_post_model.dart';
 import '../data/services/candidates_service.dart';
+import '../data/services/group_chat_service.dart';
 
 class CandidatesController extends GetxController {
   final _service = CandidatesService();
+  final _groupService = GroupChatService();
 
   final RxBool isLoadingFullTime = false.obs;
   final RxBool isLoadingPartTime = false.obs;
@@ -62,9 +65,48 @@ class CandidatesController extends GetxController {
       await _service.acceptApplication(appId, jobId);
       _updateEntry(appId, 'accepted');
       _incrementFilledSlots(jobId);
+      await _handleGroupChat(appId, jobId);
       _showSuccess('Đã duyệt ứng viên');
     } catch (e) {
       _showError('Không thể duyệt: $e');
+    }
+  }
+
+  Future<void> _handleGroupChat(String appId, String jobId) async {
+    JobWithApplications? jwA;
+    for (final list in [fullTimeJobs, partTimeJobs]) {
+      final idx = list.indexWhere((j) => j.job.jobId == jobId);
+      if (idx >= 0) { jwA = list[idx]; break; }
+    }
+    if (jwA == null) return;
+
+    final entry = jwA.entries.firstWhereOrNull((e) => e.application.appId == appId);
+    if (entry == null) return;
+
+    final candidateId = entry.candidate.uid;
+    final employerId  = entry.application.employerId;
+
+    if (jwA.job.groupChatId != null && jwA.job.groupChatId!.isNotEmpty) {
+      await _groupService.addMember(jwA.job.groupChatId!, candidateId);
+    } else {
+      final groupId = await _groupService.createGroup(
+        jobId: jobId,
+        jobTitle: jwA.job.title,
+        employerId: employerId,
+        memberIds: [candidateId],
+      );
+      _updateGroupChatId(jobId, groupId);
+    }
+  }
+
+  void _updateGroupChatId(String jobId, String groupId) {
+    for (final list in [fullTimeJobs, partTimeJobs]) {
+      final idx = list.indexWhere((j) => j.job.jobId == jobId);
+      if (idx >= 0) {
+        final j = list[idx];
+        list[idx] = j.copyWithJob(j.job.copyWith(groupChatId: groupId));
+        break;
+      }
     }
   }
 
