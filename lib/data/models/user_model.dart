@@ -11,6 +11,7 @@ class UserModel {
 	final bool isVerified;
 	final bool isActive;
 	final String? avatarUrl;
+	final String? avatarBase64; // ảnh đại diện dạng Base64 (thay thế Firebase Storage)
 	final String? gender;
 	final DateTime? dateOfBirth;
 	final String? cccd;
@@ -45,6 +46,7 @@ class UserModel {
 		this.isVerified = false,
 		this.isActive = true,
 		this.avatarUrl,
+		this.avatarBase64,
 		this.gender,
 		this.dateOfBirth,
 		this.cccd,
@@ -80,6 +82,7 @@ class UserModel {
 		bool? isVerified,
 		bool? isActive,
 		String? avatarUrl,
+		String? avatarBase64,
 		String? gender,
 		DateTime? dateOfBirth,
 		String? cccd,
@@ -112,6 +115,7 @@ class UserModel {
 			isVerified: isVerified ?? this.isVerified,
 			isActive: isActive ?? this.isActive,
 			avatarUrl: avatarUrl ?? this.avatarUrl,
+			avatarBase64: avatarBase64 ?? this.avatarBase64,
 			gender: gender ?? this.gender,
 			dateOfBirth: dateOfBirth ?? this.dateOfBirth,
 			cccd: cccd ?? this.cccd,
@@ -147,6 +151,7 @@ class UserModel {
 			'isVerified': isVerified,
 			'isActive': isActive,
 			'avatarUrl': avatarUrl,
+		if (avatarBase64 != null) 'avatarBase64': avatarBase64,
 			'gender': gender,
 			'dateOfBirth': dateOfBirth,
 			if (cccd != null) 'cccd': cccd,
@@ -180,6 +185,7 @@ class UserModel {
 			isVerified: (map['isVerified'] as bool?) ?? false,
 			isActive: (map['isActive'] as bool?) ?? true,
 			avatarUrl: map['avatarUrl']?.toString(),
+		avatarBase64: map['avatarBase64']?.toString(),
 			gender: map['gender']?.toString(),
 			dateOfBirth: _parseDate(map['dateOfBirth']),
 			cccd: map['cccd']?.toString(),

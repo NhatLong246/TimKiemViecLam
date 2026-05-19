@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -50,14 +51,12 @@ class EmployerProfileScreen extends StatelessWidget {
               _buildHeader(context, ctrl, profile),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 92),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 12),
-                      _PersonalSection(ctrl: ctrl, profile: profile),
-                      const SizedBox(height: 16),
-                      _CompanySection(ctrl: ctrl, profile: profile),
+                      _buildProfileNavCard(context, profile),
                       const SizedBox(height: 16),
                       _AccountSection(ctrl: ctrl),
                       const SizedBox(height: 24),
@@ -111,15 +110,31 @@ class EmployerProfileScreen extends StatelessWidget {
                                 errorBuilder: (_, __, ___) =>
                                     _defaultLogo(profile),
                               )
-                            : profile.avatarUrl != null &&
-                                    profile.avatarUrl!.isNotEmpty
-                                ? Image.network(
-                                    profile.avatarUrl!,
+                            : profile.avatarBase64 != null &&
+                                    profile.avatarBase64!.isNotEmpty
+                                ? Image.memory(
+                                    base64Decode(profile.avatarBase64!),
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
                                         _defaultLogo(profile),
                                   )
-                                : _defaultLogo(profile),
+                            : profile.avatarBase64 != null &&
+                                    profile.avatarBase64!.isNotEmpty
+                                ? Image.memory(
+                                    base64Decode(profile.avatarBase64!),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _defaultLogo(profile),
+                                  )
+                                : profile.avatarUrl != null &&
+                                        profile.avatarUrl!.isNotEmpty
+                                    ? Image.network(
+                                        profile.avatarUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            _defaultLogo(profile),
+                                      )
+                                    : _defaultLogo(profile),
                       ),
                     ),
                     // Camera button
@@ -209,6 +224,485 @@ class EmployerProfileScreen extends StatelessWidget {
             fontSize: 36,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Profile Navigation Card ───────────────────────────
+  Widget _buildProfileNavCard(BuildContext context, UserModel profile) {
+    return GestureDetector(
+      onTap: () => Get.to(() => const EmployerCompanyProfileScreen()),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 10),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.employerPrimary.withAlpha(26),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.business_center_outlined,
+                      size: 18,
+                      color: AppColors.employerPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Hồ sơ doanh nghiệp',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.employerGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Xem & Chỉnh sửa',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios, size: 12, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.employerPrimary.withAlpha(26),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.employerPrimary.withAlpha(51),
+                        width: 1,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: profile.companyLogoUrl != null &&
+                              profile.companyLogoUrl!.isNotEmpty
+                          ? Image.network(
+                              profile.companyLogoUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _logoPlaceholder(profile),
+                            )
+                          : _logoPlaceholder(profile),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          profile.companyName?.isNotEmpty == true
+                              ? profile.companyName!
+                              : 'Chưa có tên doanh nghiệp',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: profile.companyName?.isNotEmpty == true
+                                ? const Color(0xFF333333)
+                                : const Color(0xFFBDBDBD),
+                            fontStyle: profile.companyName?.isNotEmpty == true
+                                ? FontStyle.normal
+                                : FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (profile.companyAddress?.isNotEmpty == true) ...
+                        [
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 13,
+                                color: Color(0xFF9E9E9E),
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  profile.companyAddress!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF9E9E9E),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.person_outline,
+                              size: 13,
+                              color: Color(0xFF9E9E9E),
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                profile.fullName.isNotEmpty
+                                    ? profile.fullName
+                                    : 'Chưa có người đại diện',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF9E9E9E),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: Color(0xFFBDBDBD),
+                  ),
+                ],
+              ),
+            ),
+            _buildCompletionBar(profile),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _logoPlaceholder(UserModel profile) {
+    return Center(
+      child: Text(
+        (profile.companyName?.isNotEmpty == true
+                ? profile.companyName![0]
+                : profile.firstName.isNotEmpty
+                    ? profile.firstName[0]
+                    : '?')
+            .toUpperCase(),
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: AppColors.employerPrimary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompletionBar(UserModel profile) {
+    const total = 10;
+    var filled = 0;
+    if (profile.fullName.isNotEmpty) filled++;
+    if (profile.phone.isNotEmpty) filled++;
+    if (profile.gender?.isNotEmpty == true) filled++;
+    if (profile.dateOfBirth != null) filled++;
+    if (profile.cccd?.isNotEmpty == true) filled++;
+    if (profile.companyName?.isNotEmpty == true) filled++;
+    if (profile.companyAddress?.isNotEmpty == true) filled++;
+    if (profile.companyPhone?.isNotEmpty == true) filled++;
+    if (profile.companyTaxCode?.isNotEmpty == true) filled++;
+    if (profile.companyDescription?.isNotEmpty == true) filled++;
+    final percent = filled / total;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Độ hoàn thiện hồ sơ',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              Text(
+                '$filled/$total thông tin',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.employerPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percent,
+              backgroundColor: const Color(0xFFE0E0E0),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppColors.employerPrimary,
+              ),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Employer Company Profile Screen ─────────────────────
+
+class EmployerCompanyProfileScreen extends StatelessWidget {
+  const EmployerCompanyProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = Get.find<EmployerProfileController>();
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: Obx(() {
+        if (ctrl.isLoading.value) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.employerPrimary),
+          );
+        }
+        final profile = ctrl.profile.value;
+        if (profile == null) {
+          return const Center(child: Text('Không có dữ liệu'));
+        }
+        return NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            SliverAppBar(
+              pinned: true,
+              leading: IconButton(
+                onPressed: () => Get.back(),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                ),
+              ),
+              title: const Text(
+                'Hồ sơ doanh nghiệp',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              flexibleSpace: Container(
+                decoration:
+                    const BoxDecoration(gradient: AppColors.employerGradient),
+              ),
+            ),
+          ],
+          body: RefreshIndicator(
+            color: AppColors.employerPrimary,
+            onRefresh: ctrl.loadProfile,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLogoCard(context, ctrl, profile),
+                  const SizedBox(height: 16),
+                  _PersonalSection(ctrl: ctrl, profile: profile),
+                  const SizedBox(height: 16),
+                  _CompanySection(ctrl: ctrl, profile: profile),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildLogoCard(
+    BuildContext context,
+    EmployerProfileController ctrl,
+    UserModel profile,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: AppColors.employerPrimary.withAlpha(26),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppColors.employerPrimary.withAlpha(77),
+                    width: 2,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: profile.companyLogoUrl != null &&
+                          profile.companyLogoUrl!.isNotEmpty
+                      ? Image.network(
+                          profile.companyLogoUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _logoDetailPlaceholder(profile),
+                        )
+                      : profile.avatarBase64 != null &&
+                              profile.avatarBase64!.isNotEmpty
+                          ? Image.memory(
+                              base64Decode(profile.avatarBase64!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _logoDetailPlaceholder(profile),
+                            )
+                          : profile.avatarUrl != null &&
+                                  profile.avatarUrl!.isNotEmpty
+                              ? Image.network(
+                                  profile.avatarUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _logoDetailPlaceholder(profile),
+                                )
+                              : _logoDetailPlaceholder(profile),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => ctrl.uploadAvatar(),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.employerPrimary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            profile.companyName?.isNotEmpty == true
+                ? profile.companyName!
+                : profile.fullName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF333333),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            profile.email,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E)),
+          ),
+          if (profile.isVerified) ...
+          [
+            const SizedBox(height: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.withAlpha(26),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.verified, size: 14, color: Colors.green),
+                  SizedBox(width: 4),
+                  Text(
+                    'Đã xác minh',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _logoDetailPlaceholder(UserModel profile) {
+    return Center(
+      child: Text(
+        (profile.companyName?.isNotEmpty == true
+                ? profile.companyName![0]
+                : profile.firstName.isNotEmpty
+                    ? profile.firstName[0]
+                    : '?')
+            .toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.employerPrimary,
+          fontSize: 40,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -848,6 +1342,7 @@ class _AccountSection extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(context);
               await ctrl.logout();
+              Get.offAllNamed(AppRoutes.login);
             },
             child: const Text('Đăng xuất'),
           ),
