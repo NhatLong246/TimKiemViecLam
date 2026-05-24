@@ -48,6 +48,11 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
+        <!-- MoMo / MoMo Test deeplink momo:// -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="momo" />
+        </intent>
     </queries>
     <application
         android:label="viecnow"
@@ -73,6 +78,15 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Quay lại app sau thanh toán MoMo -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="viecnow"
+                    android:host="momo-return" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

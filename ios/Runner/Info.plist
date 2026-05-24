@@ -70,5 +70,20 @@
 	<string>Ứng dụng cần quyền camera để chụp ảnh đại diện.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ứng dụng cần quyền thư viện ảnh để chọn ảnh đại diện.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>momo</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>viecnow.momo.return</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>viecnow</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

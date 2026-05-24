@@ -46,7 +46,9 @@
 | `companyAddress` | `String?` | Địa chỉ công ty |
 | `companyLogoUrl` | `String?` | Logo công ty |
 | `walletBalance` | `double` | Số dư ví (default: 0.0) |
+| `totalDeposited` | `double` | Tổng tiền đã nạp (default: 0.0) |
 | `totalSpent` | `double` | Tổng tiền đã chi (default: 0.0) |
+| `walletSpendingLimit` | `double?` | Hạn mức chi mỗi giao dịch từ ví (`null` = không giới hạn) |
 
 **Chỉ cho Candidate thêm:**
 | Field | Kiểu | Mô tả |
@@ -172,6 +174,35 @@
 | `expectedStartTime` | `String` | Giờ bắt đầu quy định (`"HH:mm"`) |
 | `records` | `List<Map>` | `[{candidateId, checkInTime, status: "on_time"\|"late"\|"absent", lateMinutes}]` |
 | `createdAt` | `Timestamp` | Server timestamp |
+
+---
+
+### Collection: `walletTransactions`
+**Path:** `walletTransactions/{txId}`
+**PK:** `txId` (auto-generate)
+**Duplicate check:** MoMo nạp tiền — `orderId` unique per flow; chi ví — `idempotencyKey` nếu có
+
+| Field | Kiểu | Mô tả |
+|---|---|---|
+| `userId` | `String` | UID employer |
+| `type` | `String` | `"deposit"` \| `"payment"` \| `"withdrawal"` \| `"refund"` |
+| `amount` | `double` | Số tiền (dương) |
+| `description` | `String` | Mô tả hiển thị |
+| `status` | `String` | `"pending"` \| `"completed"` \| `"failed"` |
+| `paymentMethod` | `String?` | `"momo"` \| `"wallet"` |
+| `orderId` | `String?` | Mã đơn MoMo |
+| `requestId` | `String?` | Request MoMo |
+| `payUrl` | `String?` | URL thanh toán MoMo |
+| `momoTransId` | `String?` | Mã giao dịch MoMo sau khi thành công |
+| `refundedAmount` | `double` | Số tiền đã hoàn từ giao dịch nạp (default: 0) |
+| `refundOrderId` | `String?` | Mã đơn hoàn tiền MoMo (rút) |
+| `sourceDepositOrderId` | `String?` | orderId giao dịch nạp gốc (rút) |
+| `jobId` | `String?` | Job liên quan (khi chi) |
+| `idempotencyKey` | `String?` | Tránh trừ ví trùng |
+| `balanceBefore` | `double?` | Số dư trước (chi ví) |
+| `balanceAfter` | `double?` | Số dư sau (chi ví) |
+| `createdAt` | `Timestamp` | Server timestamp |
+| `completedAt` | `Timestamp?` | Khi `status == completed` |
 
 ---
 
