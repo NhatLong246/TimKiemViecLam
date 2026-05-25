@@ -149,6 +149,7 @@ class MessagingController extends GetxController {
         startTime: startTime,
         endTime: endTime,
         jobTitle: thread.jobTitle,
+        employerName: thread.peerName,
       );
     } finally {
       isSending.value = false;

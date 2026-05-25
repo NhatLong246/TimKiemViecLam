@@ -155,6 +155,9 @@
 | `startTime` | `String` | Format: `"HH:mm"` |
 | `endTime` | `String` | Format: `"HH:mm"` |
 | `status` | `String` | `"scheduled"` \| `"completed"` \| `"cancelled"` |
+| `jobTitle` | `String?` | Denormalized — tên job (hiển thị lịch) |
+| `jobLocation` | `String?` | Denormalized — địa điểm làm |
+| `employerName` | `String?` | Denormalized — tên công ty / employer |
 | `createdAt` | `Timestamp` | Server timestamp |
 
 ---
