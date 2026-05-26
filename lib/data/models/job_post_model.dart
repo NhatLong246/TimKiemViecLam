@@ -57,6 +57,28 @@ class JobPostModel {
     return city.isNotEmpty ? city : (location['address'] as String? ?? '');
   }
 
+  double? get locationLat => (location['lat'] as num?)?.toDouble();
+
+  double? get locationLng => (location['lng'] as num?)?.toDouble();
+
+  /// Tọa độ hợp lệ từ Firestore (`location.lat` / `location.lng`).
+  bool get hasMapCoordinates {
+    final lat = locationLat;
+    final lng = locationLng;
+    if (lat == null || lng == null) return false;
+    if (lat.abs() < 1e-6 && lng.abs() < 1e-6) return false;
+    return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  }
+
+  /// Chuỗi đích cho Google Maps khi không có tọa độ.
+  String get mapsDestinationQuery {
+    final address = (location['address'] as String?)?.trim() ?? '';
+    if (address.isNotEmpty) return address;
+    final display = locationDisplay.trim();
+    if (display.isNotEmpty) return display;
+    return title;
+  }
+
   String get salaryDisplay {
     final formatted = _formatNumber(salary.toInt());
     switch (salaryType) {

@@ -5,6 +5,7 @@ import '../../controller/job_detail_controller.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/job_post_model.dart';
 import '../messaging/conversation_list_screen.dart';
+import 'job_directions_map_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -131,24 +132,54 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            color: Colors.grey.shade600,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              location,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade700,
-                              ),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: location.isEmpty
+                              ? null
+                              : () => _openDirectionsMap(context),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  color: location.isEmpty
+                                      ? Colors.grey.shade600
+                                      : primaryColor,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    location.isEmpty
+                                        ? 'Chưa có địa điểm'
+                                        : location,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: location.isEmpty
+                                          ? Colors.grey.shade700
+                                          : primaryColor,
+                                      decoration: location.isEmpty
+                                          ? null
+                                          : TextDecoration.underline,
+                                      decorationColor: primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                if (location.isNotEmpty) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.map_outlined,
+                                    size: 18,
+                                    color: primaryColor,
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -396,6 +427,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openDirectionsMap(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => JobDirectionsMapScreen(job: job),
       ),
     );
   }
