@@ -108,8 +108,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
             EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
@@ -254,7 +253,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showTopUpSheet,
         backgroundColor: const Color(0xFFAD1457),
@@ -429,7 +428,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -465,7 +464,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
   Widget _buildTabBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -547,7 +546,7 @@ class _WalletHistoryTab extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
@@ -707,7 +706,7 @@ class _WalletStatsTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
@@ -785,12 +784,14 @@ class _WalletStatsTab extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _summaryCard(
+                  ctx,
                   'T\u1ed5ng \u0111\u00e3 n\u1ea1p',
                   totalDep,
                   const Color(0xFF2E7D32),
                   Icons.add_circle_outline_rounded),
               const SizedBox(height: 10),
               _summaryCard(
+                  ctx,
                   'T\u1ed5ng \u0111\u00e3 chi',
                   totalSpent,
                   const Color(0xFFC62828),
@@ -825,13 +826,13 @@ class _WalletStatsTab extends StatelessWidget {
                 fontSize: 12, color: Color(0xFF616161))),
       ]);
 
-  Widget _summaryCard(
-      String label, double value, Color color, IconData icon) {
+  Widget _summaryCard(BuildContext context, String label, double value,
+      Color color, IconData icon) {
     return Container(
       padding:
           const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(

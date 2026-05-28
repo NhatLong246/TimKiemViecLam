@@ -30,7 +30,7 @@ class EmployerMarketRateScreen extends StatelessWidget {
           _buildHeader(c, context),
           _buildCategoryChips(c),
           _buildSortBar(c),
-          Expanded(child: _buildBody(c)),
+          Expanded(child: _buildBody(context, c)),
         ],
       ),
     );
@@ -194,7 +194,7 @@ class EmployerMarketRateScreen extends StatelessWidget {
     return Container(
       height: 46,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         // No boxShadow — prevents border-like halo on gradient background
       ),
@@ -463,7 +463,7 @@ class EmployerMarketRateScreen extends StatelessWidget {
   }
 
   // ── BODY ─────────────────────────────────────────────────────────────────────
-  Widget _buildBody(EmployerReferenceController c) {
+  Widget _buildBody(BuildContext context, EmployerReferenceController c) {
     return Obx(() {
       if (c.isLoading.value) {
         return const Center(child: _LoadingShimmer());
@@ -480,20 +480,21 @@ class EmployerMarketRateScreen extends StatelessWidget {
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
           itemCount: c.filteredItems.length,
-          itemBuilder: (_, i) => _buildRateCard(c.filteredItems[i]),
+          itemBuilder: (_, i) =>
+              _buildRateCard(context, c.filteredItems[i]),
         ),
       );
     });
   }
 
   // ── MARKET RATE CARD ─────────────────────────────────────────────────────────
-  Widget _buildRateCard(MarketRateItem item) {
+  Widget _buildRateCard(BuildContext context, MarketRateItem item) {
     final demandColors = _demandStyle(item.demandLevel);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
@@ -894,8 +895,7 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
 
     return Container(
       constraints: BoxConstraints(maxHeight: screenH * 0.88),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(28),
           topRight: Radius.circular(28),

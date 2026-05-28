@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../utils/chat_wallpaper_preferences.dart';
 
 class GroupChatModel {
   final String groupId;
@@ -10,6 +11,10 @@ class GroupChatModel {
   final String? groupAvatarBase64;       // ảnh đại diện nhóm (Base64)
   final Map<String, String> nicknames;   // userId → biệt danh
   final List<String> mutedBy;            // danh sách userId đã tắt thông báo
+  final String? chatWallpaperPresetId;
+  final String? chatWallpaperImageBase64;
+  /// `active` | `closed` — closed = nhóm đã giải tán, có thể khiếu nại sau.
+  final String status;
 
   const GroupChatModel({
     required this.groupId,
@@ -21,10 +26,30 @@ class GroupChatModel {
     this.groupAvatarBase64,
     this.nicknames = const {},
     this.mutedBy = const [],
+    this.chatWallpaperPresetId,
+    this.chatWallpaperImageBase64,
+    this.status = 'active',
   });
+
+  bool get isDissolved => status == 'closed';
+
+  /// Hình nền chung của nhóm (đồng bộ Firestore).
+  ChatWallpaperConfig get chatWallpaper => ChatWallpaperConfig.fromGroupFields(
+        presetId: chatWallpaperPresetId,
+        imageBase64: chatWallpaperImageBase64,
+      );
 
   factory GroupChatModel.fromMap(Map<String, dynamic> map, String docId) {
     final rawNick = map['nicknames'] as Map? ?? {};
+    final wpRaw = map['chatWallpaper'] as Map?;
+    String? wpPreset;
+    String? wpImage;
+    if (wpRaw != null) {
+      wpPreset = wpRaw['presetId']?.toString();
+      wpImage = wpRaw['imageBase64']?.toString();
+      if (wpPreset == 'default' || wpPreset?.isEmpty == true) wpPreset = null;
+      if (wpImage?.isEmpty == true) wpImage = null;
+    }
     return GroupChatModel(
       groupId: docId,
       jobId: map['jobId'] as String? ?? '',
@@ -35,6 +60,9 @@ class GroupChatModel {
       groupAvatarBase64: map['groupAvatarBase64'] as String?,
       nicknames: Map<String, String>.from(rawNick),
       mutedBy: List<String>.from(map['mutedBy'] as List? ?? []),
+      chatWallpaperPresetId: wpPreset,
+      chatWallpaperImageBase64: wpImage,
+      status: (map['status'] as String?) ?? 'active',
     );
   }
 

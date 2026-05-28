@@ -96,7 +96,7 @@ class _MystoreScreenState extends State<MystoreScreen> {
               width: 100,
               margin: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(

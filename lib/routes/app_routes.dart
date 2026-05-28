@@ -7,7 +7,6 @@ import 'package:viecnow/screens/auth/forget_password_screen.dart';
 import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
 import 'package:viecnow/screens/post/post_management_screen.dart';
 import 'package:viecnow/screens/post/create_post_screen.dart';
-import 'package:viecnow/screens/menu_employer/employer_menu_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_messages_screen.dart';
 import 'package:viecnow/screens/menu_employer/attendance_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/schedule_tool_screen.dart';
@@ -15,11 +14,22 @@ import 'package:viecnow/screens/menu_employer/rating_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_report_screen.dart';
 import 'package:viecnow/screens/chat/employer_groups_screen.dart';
 import 'package:viecnow/screens/chat/group_chat_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:viecnow/screens/messaging/chat_room_screen.dart';
+import 'package:viecnow/data/models/group_chat_model.dart';
 import 'package:viecnow/screens/chat/group_management_screen.dart';
 import 'package:viecnow/screens/chat/work_schedule_screen.dart';
 import 'package:viecnow/screens/chat/complaint_screen.dart';
 import 'package:viecnow/screens/chat/search_messages_screen.dart';
 import 'package:viecnow/screens/employer/attendance_screen.dart' as att_screen;
+import 'package:viecnow/screens/employer/job_day_end_flow_screen.dart';
+import 'package:viecnow/screens/employer/job_attendance_summary_screen.dart';
+import 'package:viecnow/screens/attendance/candidate_attendance_screen.dart';
+import 'package:viecnow/screens/candidate/candidate_job_complaint_screen.dart';
+import 'package:viecnow/screens/shared/post_dissolution_complaint_screen.dart';
+import 'package:viecnow/screens/shared/complaints_catalog_screen.dart';
+import 'package:viecnow/screens/admin/admin_home_screen.dart';
+import 'package:viecnow/screens/admin/admin_disbursement_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_wallet_screen.dart';
 import 'package:viecnow/screens/reference/employer_market_rate_screen.dart';
 import 'package:viecnow/screens/stats/employer_stats_screen.dart';
@@ -102,8 +112,16 @@ class AppRoutes {
   static const String groupChat = '/group-chat';
   static const String groupManagement = '/group-management';
   static const String attendance = '/attendance';
+  static const String candidateAttendance = '/candidate-attendance';
   static const String workSchedule = '/work-schedule';
   static const String complaint = '/complaint';
+  static const String jobDayEndFlow = '/job-day-end-flow';
+  static const String jobAttendanceSummary = '/job-attendance-summary';
+  static const String candidateJobComplaint = '/candidate-job-complaint';
+  static const String postDissolutionComplaint = '/post-dissolution-complaint';
+  static const String complaintsCatalog = '/complaints-catalog';
+  static const String adminHome = '/admin-home';
+  static const String adminDisbursements = '/admin-disbursements';
   static const String searchMessages = '/search-messages';
   static const String employerNotifications = '/employer-notifications';
   static const String employerSearch = '/employer-search';
@@ -149,11 +167,33 @@ class AppRoutes {
     employerReviews: (context) => const EmployerReviewsScreen(),
     employerLoginHistory: (context) => const EmployerLoginHistoryScreen(),
     employerCandidates: (context) => const EmployerCandidatesScreen(),
-    AppRoutes.groupChat: (context) => const GroupChatScreen(),
+    AppRoutes.groupChat: (context) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is GroupChatModel) {
+        final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+        return ChatRoomScreen(
+          groupId: args.groupId,
+          isEmployer: uid.isNotEmpty && uid == args.employerId,
+        );
+      }
+      return const GroupChatScreen();
+    },
     AppRoutes.groupManagement: (context) => const GroupManagementScreen(),
     AppRoutes.attendance: (context) => const att_screen.AttendanceScreen(),
+    AppRoutes.candidateAttendance: (context) =>
+        const CandidateAttendanceScreen(),
     AppRoutes.workSchedule: (context) => const WorkScheduleScreen(),
     AppRoutes.complaint: (context) => const ComplaintScreen(),
+    AppRoutes.jobDayEndFlow: (context) => const JobDayEndFlowScreen(),
+    AppRoutes.jobAttendanceSummary: (context) =>
+        const JobAttendanceSummaryScreen(),
+    AppRoutes.candidateJobComplaint: (context) =>
+        const CandidateJobComplaintScreen(),
+    AppRoutes.postDissolutionComplaint: (context) =>
+        const PostDissolutionComplaintScreen(),
+    AppRoutes.complaintsCatalog: (context) => const ComplaintsCatalogScreen(),
+    AppRoutes.adminHome: (context) => const AdminHomeScreen(),
+    AppRoutes.adminDisbursements: (context) => const AdminDisbursementScreen(),
     AppRoutes.searchMessages: (context) => const SearchMessagesScreen(),
     AppRoutes.employerNotifications: (context) =>
         const EmployerNotificationsScreen(),

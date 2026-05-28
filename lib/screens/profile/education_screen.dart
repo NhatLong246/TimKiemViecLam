@@ -122,7 +122,7 @@ class _EducationScreenState extends State<EducationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(
         context,
         _isEditing ? 'Chỉnh sửa học vấn' : 'Trình độ học vấn',
@@ -141,8 +141,7 @@ class _EducationScreenState extends State<EducationScreen> {
                 validator: (v) => v == null || v.trim().isEmpty
                     ? 'Vui lòng nhập tên trường'
                     : null,
-                decoration: ProfileFormTheme.fieldDecoration(
-                  hintText: 'Nhập tên trường học',
+                decoration: ProfileFormTheme.fieldDecoration(hintText: 'Nhập tên trường học',
                 ),
               ),
               const SizedBox(height: 20),
@@ -154,8 +153,7 @@ class _EducationScreenState extends State<EducationScreen> {
                       children: [
                         ProfileFormTheme.requiredLabel('Năm bắt đầu'),
                         const SizedBox(height: 8),
-                        ProfileFormTheme.dateField(
-                          value: _startYear,
+                        ProfileFormTheme.dateField(value: _startYear,
                           placeholder: 'YYYY',
                           onTap: () => _pickYear(true),
                         ),
@@ -169,8 +167,7 @@ class _EducationScreenState extends State<EducationScreen> {
                       children: [
                         ProfileFormTheme.requiredLabel('Năm kết thúc'),
                         const SizedBox(height: 8),
-                        ProfileFormTheme.dateField(
-                          value: _endYear,
+                        ProfileFormTheme.dateField(value: _endYear,
                           placeholder: 'YYYY',
                           onTap: () => _pickYear(false),
                         ),
@@ -184,15 +181,13 @@ class _EducationScreenState extends State<EducationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _majorController,
-                decoration: ProfileFormTheme.fieldDecoration(
-                  hintText: 'Nhập ngành học',
+                decoration: ProfileFormTheme.fieldDecoration(hintText: 'Nhập ngành học',
                 ),
               ),
               const SizedBox(height: 20),
               ProfileFormTheme.requiredLabel('Bằng cấp', required: false),
               const SizedBox(height: 8),
-              ProfileFormTheme.selectField(
-                value: _degree,
+              ProfileFormTheme.selectField(value: _degree,
                 placeholder: 'Chọn bằng cấp',
                 onTap: () async {
                   final picked = await showProfileOptionSheet(
@@ -211,8 +206,7 @@ class _EducationScreenState extends State<EducationScreen> {
                 controller: _descriptionController,
                 minLines: 4,
                 maxLines: 8,
-                decoration: ProfileFormTheme.fieldDecoration(
-                  hintText: 'Nhập mô tả',
+                decoration: ProfileFormTheme.fieldDecoration(hintText: 'Nhập mô tả',
                   maxLines: 4,
                 ),
               ),

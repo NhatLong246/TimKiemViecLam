@@ -5,7 +5,7 @@
 
 ## Trạng thái ký hiệu
 - `✅` Done — Đã hoàn thành, có thể tham chiếu
-- `🔄` In Progress — Đang làm
+- `🔄` In Progress — Đang làm / một phần còn thiếu
 - `❌` Not Started — Chưa làm
 - `⚠️` Needs Fix — Có vấn đề cần sửa
 
@@ -15,141 +15,164 @@
 
 | # | Tính năng | Screen/File | Status | Ghi chú |
 |---|---|---|---|---|
-| S1 | Splash & routing logic | `splash_screen.dart` | ✅ | |
-| S2 | Onboarding | `onboarding_screen.dart` | ✅ | |
-| S3 | Đăng ký tài khoản | `register_screen.dart` | ✅ | Chưa có chọn role Employer/Candidate |
-| S4 | Đăng nhập | `login_screen.dart` | ✅ | |
-| S5 | Quên mật khẩu | `forget_password_screen.dart` | ✅ | |
-| S6 | Xác thực email | `verify_email_screen.dart` | ✅ | |
-| S7 | Đổi tên | `change_name_screen.dart` | ✅ | |
-| S8 | Đổi username | `change_username_screen.dart` | ✅ | |
-| S9 | Đổi email | `change_email_screen.dart` | ✅ | |
-| S10 | Đổi SĐT | `change_phonenumber_screen.dart` | ✅ | |
-| S11 | Đổi giới tính | `change_gender_screen.dart` | ✅ | |
-| S12 | Đổi ngày sinh | `change_dateofbirth_screen.dart` | ✅ | |
-| S13 | Tài khoản ngân hàng | `my_bank_account_screen.dart` | ✅ | |
-| S14 | Thêm/sửa tài khoản NH | `add_edit_bank_account_screen.dart` | ✅ | |
-| S15 | Main Navigation (bottom nav) | `main_navigation_screen.dart` | ✅ | Cần tách theo role |
+| S1 | Splash & routing logic | `screens/spalsh/splash_screen.dart` | ✅ | |
+| S2 | Onboarding | `screens/onboarding/onboarding_screen.dart` | ✅ | |
+| S3 | Đăng ký tài khoản | `screens/auth/register_screen.dart` | ⚠️ | Hoạt động; chưa chọn role Employer/Candidate khi đăng ký |
+| S4 | Đăng nhập | `screens/auth/login_screen.dart` | ✅ | Email + Google/Facebook |
+| S5 | Quên mật khẩu | `screens/auth/forget_password_screen.dart` | ✅ | |
+| S6 | Xác thực email | `screens/auth/verify_email_screen.dart` | ✅ | |
+| S7 | Đổi tên | `screens/profile/change_name_screen.dart` | ✅ | |
+| S8 | Đổi username | `screens/profile/change_username_screen.dart` | ✅ | |
+| S9 | Đổi email | `screens/profile/change_email_screen.dart` | ✅ | |
+| S10 | Đổi SĐT | `screens/profile/change_phonenumber_screen.dart` | ✅ | |
+| S11 | Đổi giới tính | `screens/profile/change_gender_screen.dart` | ✅ | |
+| S12 | Đổi ngày sinh | `screens/profile/change_dateofbirth_screen.dart` | ✅ | |
+| S13 | Tài khoản ngân hàng | `screens/bank_account/my_bank_account_screen.dart` | ✅ | |
+| S14 | Thêm/sửa tài khoản NH | `screens/bank_account/add_edit_bank_account_screen.dart` | ✅ | |
+| S15 | Main Navigation (bottom nav) | `screens/home/main_navigation_screen.dart` | ✅ | Ứng viên; NTD: `employer_main_navigation_screen.dart` |
+| S16 | Hồ sơ / cập nhật tài khoản | `screens/profile/profile_screen.dart`, `update_account_screen.dart` | ✅ | |
+| S17 | Thông báo (chuông) | `screens/notification/notification_screen.dart` | ✅ | Lọc mute nhóm chat |
+| S18 | Chatbot AI (Gemini) | `screens/chatbot/chatbot_screen.dart` | ✅ | FAB nổi trên home |
 
 ---
 
 ## CANDIDATE FEATURES
 
-| # | Tính năng | Screen/File (dự kiến) | Status | Ghi chú |
+| # | Tính năng | Screen/File | Status | Ghi chú |
 |---|---|---|---|---|
-| C1 | Feed công việc (Home) | `screens/job/job_feed_screen.dart` | ❌ | |
-| C2 | Tìm kiếm việc làm | `screens/search/search_screen.dart` | ✅ | Tìm theo keyword, mức lương, khoảng cách (thành phố) |
-| C3 | Xem chi tiết công việc | `screens/job/job_detail_screen.dart` | ❌ | |
-| C4 | Ứng tuyển (part-time: đề xuất) | `controller/application_controller.dart` | ❌ | Kiểm tra duplicate `candidateId+jobId` |
-| C5 | Nộp CV (full-time) | `screens/job/apply_fulltime_screen.dart` | ❌ | Upload CV lên Firebase Storage |
-| C6 | Danh sách đã ứng tuyển | `screens/application/my_applications_screen.dart` | ❌ | |
-| C7 | Lịch làm việc | `screens/schedule/candidate_schedule_screen.dart` | ❌ | Calendar view tuần/tháng |
-| C8 | Thống kê thu nhập | `screens/stats/candidate_stats_screen.dart` | ❌ | Tổng job, tổng thu nhập |
-| C9 | CV cá nhân | `screens/profile/cv_screen.dart` | ❌ | Dành cho full-time |
-| C10 | Tham khảo giá thị trường | `screens/reference/market_rate_screen.dart` | ❌ | So sánh lương theo loại job + khu vực |
-| C11 | Đánh giá Employer | `controller/review_controller.dart` | ❌ | Sau khi hoàn thành job |
-| C12 | Xem đánh giá cá nhân | `screens/profile/my_ratings_screen.dart` | ❌ | |
-| C13 | Tạo Lead Group | `screens/group/create_lead_group_screen.dart` | ❌ | Nhóm Candidates |
-| C14 | Phân loại công việc | `screens/job/job_category_screen.dart` | ❌ | |
+| C1 | Feed công việc (Home) | `screens/home/home_screen.dart` | ✅ | Việc mới nhất, refresh, quick tools |
+| C2 | Tìm kiếm việc làm | `screens/search/search_screen.dart`, `search_results_screen.dart` | ✅ | Keyword, lương, khoảng cách |
+| C3 | Xem chi tiết công việc | `screens/job/job_detail_screen.dart` | ✅ | `job_detail_controller.dart` |
+| C4 | Ứng tuyển (part-time) | `controller/job_detail_controller.dart` | ✅ | `applyForJob`; check duplicate qua service |
+| C5 | Nộp CV (full-time) | `screens/job/apply_fulltime_screen.dart` | ❌ | Chưa có màn riêng upload CV |
+| C6 | Danh sách đã ứng tuyển | — | ❌ | Có `application_service.dart`, chưa có màn list |
+| C7 | Lịch làm việc | `screens/schedule/candidate_schedule_screen.dart` | ✅ | Quick tool "Lịch làm" |
+| C8 | Thống kê thu nhập | `screens/stats/candidate_stats_screen.dart` | ✅ | Quick tool "Thống kê" |
+| C9 | CV / hồ sơ chi tiết | `screens/profile/my_profile_screen.dart` + form screens | 🔄 | Kinh nghiệm, học vấn, kỹ năng, chứng chỉ… |
+| C10 | Tham khảo giá thị trường | `screens/reference/market_rate_screen.dart` | ✅ | Quick tool "Tham khảo" |
+| C11 | Đánh giá Employer | `screens/menu_candidate/candidate_reviews_screen.dart` | 🔄 | UI có; logic đánh giá đầy đủ chưa rõ |
+| C12 | Xem đánh giá cá nhân | `screens/menu_candidate/candidate_reviews_screen.dart` | 🔄 | |
+| C13 | Nhóm / Lead Group (ứng viên) | `screens/menu_candidate/candidate_groups_screen.dart` | ✅ | Menu ứng viên |
+| C14 | Phân loại / tiêu chí việc | `screens/profile/job_criteria_screen.dart` | ✅ | |
+| C15 | Menu ứng viên (benefits, nhóm…) | `screens/menu_candidate/candidate_menu_scaffold.dart` | ✅ | |
+| C16 | Điểm danh (ứng viên) | `screens/attendance/candidate_attendance_screen.dart` | ✅ | Chỉ ngày làm bắt buộc (`workSchedules` hoặc start–end job) |
+| C18 | Khiếu nại sau giải tán | `post_dissolution_complaint_screen.dart` | ✅ | Chỉ nhóm `closed`; oan ức sau giải tán |
+| C17 | Phân công ca (ứng viên) | `screens/attendance/candidate_work_assignment_screen.dart` | ✅ | |
 
 ---
 
 ## EMPLOYER FEATURES
 
-| # | Tính năng | Screen/File (dự kiến) | Status | Ghi chú |
+| # | Tính năng | Screen/File | Status | Ghi chú |
 |---|---|---|---|---|
-| E1 | Dashboard Employer | `screens/employer/employer_home_screen.dart` | ✅ | Giao diện quản lý, mock data, bottom nav employer |
-| E2 | Đăng tin tuyển dụng | `screens/employer/post_job_screen.dart` | ❌ | Cần check budget trong ví |
-| E3 | Xem/Sửa/Xóa tin đăng | `screens/employer/manage_jobs_screen.dart` | ❌ | |
-| E4 | Xem danh sách ứng viên | `screens/employer/applicants_screen.dart` | ❌ | |
-| E5 | Duyệt/Từ chối ứng viên | `controller/employer_application_controller.dart` | ❌ | Tạo group chat sau khi duyệt |
-| E6 | Quản lý nhân viên đang làm | `screens/employer/manage_employees_screen.dart` | ❌ | Tính lương, theo dõi |
-| E7 | Điểm danh | `screens/employer/attendance_screen.dart` | ❌ | Theo giờ setup, check trễ/đúng |
-| E8 | Lịch làm việc | `screens/employer/employer_schedule_screen.dart` | ❌ | Thêm lịch vào group chat |
-| E9 | Thống kê chi tiêu | `screens/stats/employer_stats_screen.dart` | ✅ | Bar+Line+Area charts, filter Ngày/Tuần/Tháng/Năm, date range picker, 6 stat cards |
-| E10 | Xác nhận hoàn thành job | `controller/job_completion_controller.dart` | ❌ | 2 bên xác nhận |
-| E11 | Thanh toán lương | `controller/payment_controller.dart` | ❌ | Từ ví → tài khoản Candidate |
-| E12 | Xử lý tranh chấp | `screens/employer/dispute_screen.dart` | ❌ | Xác nhận từ Candidates khác |
-| E13 | Nạp tiền vào ví | `screens/wallet/deposit_screen.dart` | ❌ | |
-| E14 | Lịch sử giao dịch | `screens/wallet/transaction_history_screen.dart` | ❌ | |
-| E15 | Rút tiền | `screens/wallet/withdrawal_screen.dart` | ❌ | |
-| E16 | Tham khảo giá thị trường | `screens/reference/employer_market_rate_screen.dart` | ✅ | Employer: xem mặt bằng lương theo category + khu vực. Route: `/employer-reference` |
-| E17 | Đánh giá Candidate | `controller/review_controller.dart` | ❌ | |
+| E1 | Dashboard Employer | `screens/employer/employer_home_screen.dart` | ✅ | Bottom nav, quick tools |
+| E2 | Đăng tin tuyển dụng | `screens/post/create_post_screen.dart` | ✅ | Validate đầy đủ + ảnh minh họa (`imageUrls`) |
+| E3 | Xem/Sửa/Xóa tin đăng | `screens/post/post_management_screen.dart` | ✅ | |
+| E4 | Xem danh sách ứng viên | `screens/employer/employer_candidates_screen.dart` | ✅ | |
+| E5 | Duyệt/Từ chối ứng viên | `controller/candidates_controller.dart` | ✅ | Accept → tạo/thêm nhóm chat |
+| E6 | Quản lý nhân viên đang làm | `screens/employer/employer_candidates_screen.dart` | 🔄 | Gộp với duyệt ứng viên; chưa tách màn riêng lương |
+| E7 | Điểm danh | `screens/employer/attendance_screen.dart` | ✅ | Cuối ngày → giải ngân & đánh giá; bảng tổng hợp |
+| E7b | Bảng điểm danh tổng hợp | `screens/employer/job_attendance_summary_screen.dart` | ✅ | Menu nhóm NTD |
+| E7c | Kết thúc ngày / giải ngân | `screens/employer/job_day_end_flow_screen.dart` | ✅ | Chỉ khi đủ N ngày điểm danh (N=1 → 1 ngày xong là giải ngân) |
+| E7d | Nhắc giải ngân tự động (hết endDate) | `job_disbursement_reminder_service.dart` | ✅ | Poll mỗi phút khi NTD đăng nhập; log `workflowReminders/disbursement` |
+| E8 | Lịch làm việc | `screens/chat/work_schedule_screen.dart`, `schedule_tool_screen.dart` | ✅ | Gửi lịch vào chat qua `MessagingService` |
+| E9 | Thống kê chi tiêu | `screens/stats/employer_stats_screen.dart` | ✅ | fl_chart, filter Ngày/Tuần/Tháng/Năm |
+| E10 | Xác nhận hoàn thành job | `job_day_end_flow_screen.dart` | 🔄 | Gắn cuối ca; chưa tự đóng job |
+| E11 | Thanh toán lương (giải ngân) | `job_workflow_service.dart` | 🔄 | NTD gửi yêu cầu → Admin duyệt → NTD xác nhận GN |
+| E12 | Xử lý tranh chấp | `screens/chat/complaint_screen.dart` | ✅ | Khiếu nại NV; luồng cuối ngày tích hợp |
+| E13 | Nạp tiền vào ví | `screens/menu_employer/employer_wallet_screen.dart` | 🔄 | UI ví; logic nạp thật chưa đủ |
+| E14 | Lịch sử giao dịch | `screens/menu_employer/employer_wallet_screen.dart` | 🔄 | |
+| E15 | Rút tiền | — | ❌ | |
+| E16 | Tham khảo giá thị trường | `screens/reference/employer_market_rate_screen.dart` | ✅ | Route `/employer-reference` |
+| E17 | Đánh giá Candidate | `job_day_end_flow_screen.dart`, `reviews` | 🔄 | Sau giải ngân trong luồng cuối ngày |
+| E18 | Menu NTD | `screens/menu_employer/employer_menu_screen.dart` | ✅ | |
+| E19 | Tin nhắn hub NTD | `screens/menu_employer/employer_messages_screen.dart` | ✅ | Tab Nhóm chat / Chat cá nhân |
+| E20 | Danh sách nhóm (tab Nhóm) | `screens/chat/employer_groups_screen.dart` | ✅ | |
+| E21 | Tìm việc / ứng viên (NTD) | `screens/employer/employer_search_screen.dart` | ✅ | |
+| E22 | Thông báo NTD | `screens/employer/employer_notifications_screen.dart` | ✅ | |
 
 ---
 
-## CHAT FEATURES (shared)
+## CHAT & MESSAGING (shared — đã làm nhiều)
 
-| # | Tính năng | Screen/File (dự kiến) | Status | Ghi chú |
+| # | Tính năng | Screen/File | Status | Ghi chú |
 |---|---|---|---|---|
-| CH1 | Danh sách nhóm chat | `screens/chat/chat_list_screen.dart` | ❌ | |
-| CH2 | Giao diện chat nhóm | `screens/chat/group_chat_screen.dart` | ❌ | Real-time Firestore listener |
-| CH3 | Gửi lịch làm vào chat | Widget trong chat | ❌ | Type `"schedule"` |
-| CH4 | Gửi thông báo điểm danh | Widget trong chat | ❌ | Type `"attendance_call"` |
+| CH1 | Danh sách hội thoại (ứng viên) | `screens/messaging/conversation_list_screen.dart` | ✅ | Tab Nhóm chat / Chat cá nhân |
+| CH2 | Giao diện chat nhóm | `screens/chat/group_chat_screen.dart` | ✅ | Real-time Firestore |
+| CH3 | Phòng chat thống nhất (1-1 + nhóm) | `screens/messaging/chat_room_screen.dart` | ✅ | Ảnh, file, vị trí, gọi, điểm danh |
+| CH4 | Gửi lịch làm vào chat | `MessagingService.sendSchedule` | ✅ | Message type `schedule` |
+| CH5 | Yêu cầu / kết quả điểm danh trong chat | `chat_room_screen.dart` | ✅ | `attendance_request`, check-in/out ảnh |
+| CH6 | Chat 1-1 NTD ↔ ứng viên | `MessagingService.getOrCreateDirectChat` | ✅ | `chatType: direct` |
+| CH7 | Chat 1-1 giữa thành viên (peer) | `MessagingService.getOrCreatePeerChat` | ✅ | Từ màn Thành viên; tab Chat cá nhân |
+| CH8 | Quản lý nhóm | `screens/chat/group_management_screen.dart` | ✅ | Hình nền, mute, thành viên, rời/giải tán |
+| CH9 | Danh sách thành viên + nhắn riêng | `_MembersScreen` trong `group_management_screen.dart` | ✅ | Peer + direct |
+| CH10 | Swipe để trả lời tin | `widgets/swipe_to_reply.dart` | ✅ | User + NTD, nhóm + 1-1 |
+| CH11 | Tắt thông báo nhóm (mute) | `group_management_screen.dart`, `MessagingController` | ✅ | Không badge/chuông/bong bóng khi mute |
+| CH12 | Hình nền nhóm (đồng bộ Firestore) | `group_chat_service.saveGroupWallpaper*` | ✅ | Mọi thành viên thấy; tin hệ thống khi đổi |
+| CH13 | Tìm tin trong nhóm | `screens/chat/search_messages_screen.dart` | ✅ | |
+| CH14 | Gọi thoại / video | `screens/chat/call_screen.dart` | ✅ | Agora |
+| CH15 | Bong bóng tin nhắn nổi | `widgets/floating_message_bubble.dart` | ✅ | Kéo ẩn; hiện lại khi tin mới |
+| CH16 | Bong bóng chatbot nổi | `widgets/floating_chat_button.dart` | ✅ | |
+| CH17 | Trả lời / thu hồi / ghim / reaction | `chat_room_screen.dart`, `MessagingController` | ✅ | |
+| CH18 | Đồng bộ inbox / badge | `MessagingController`, `messaging_bootstrap.dart` | ✅ | Chuông + bong bóng dùng chung logic unread |
+| CH19 | Auto tạo nhóm khi duyệt ứng viên | `candidates_controller.dart`, `group_chat_service.dart` | ✅ | `ensureJobGroup` / add member |
+| CH20 | Trùng nhóm chat (1 job = 1 nhóm) | `group_chat_service.dart` | ⚠️ | Đã gom logic; cần kiểm tra data cũ trùng |
 
 ---
 
 ## ADMIN FEATURES
 
-| # | Tính năng | Screen/File (dự kiến) | Status | Ghi chú |
+| # | Tính năng | Screen/File | Status | Ghi chú |
 |---|---|---|---|---|
-| A1 | Dashboard Admin | `screens/admin/admin_home_screen.dart` | ❌ | |
-| A2 | Duyệt/Từ chối tin tuyển dụng | `screens/admin/job_approval_screen.dart` | ❌ | Đổi `status: "pending"` → `"approved"/"rejected"` |
-| A3 | Quản lý người dùng | `screens/admin/user_management_screen.dart` | ❌ | |
-| A4 | Xử lý tranh chấp | `screens/admin/dispute_management_screen.dart` | ❌ | |
-| A5 | Báo cáo doanh thu | `screens/admin/revenue_screen.dart` | ❌ | |
+| A1 | Dashboard Admin | `screens/admin/admin_home_screen.dart` | 🔄 | Giải ngân + khiếu nại |
+| A2 | Duyệt giải ngân NTD | `screens/admin/admin_disbursement_screen.dart` | ✅ | Cho phép GN / từ chối / đóng nhóm |
+| A3 | Quản lý người dùng | — | ❌ | |
+| A4 | Danh mục khiếu nại | `screens/shared/complaints_catalog_screen.dart` | ✅ | incidents + jobComplaints |
+| A5 | Báo cáo doanh thu | — | ❌ | |
 
 ---
 
-## FILE/FOLDER CẦN TẠO (dự kiến cho các feature chưa có)
+## FILE/FOLDER ĐÃ CÓ (thực tế trong repo)
+
 ```
 lib/screens/
-    job/                    # C1, C2, C3, C4, C5, C14
-    application/            # C6
+    home/                   # C1, S15
+    job/                    # C3
+    search/                 # C2
     schedule/               # C7
     stats/                  # C8, E9
     reference/              # C10, E16
-    wallet/                 # E13, E14, E15
-    employer/               # E1-E17
-    chat/                   # CH1-CH4
-    admin/                  # A1-A5
+    post/                   # E2, E3
+    employer/               # E1, E4, E7, E21, E22
+    chat/                   # CH2, CH8, CH9, CH13, CH14
+    messaging/              # CH1, CH3, CH10
+    menu_employer/          # E18–E19, tools
+    menu_candidate/         # C13, C15
+    attendance/             # C16, C17
+    chatbot/                # S18
+    notification/           # S17
 lib/controller/
-    job_controller.dart
-    application_controller.dart
-    employer_application_controller.dart
-    job_completion_controller.dart
-    payment_controller.dart
-    attendance_controller.dart
-    chat_controller.dart
-    review_controller.dart
-    admin_controller.dart
-    wallet_controller.dart
+    home_controller.dart, job_detail_controller.dart
+    job_post_controller.dart, candidates_controller.dart
+    messaging_controller.dart, group_chat_controller.dart
+    employer_stats_controller.dart, employer_reference_controller.dart
+    ...
 lib/data/
-    models/
-        job_model.dart
-        application_model.dart
-        group_chat_model.dart
-        message_model.dart
-        schedule_model.dart
-        attendance_model.dart
-        transaction_model.dart
-        review_model.dart
-    services/
-        job_service.dart
-        application_service.dart
-        chat_service.dart
-        attendance_service.dart
-        wallet_service.dart
-        review_service.dart
-        admin_service.dart
-        sqlite_cache_service.dart   # quản lý SQLite
+    models/                 # job_post, application, group_chat, messaging, attendance, ...
+    services/               # messaging, group_chat, application, job_post, attendance, ...
 ```
 
 ---
 
-## Thứ tự ưu tiên phát triển (recommended)
-1. **Phase 1:** S3 fix (chọn role khi đăng ký) → C1 Job Feed → C3 Job Detail → C4 Apply
-2. **Phase 2:** E2 Post Job → E4 Applicants → E5 Approve → CH1/CH2 Group Chat
-3. **Phase 3:** E7 Attendance → E10 Confirm → E11 Payment → C7 Schedule
-4. **Phase 4:** E13/E14/E15 Wallet → C8/E9 Stats → C10/E16 Market Reference
-5. **Phase 5:** Admin panel → Reviews → Lead Group → Dispute handling
+## Thứ tự ưu tiên phát triển (cập nhật 2026-05)
+
+**Đã xong (Phase chat + employer core):** E1–E5, E7–E9, E16, CH1–CH19, C1–C4, C7–C8, C10, C13–C17
+
+**Tiếp theo đề xuất:**
+1. S3 — Chọn role khi đăng ký
+2. C6 — Màn danh sách đơn ứng tuyển
+3. E10 → E11 — Hoàn thành job + thanh toán lương
+4. E13–E15 — Ví đầy đủ (nạp/rút/lịch sử)
+5. CH20 — Dọn duplicate `groupChats` trên Firestore (nếu còn)
+6. Admin panel (A1–A5)
+7. Reviews đầy đủ (C11, E17)

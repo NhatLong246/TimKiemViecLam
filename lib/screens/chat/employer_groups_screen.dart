@@ -8,7 +8,7 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/group_chat_controller.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../data/services/group_chat_service.dart';
-import '../../routes/app_routes.dart';
+import '../messaging/chat_room_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerGroupsScreen — danh sách nhóm chat theo job
@@ -21,7 +21,7 @@ class EmployerGroupsScreen extends StatelessWidget {
     final ctrl = Get.put(GroupChatController());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [_buildAppBar()],
         body: Obx(() {
@@ -41,7 +41,12 @@ class EmployerGroupsScreen extends StatelessWidget {
                 group: g,
                 onTap: () {
                   ctrl.openGroup(g);
-                  Get.toNamed(AppRoutes.groupChat, arguments: g);
+                  Get.to(
+                    () => ChatRoomScreen(
+                      groupId: g.groupId,
+                      isEmployer: true,
+                    ),
+                  );
                 },
               );
             },
@@ -145,7 +150,7 @@ class _GroupCardState extends State<_GroupCard> {
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(

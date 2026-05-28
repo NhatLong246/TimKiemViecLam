@@ -105,7 +105,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(
         context,
         _isEditing ? 'Chỉnh sửa dự án' : 'Dự án/ thành tựu',
@@ -124,8 +124,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 validator: (v) => v == null || v.trim().isEmpty
                     ? 'Vui lòng nhập tên dự án'
                     : null,
-                decoration: ProfileFormTheme.fieldDecoration(
-                  hintText: 'Nhập tên dự án/ thành tựu',
+                decoration: ProfileFormTheme.fieldDecoration(hintText: 'Nhập tên dự án/ thành tựu',
                 ),
               ),
               const SizedBox(height: 20),
@@ -137,8 +136,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                       children: [
                         ProfileFormTheme.requiredLabel('Ngày bắt đầu'),
                         const SizedBox(height: 8),
-                        ProfileFormTheme.dateField(
-                          value: _startDate,
+                        ProfileFormTheme.dateField(value: _startDate,
                           placeholder: 'MM/YYYY',
                           onTap: () => _pickDate(true),
                         ),
@@ -152,8 +150,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                       children: [
                         ProfileFormTheme.requiredLabel('Ngày kết thúc'),
                         const SizedBox(height: 8),
-                        ProfileFormTheme.dateField(
-                          value: _endDate,
+                        ProfileFormTheme.dateField(value: _endDate,
                           placeholder: 'MM/YYYY',
                           onTap: () => _pickDate(false),
                         ),
@@ -169,8 +166,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 controller: _descriptionController,
                 minLines: 4,
                 maxLines: 8,
-                decoration: ProfileFormTheme.fieldDecoration(
-                  hintText:
+                decoration: ProfileFormTheme.fieldDecoration(hintText:
                       'Nhập mô tả vai trò trong dự án/ thành tựu này',
                   maxLines: 4,
                 ),

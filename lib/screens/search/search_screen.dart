@@ -60,7 +60,7 @@ class _SearchScreenState extends State<SearchScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -82,7 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Container(
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: _primary, width: 1.2),
             ),
@@ -194,7 +194,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: Colors.grey.shade300,

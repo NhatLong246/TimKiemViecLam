@@ -1,5 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:viecnow/controller/login_controller.dart';
 import 'package:viecnow/screens/chatbot/chatbot_screen.dart';
+import '../utils/floating_message_bubble_preferences.dart';
+import 'floating_overlay_layout.dart';
 
 class FloatingChatButton extends StatefulWidget {
   const FloatingChatButton({super.key});
@@ -16,6 +22,9 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
   bool _showTooltip = true;
   bool _isDragging = false;
   bool _isHidden = false;
+  bool _userMoved = false;
+  bool _prefsLoaded = false;
+  String? _loadedForUserId;
 
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulseAnim;
@@ -42,19 +51,55 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
     );
     _tooltipAnim = CurvedAnimation(parent: _tooltipCtrl, curve: Curves.easeOut);
 
-    // Tự ẩn tooltip sau 4 giây
     Future.delayed(const Duration(seconds: 4), () {
       if (mounted) _hideTooltip();
     });
+
+    final uid = Get.find<AuthController>().currentUser?.id ?? '';
+    if (uid.isNotEmpty) {
+      _loadedForUserId = uid;
+      _loadDismissState(uid);
+    }
+  }
+
+  void _applyDefaultPosition(Size size) {
+    if (_userMoved) return;
+    _x = FloatingOverlayLayout.chatbotLeft(size);
+    _y = FloatingOverlayLayout.chatbotTop(size);
+    _initialized = true;
+  }
+
+  Future<void> _loadDismissState(String uid) async {
+    final hidden = await FloatingMessageBubblePreferences.loadChatbotHidden(uid);
+    if (!mounted || _loadedForUserId != uid) return;
+    final size = MediaQuery.sizeOf(context);
+    setState(() {
+      _isHidden = hidden;
+      _prefsLoaded = true;
+      if (!_initialized) _applyDefaultPosition(size);
+    });
+  }
+
+  void _ensureDismissLoadedForUser(String uid) {
+    if (uid.isEmpty) return;
+    if (uid == _loadedForUserId && _prefsLoaded) return;
+    _loadedForUserId = uid;
+    _prefsLoaded = false;
+    _loadDismissState(uid);
+  }
+
+  Future<void> _persistDismiss() async {
+    final uid = Get.find<AuthController>().currentUser?.id ?? '';
+    await FloatingMessageBubblePreferences.saveChatbotDismissed(uid);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_initialized) {
+    if (!_initialized && _prefsLoaded) {
       final size = MediaQuery.of(context).size;
-      _x = size.width - 72;
-      _y = size.height * 0.65;
+      _x = FloatingOverlayLayout.chatbotLeft(size);
+      _y = FloatingOverlayLayout.chatbotTop(size);
       _initialized = true;
     }
   }
@@ -74,7 +119,17 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
 
   @override
   Widget build(BuildContext context) {
+    final uid = Get.find<AuthController>().currentUser?.id ?? '';
+    if (uid.isEmpty) return const SizedBox.shrink();
+
+    _ensureDismissLoadedForUser(uid);
+    if (!_prefsLoaded) return const SizedBox.shrink();
+
     final size = MediaQuery.of(context).size;
+    if (!_initialized && !_userMoved) {
+      _applyDefaultPosition(size);
+    }
+    final topY = _userMoved ? _y : FloatingOverlayLayout.chatbotTop(size);
     final isRightSide = _x > size.width / 2;
 
     if (_isHidden) return const SizedBox.shrink();
@@ -84,18 +139,30 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
         children: [
           if (_isDragging) _buildCloseTarget(size),
           Positioned(
-            left: isRightSide ? null : _x,
-            right: isRightSide ? (size.width - _x - 56) : null,
-            top: _y,
+            left: _userMoved ? _x : null,
+            right: _userMoved ? null : FloatingOverlayLayout.rightMargin,
+            top: topY,
             child: GestureDetector(
               onPanStart: (_) {
-                setState(() => _isDragging = true);
+                setState(() {
+                  _isDragging = true;
+                  if (!_userMoved) {
+                    _userMoved = true;
+                    _x = FloatingOverlayLayout.chatbotLeft(size);
+                  }
+                });
                 if (_showTooltip) _hideTooltip();
               },
               onPanUpdate: (details) {
                 setState(() {
-                  _x = (_x + details.delta.dx).clamp(0, size.width - 58);
-                  _y = (_y + details.delta.dy).clamp(0, size.height - 58);
+                  _x = (_x + details.delta.dx).clamp(
+                    0,
+                    size.width - FloatingOverlayLayout.chatbotSize - 2,
+                  );
+                  _y = (_y + details.delta.dy).clamp(
+                    0,
+                    size.height - FloatingOverlayLayout.chatbotSize - 2,
+                  );
                 });
               },
               onPanEnd: (_) {
@@ -104,6 +171,7 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
                   _isDragging = false;
                   if (shouldHide) _isHidden = true;
                 });
+                if (shouldHide) unawaited(_persistDismiss());
               },
               onPanCancel: () => setState(() => _isDragging = false),
               onTap: () {

@@ -166,7 +166,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     final headerH = (screenH * 0.30).clamp(200.0, 260.0);
     final cardTop = headerH - 28;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(children: [
         // Wave header (animated gradient via TweenAnimationBuilder)
         SlideTransition(
@@ -268,7 +268,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                     opacity: _formFade,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
@@ -705,7 +705,7 @@ class _SocialBtn extends StatelessWidget {
         child: Container(
           height: 48,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey.shade200),
             boxShadow: [

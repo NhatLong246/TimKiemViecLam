@@ -20,6 +20,7 @@ class JobPostModel {
   final String status; // "draft"|"pending"|"approved"|"active"|"closed"|"rejected"
   final double totalBudget;
   final String? groupChatId;
+  final List<String> imageUrls;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -43,6 +44,7 @@ class JobPostModel {
     required this.status,
     required this.totalBudget,
     this.groupChatId,
+    this.imageUrls = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -108,6 +110,11 @@ class JobPostModel {
       status: map['status'] as String? ?? 'draft',
       totalBudget: (map['totalBudget'] as num?)?.toDouble() ?? 0,
       groupChatId: map['groupChatId'] as String?,
+      imageUrls: (map['imageUrls'] as List?)
+              ?.map((e) => e.toString())
+              .where((s) => s.isNotEmpty)
+              .toList() ??
+          const [],
       createdAt: map['createdAt'] != null ? _toDateTime(map['createdAt']) : null,
       updatedAt: map['updatedAt'] != null ? _toDateTime(map['updatedAt']) : null,
     );
@@ -134,6 +141,7 @@ class JobPostModel {
       'status': status,
       'totalBudget': totalBudget,
       if (groupChatId != null) 'groupChatId': groupChatId,
+      if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -159,6 +167,7 @@ class JobPostModel {
     String? status,
     double? totalBudget,
     String? groupChatId,
+    List<String>? imageUrls,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -182,6 +191,7 @@ class JobPostModel {
       status: status ?? this.status,
       totalBudget: totalBudget ?? this.totalBudget,
       groupChatId: groupChatId ?? this.groupChatId,
+      imageUrls: imageUrls ?? this.imageUrls,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../common/styles/app_colors.dart';
+import '../../controller/login_controller.dart';
 import '../../data/models/chat_message_model.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../data/services/group_chat_service.dart';
+import '../messaging/chat_room_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SearchMessagesScreen — Tìm kiếm tin nhắn trong nhóm
@@ -26,14 +28,20 @@ class _SearchMessagesScreenState extends State<SearchMessagesScreen> {
   bool _searching = false;
   String _lastQuery = '';
 
+  void _onSearchTextChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     _group = Get.arguments as GroupChatModel;
+    _searchCtrl.addListener(_onSearchTextChanged);
   }
 
   @override
   void dispose() {
+    _searchCtrl.removeListener(_onSearchTextChanged);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -61,7 +69,7 @@ class _SearchMessagesScreenState extends State<SearchMessagesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: AppColors.employerPrimary,
         flexibleSpace: Container(
@@ -72,42 +80,65 @@ class _SearchMessagesScreenState extends State<SearchMessagesScreen> {
               color: Colors.white, size: 20),
           onPressed: Get.back,
         ),
+        titleSpacing: 0,
         title: Container(
-          height: 38,
+          height: 40,
+          margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
           ),
           child: TextField(
             controller: _searchCtrl,
             autofocus: true,
-            style:
-                const TextStyle(color: Colors.white, fontSize: 14),
-            cursorColor: Colors.white,
+            style: const TextStyle(
+              color: Color(0xFF212121),
+              fontSize: 14,
+            ),
+            cursorColor: AppColors.employerPrimary,
             textInputAction: TextInputAction.search,
             onSubmitted: _search,
             onChanged: (v) {
-              if (v.trim().length >= 2) _search(v);
-              if (v.trim().isEmpty) setState(() => _results = null);
+              if (v.trim().length >= 2) {
+                _search(v);
+              } else if (v.trim().isEmpty) {
+                setState(() {
+                  _results = null;
+                  _lastQuery = '';
+                });
+              }
             },
             decoration: InputDecoration(
               hintText: 'Tìm kiếm tin nhắn...',
               hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.7), fontSize: 14),
-              prefixIcon: Icon(Icons.search,
-                  color: Colors.white.withOpacity(0.8), size: 20),
+                color: Colors.grey.shade500,
+                fontSize: 14,
+              ),
+              prefixIcon: Icon(
+                Icons.search,
+                color: Colors.grey.shade600,
+                size: 20,
+              ),
               suffixIcon: _searchCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.close,
-                          color: Colors.white.withOpacity(0.8), size: 18),
+                      icon: Icon(
+                        Icons.close,
+                        color: Colors.grey.shade600,
+                        size: 18,
+                      ),
                       onPressed: () {
                         _searchCtrl.clear();
-                        setState(() { _results = null; _lastQuery = ''; });
+                        setState(() {
+                          _results = null;
+                          _lastQuery = '';
+                        });
                       },
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 9),
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
@@ -168,7 +199,7 @@ class _SearchMessagesScreenState extends State<SearchMessagesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           color: Colors.white,
           child: Text(
-            'Tìm thấy ${_results!.length} kết quả cho "${_searchCtrl.text.trim()}"',
+            'Tìm thấy ${_results!.length} kết quả cho "$_lastQuery"',
             style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey.shade600,
@@ -179,8 +210,11 @@ class _SearchMessagesScreenState extends State<SearchMessagesScreen> {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: _results!.length,
-            itemBuilder: (_, i) =>
-                _ResultCard(msg: _results![i], query: _searchCtrl.text.trim()),
+            itemBuilder: (_, i) => _ResultCard(
+              msg: _results![i],
+              query: _lastQuery,
+              groupId: _group.groupId,
+            ),
           ),
         ),
       ],
@@ -189,18 +223,36 @@ class _SearchMessagesScreenState extends State<SearchMessagesScreen> {
 }
 
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.msg, required this.query});
+  const _ResultCard({
+    required this.msg,
+    required this.query,
+    required this.groupId,
+  });
   final ChatMessageModel msg;
   final String query;
+  final String groupId;
 
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('dd/MM/yyyy HH:mm').format(msg.createdAt);
 
-    return Container(
+    return InkWell(
+      onTap: () {
+        final isEmployer =
+            Get.find<AuthController>().currentUser?.role == 'employer';
+        Get.to(
+          () => ChatRoomScreen(
+            groupId: groupId,
+            isEmployer: isEmployer,
+          ),
+          transition: Transition.rightToLeft,
+        );
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -250,6 +302,7 @@ class _ResultCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

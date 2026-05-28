@@ -78,9 +78,17 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _navigateByRole(String role) {
-    final route = role == 'employer'
-        ? AppRoutes.employerHome
-        : AppRoutes.home;
+    final String route;
+    switch (role) {
+      case 'employer':
+        route = AppRoutes.employerHome;
+        break;
+      case 'admin':
+        route = AppRoutes.adminHome;
+        break;
+      default:
+        route = AppRoutes.home;
+    }
     Navigator.pushNamedAndRemoveUntil(context, route, (r) => false);
   }
 

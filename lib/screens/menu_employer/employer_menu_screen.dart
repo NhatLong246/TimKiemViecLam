@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../controller/messaging_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/messaging_bootstrap.dart';
 
 class EmployerMenuScreen extends StatelessWidget {
   const EmployerMenuScreen({super.key});
@@ -8,6 +10,13 @@ class EmployerMenuScreen extends StatelessWidget {
   static const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
 
   static const _group2Items = [
+    _MenuItem(
+      icon: Icons.gavel_outlined,
+      iconColor: Color(0xFFC62828),
+      title: 'Danh mục khiếu nại',
+      subtitle: 'Khiếu nại nhân viên & theo dõi xử lý',
+      route: AppRoutes.complaintsCatalog,
+    ),
     _MenuItem(
       icon: Icons.bar_chart_rounded,
       iconColor: Color(0xFF2E7D32),
@@ -26,6 +35,7 @@ class EmployerMenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    MessagingBootstrap.startIfLoggedIn();
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4F8),
       body: CustomScrollView(
@@ -135,8 +145,41 @@ class EmployerMenuScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: Colors.grey.shade400, size: 26),
+              if (Get.isRegistered<MessagingController>())
+                Obx(() {
+                  final n = Get.find<MessagingController>().unreadTotal.value;
+                  if (n <= 0) {
+                    return Icon(Icons.chevron_right_rounded,
+                        color: Colors.grey.shade400, size: 26);
+                  }
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          n > 99 ? '99+' : '$n',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.chevron_right_rounded,
+                          color: Colors.grey.shade400, size: 26),
+                    ],
+                  );
+                })
+              else
+                Icon(Icons.chevron_right_rounded,
+                    color: Colors.grey.shade400, size: 26),
             ],
           ),
         ),

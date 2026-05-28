@@ -90,6 +90,18 @@ class AttendanceController extends GetxController {
     final id = currentSession.value?.attendanceId;
     if (id == null || id.isEmpty) return;
 
+    for (var i = 0; i < editRecords.length; i++) {
+      final r = editRecords[i];
+      final hasIn = (r.checkInTime ?? '').isNotEmpty;
+      final hasOut = (r.checkOutTime ?? '').isNotEmpty;
+      if (hasIn &&
+          !hasOut &&
+          (r.status == 'not_marked' || r.checkOutPhotoUrl == null)) {
+        editRecords[i] = r.copyWith(status: 'absent');
+      }
+    }
+    editRecords.refresh();
+
     isSaving.value = true;
     await _service.saveAllRecords(id, editRecords.toList());
     isSaving.value = false;

@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../controller/employer_notification_controller.dart';
+import '../../controller/login_controller.dart';
+import '../../data/services/attendance_auto_notify_service.dart';
+import '../../utils/messaging_bootstrap.dart';
+import '../../widgets/floating_message_bubble.dart';
 import 'employer_home_screen.dart';
 import '../menu_employer/employer_menu_screen.dart';
 import 'employer_profile_screen.dart';
@@ -16,6 +22,25 @@ class EmployerMainNavigationScreen extends StatefulWidget {
 class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScreen> {
   int _currentIndex = 1; // home là trung tâm (index 1)
 
+  @override
+  void initState() {
+    super.initState();
+    Get.put(EmployerNotificationController(), permanent: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.find<AuthController>().currentUser?.role == 'employer') {
+        MessagingBootstrap.startIfLoggedIn();
+        Get.find<EmployerNotificationController>().refreshNow();
+        AttendanceAutoNotifyService.instance.startEmployerPolling();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    AttendanceAutoNotifyService.instance.stopEmployerPolling();
+    super.dispose();
+  }
+
   final List<Widget> _screens = [
     const EmployerMenuScreen(),
     const EmployerHomeScreen(),
@@ -26,9 +51,14 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
+          const FloatingMessageBubble(isEmployer: true),
+        ],
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -51,7 +81,6 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
       ),
       child: Row(
         children: [
-          // Tab 0: Danh mục / Menu
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -72,15 +101,18 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
                     'Danh mục',
                     style: TextStyle(
                       fontSize: 10,
-                      color: _currentIndex == 0 ? const Color(0xFF7B1FA2) : Colors.grey.shade400,
-                      fontWeight: _currentIndex == 0 ? FontWeight.w600 : FontWeight.normal,
+                      color: _currentIndex == 0
+                          ? const Color(0xFF7B1FA2)
+                          : Colors.grey.shade400,
+                      fontWeight: _currentIndex == 0
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          // Tab 1: Home (floating center button)
           GestureDetector(
             onTap: () => setState(() => _currentIndex = 1),
             child: Transform.translate(
@@ -115,7 +147,6 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
               ),
             ),
           ),
-          // Tab 2: Cá nhân / Profile
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -136,8 +167,12 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
                     'Cá nhân',
                     style: TextStyle(
                       fontSize: 10,
-                      color: _currentIndex == 2 ? const Color(0xFF7B1FA2) : Colors.grey.shade400,
-                      fontWeight: _currentIndex == 2 ? FontWeight.w600 : FontWeight.normal,
+                      color: _currentIndex == 2
+                          ? const Color(0xFF7B1FA2)
+                          : Colors.grey.shade400,
+                      fontWeight: _currentIndex == 2
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ],

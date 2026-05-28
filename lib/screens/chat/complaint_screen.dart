@@ -10,6 +10,8 @@ import '../../data/models/group_chat_model.dart';
 import '../../data/models/incident_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/group_chat_service.dart';
+import '../../data/services/notification_service.dart';
+import '../../routes/app_routes.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ComplaintScreen — Khiếu nại nhân viên
@@ -140,6 +142,7 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
         workerName:
             '${_selectedWorker!.firstName} ${_selectedWorker!.lastName}'
                 .trim(),
+        jobTitle: _group.jobTitle,
         description: _descCtrl.text.trim(),
         imageBase64s: List.from(_imageBase64s),
         deductAmount: double.tryParse(_deductCtrl.text) ?? 0,
@@ -153,14 +156,27 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
           .collection('incidents')
           .add(incident.toMap());
 
+      await NotificationService().create(
+        recipientId: _selectedWorker!.id,
+        type: 'complaint_received',
+        title: 'Khiếu nại về công việc bạn làm',
+        body:
+            'NTD khiếu nại về ca "${_group.jobTitle}" bạn đã làm. Xem mục Ca làm của tôi.',
+        data: {
+          'groupId': _group.groupId,
+          'jobId': _group.jobId,
+        },
+      );
+
       Get.snackbar(
         'Đã gửi khiếu nại',
-        'Khiếu nại về ${incident.workerName} đã được gửi đến Admin để xem xét.',
+        'Đã lưu vào Danh mục khiếu nại. Admin sẽ xem xét.',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 3),
       );
+      Get.toNamed(AppRoutes.complaintsCatalog, arguments: _group);
 
       // Reset form
       setState(() {
@@ -183,7 +199,7 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: AppColors.employerPrimary,
         flexibleSpace: Container(
@@ -497,7 +513,7 @@ class _SCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(

@@ -73,11 +73,21 @@ class UpdateAccountController extends GetxController {
   }
 
   Future<void> refreshProfile() async {
-    final user = await _service.refreshCurrentUser();
-    if (user == null) return;
+    final user = await _service
+        .refreshCurrentUser()
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception(
+            'Tải hồ sơ quá lâu. Kiểm tra mạng và thử lại.',
+          ),
+        );
+    if (user == null) {
+      throw Exception('Không tải được hồ sơ. Vui lòng đăng nhập lại.');
+    }
     final authController = Get.find<AuthController>();
     authController.currentUser = user;
     authController.update();
+    update();
   }
 
   Future<void> addWorkExperience({

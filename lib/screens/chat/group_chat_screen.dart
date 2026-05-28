@@ -18,9 +18,14 @@ import 'call_screen.dart';
 import '../../controller/group_chat_controller.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/chat_message_model.dart';
+import '../../data/services/group_chat_service.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../routes/app_routes.dart';
 import 'group_management_screen.dart';
+import '../../utils/chat_wallpaper_preferences.dart';
+import '../../widgets/chat_conversation_background.dart';
+import '../../widgets/swipe_to_reply.dart';
+import '../../widgets/chat_wallpaper_picker_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GroupChatScreen — màn hình nhắn tin nhóm
@@ -49,6 +54,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
   String? _recordingPath;
+  ChatWallpaperConfig _wallpaper = const ChatWallpaperConfig();
 
   @override
   void initState() {
@@ -56,10 +62,27 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _ctrl = Get.find<GroupChatController>();
     _auth = Get.find<AuthController>();
     _group = Get.arguments as GroupChatModel;
+    _wallpaper = _group.chatWallpaper;
+    _loadWallpaper();
+    _groupWallpaperSub = GroupChatService()
+        .streamGroup(_group.groupId)
+        .listen((g) {
+      if (g != null && mounted) {
+        setState(() => _wallpaper = g.chatWallpaper);
+      }
+    });
+  }
+
+  StreamSubscription<GroupChatModel?>? _groupWallpaperSub;
+
+  Future<void> _loadWallpaper() async {
+    final cfg = await ChatWallpaperPreferences.loadForGroup(_group.groupId);
+    if (mounted) setState(() => _wallpaper = cfg);
   }
 
   @override
   void dispose() {
+    _groupWallpaperSub?.cancel();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     _recordingTimer?.cancel();
@@ -822,8 +845,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           padding: EdgeInsets.only(
               bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -1074,9 +1096,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _scrollToBottom();
   }
 
+  bool _canSwipeToReply(ChatMessageModel msg) {
+    if (msg.type == 'system' || msg.senderId == 'system') return false;
+    if (msg.type == 'call' || msg.type == 'recalled') return false;
+    return true;
+  }
+
   // ── Hiển thị action menu khi long press ──────────────────────────────────
   void _showMessageActions(
       BuildContext context, ChatMessageModel msg, bool isMe) {
+    if (msg.type == 'system' || msg.senderId == 'system') return;
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
@@ -1091,15 +1120,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           setState(() => _replyToMsg = msg);
         },
         onCopy: () {
-          if (msg.type == 'text') {
-            Clipboard.setData(ClipboardData(text: msg.content));
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Đã sao chép'),
-                  duration: Duration(seconds: 1)),
-            );
+          Navigator.pop(context);
+          var text = msg.content.trim();
+          if (text.isEmpty) {
+            if (msg.type == 'image') text = '[Hình ảnh]';
+            else if (msg.type == 'audio') text = '[Tin thoại]';
+            else if (msg.type == 'file') text = '[Tệp đính kèm]';
+            else if (msg.type == 'location') text = '[Vị trí]';
+            else return;
           }
+          Clipboard.setData(ClipboardData(text: text));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã sao chép'),
+              duration: Duration(seconds: 1),
+            ),
+          );
         },
         onEdit: (isMe && msg.type == 'text')
             ? () {
@@ -1222,7 +1258,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       appBar: _buildAppBar(),
       body: Stack(
         children: [
-          const _ChatBackground(),
+          ChatConversationBackground(
+            config: _wallpaper,
+            isCandidateTheme: true,
+          ),
           Column(
             children: [
               Expanded(
@@ -1236,11 +1275,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     itemBuilder: (_, i) {
                       final msg = _ctrl.messages[i];
                       final isMe = msg.senderId == _auth.currentUser?.id;
-                      return _MessageBubble(
+                      final bubble = _MessageBubble(
                         msg: msg,
                         isMe: isMe,
                         onLongPress: () =>
                             _showMessageActions(context, msg, isMe),
+                      );
+                      if (!_canSwipeToReply(msg)) return bubble;
+                      return SwipeToReply(
+                        alignEnd: isMe,
+                        iconColor: const Color(0xFF2E7D32),
+                        onReply: () => setState(() => _replyToMsg = msg),
+                        child: bubble,
                       );
                     },
                   );
@@ -1258,7 +1304,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 28, vertical: 22),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -1321,13 +1367,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         title: Obx(() {
       final group = _ctrl.currentGroup.value ?? _group;
       return GestureDetector(
-        onTap: () => Get.to(
-          () => const GroupManagementScreen(),
-          arguments: group,
-          transition: Transition.downToUp,
-          duration: const Duration(milliseconds: 380),
-          curve: Curves.easeOutCubic,
-        ),
+        onTap: () async {
+          await Get.to(
+            () => const GroupManagementScreen(),
+            arguments: {'group': group, 'isCandidate': true},
+            transition: Transition.downToUp,
+            duration: const Duration(milliseconds: 380),
+            curve: Curves.easeOutCubic,
+          );
+          await _loadWallpaper();
+        },
         child: Row(
           children: [
             // Group avatar circle — hiển thị Base64 nếu có
@@ -1409,13 +1458,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           final g = _ctrl.currentGroup.value ?? _group;
           return _AppBarIconBtn(
             icon: Icons.menu_rounded,
-            onTap: () => Get.to(
-              () => const GroupManagementScreen(),
-              arguments: g,
-              transition: Transition.downToUp,
-              duration: const Duration(milliseconds: 380),
-              curve: Curves.easeOutCubic,
-            ),
+            onTap: () async {
+              await Get.to(
+                () => const GroupManagementScreen(),
+                arguments: {'group': g, 'isCandidate': true},
+                transition: Transition.downToUp,
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutCubic,
+              );
+              await _loadWallpaper();
+            },
           );
         }),
         const SizedBox(width: 4),
@@ -1615,8 +1667,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
@@ -1650,6 +1701,21 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                _AttachOption(
+                  icon: Icons.image_rounded,
+                  label: 'Ảnh',
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7B1FA2), Color(0xFFCE93D8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await Future.delayed(const Duration(milliseconds: 350));
+                    if (!mounted) return;
+                    _pickFromGallery();
+                  },
+                ),
                 _AttachOption(
                   icon: Icons.insert_drive_file_rounded,
                   label: 'File',
@@ -1785,12 +1851,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             icon: Icons.camera_alt_rounded,
             bgColor: const Color(0xFF37474F),
             onTap: _takePhoto,
-          ),
-          const SizedBox(width: 6),
-          _InputIconBtn(
-            icon: Icons.image_rounded,
-            bgColor: const Color(0xFF37474F),
-            onTap: _pickFromGallery,
           ),
           const SizedBox(width: 6),
           _InputIconBtn(
@@ -2286,8 +2346,7 @@ class _MessageActionsSheet extends StatelessWidget {
     ];
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       // Không set chiều cao cố định — để co theo nội dung
@@ -2402,25 +2461,25 @@ class _SystemMessage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0x1A7B1FA2), Color(0x1A1565C0)],
+              colors: [Color(0x1A2E7D32), Color(0x1A43A047)],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0x257B1FA2)),
+            border: Border.all(color: const Color(0x252E7D32)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.info_outline_rounded,
-                  size: 12, color: Color(0xFF7B1FA2)),
+                  size: 12, color: Color(0xFF2E7D32)),
               const SizedBox(width: 5),
               Flexible(
                 child: Text(
                   content,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF5C3380),
+                    color: Color(0xFF1B5E20),
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
@@ -2450,7 +2509,7 @@ class _ScheduleBubble extends StatelessWidget {
           constraints:
               BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: const Color(0x337B1FA2)),
             boxShadow: [
@@ -2476,11 +2535,11 @@ class _ScheduleBubble extends StatelessWidget {
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.calendar_month_rounded,
+                    Icon(Icons.assignment_rounded,
                         color: Colors.white, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      'Lịch làm việc',
+                      'Phân công công việc',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -3204,7 +3263,7 @@ class _LocationBubble extends StatelessWidget {
                     constraints: BoxConstraints(
                         maxWidth: MediaQuery.of(context).size.width * 0.72),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(20),
                         topRight: const Radius.circular(20),
@@ -3409,7 +3468,7 @@ class _PollBubble extends StatelessWidget {
                   constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.82),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20),
                       topRight: const Radius.circular(20),
@@ -3669,7 +3728,7 @@ class _CallBubble extends StatelessWidget {
           constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.82),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
                 color: isOngoing ? primary.withOpacity(0.3) : Colors.grey.shade200),

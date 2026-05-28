@@ -16,6 +16,7 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
   static const _keySystem = 'notify_system';
   static const _keyPromo = 'notify_promo';
   static const _keyProfile = 'notify_profile';
+  static const _keyMessage = 'notify_message';
 
   final _service = NotificationService();
 
@@ -23,6 +24,7 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
   bool _system = true;
   bool _promo = false;
   bool _profile = true;
+  bool _message = true;
   bool _loading = true;
 
   @override
@@ -43,6 +45,7 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
       _system = remote['system'] ?? prefs.getBool(_keySystem) ?? true;
       _promo = remote['promo'] ?? prefs.getBool(_keyPromo) ?? false;
       _profile = remote['profile'] ?? prefs.getBool(_keyProfile) ?? true;
+      _message = remote['message'] ?? prefs.getBool(_keyMessage) ?? true;
       _loading = false;
     });
   }
@@ -53,21 +56,23 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
     await prefs.setBool(_keySystem, _system);
     await prefs.setBool(_keyPromo, _promo);
     await prefs.setBool(_keyProfile, _profile);
+    await prefs.setBool(_keyMessage, _message);
 
     await _service.savePrefs({
       'job': _job,
       'system': _system,
       'promo': _promo,
       'profile': _profile,
+      'message': _message,
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
@@ -143,6 +148,17 @@ class _SettingsNotificationScreenState extends State<SettingsNotificationScreen>
                             await _saveAll();
                           },
                         ),
+                        const _SettingsDivider(),
+                        _buildSwitch(
+                          title: 'Tin nhắn',
+                          subtitle:
+                              'Tin mới từ nhóm chat hoặc chat cá nhân',
+                          value: _message,
+                          onChanged: (v) async {
+                            setState(() => _message = v);
+                            await _saveAll();
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -208,7 +224,7 @@ class _SettingsCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE1E1E1)),
         boxShadow: [

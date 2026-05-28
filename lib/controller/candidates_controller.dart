@@ -1,20 +1,36 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../data/models/application_model.dart';
 import '../data/models/job_post_model.dart';
 import '../data/services/candidates_service.dart';
-import '../data/services/group_chat_service.dart';
-
 class CandidatesController extends GetxController {
   final _service = CandidatesService();
-  final _groupService = GroupChatService();
-
   final RxBool isLoadingFullTime = false.obs;
   final RxBool isLoadingPartTime = false.obs;
   final RxList<JobWithApplications> fullTimeJobs =
       <JobWithApplications>[].obs;
   final RxList<JobWithApplications> partTimeJobs =
       <JobWithApplications>[].obs;
+
+  /// Lọc theo jobId khi mở từ Quản lý bài đăng.
+  String? filterJobId;
+
+  void setFilterJobId(String? jobId) {
+    final value = jobId?.trim();
+    filterJobId = (value == null || value.isEmpty) ? null : value;
+  }
+
+  List<JobWithApplications> filteredFullTimeJobs() =>
+      _filterByJobId(fullTimeJobs);
+
+  List<JobWithApplications> filteredPartTimeJobs() =>
+      _filterByJobId(partTimeJobs);
+
+  List<JobWithApplications> _filterByJobId(List<JobWithApplications> list) {
+    if (filterJobId == null || filterJobId!.isEmpty) return list;
+    return list.where((j) => j.job.jobId == filterJobId).toList();
+  }
 
   // Tổng số đơn đang chờ duyệt (dùng cho tab badge)
   int get pendingFullTimeCount => fullTimeJobs
@@ -30,6 +46,10 @@ class CandidatesController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    final args = Get.arguments;
+    if (args is Map && args['jobId'] is String) {
+      filterJobId = args['jobId'] as String;
+    }
     loadAll();
   }
 
@@ -65,38 +85,20 @@ class CandidatesController extends GetxController {
       await _service.acceptApplication(appId, jobId);
       _updateEntry(appId, 'accepted');
       _incrementFilledSlots(jobId);
-      await _handleGroupChat(appId, jobId);
+      await _refreshJobGroupChatId(jobId);
       _showSuccess('Đã duyệt ứng viên');
     } catch (e) {
       _showError('Không thể duyệt: $e');
     }
   }
 
-  Future<void> _handleGroupChat(String appId, String jobId) async {
-    JobWithApplications? jwA;
-    for (final list in [fullTimeJobs, partTimeJobs]) {
-      final idx = list.indexWhere((j) => j.job.jobId == jobId);
-      if (idx >= 0) { jwA = list[idx]; break; }
-    }
-    if (jwA == null) return;
-
-    final entry = jwA.entries.firstWhereOrNull((e) => e.application.appId == appId);
-    if (entry == null) return;
-
-    final candidateId = entry.candidate.uid;
-    final employerId  = entry.application.employerId;
-
-    if (jwA.job.groupChatId != null && jwA.job.groupChatId!.isNotEmpty) {
-      await _groupService.addMember(jwA.job.groupChatId!, candidateId);
-    } else {
-      final groupId = await _groupService.createGroup(
-        jobId: jobId,
-        jobTitle: jwA.job.title,
-        employerId: employerId,
-        memberIds: [candidateId],
-      );
-      _updateGroupChatId(jobId, groupId);
-    }
+  Future<void> _refreshJobGroupChatId(String jobId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('jobPosts')
+        .doc(jobId)
+        .get();
+    final gid = (snap.data()?['groupChatId'] ?? '').toString();
+    if (gid.isNotEmpty) _updateGroupChatId(jobId, gid);
   }
 
   void _updateGroupChatId(String jobId, String groupId) {

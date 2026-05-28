@@ -63,7 +63,7 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildSearchHeader(),
@@ -130,7 +130,7 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                 child: Container(
                   height: 46,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
@@ -277,8 +277,7 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
       useSafeArea: true,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -683,7 +682,7 @@ class _PostCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -830,7 +829,7 @@ class _WorkerCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(

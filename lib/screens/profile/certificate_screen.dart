@@ -123,7 +123,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
             : null;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(
         context,
         _isEditing ? 'Chỉnh sửa chứng chỉ' : 'Chứng chỉ/ Bằng cấp',
@@ -142,8 +142,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                 validator: (v) => v == null || v.trim().isEmpty
                     ? 'Vui lòng nhập tên chứng chỉ'
                     : null,
-                decoration: ProfileFormTheme.fieldDecoration(
-                  hintText: 'Nhập tên chứng chỉ/ bằng cấp',
+                decoration: ProfileFormTheme.fieldDecoration(hintText: 'Nhập tên chứng chỉ/ bằng cấp',
                 ),
               ),
               const SizedBox(height: 24),

@@ -1,0 +1,142 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../data/models/job_post_model.dart';
+import '../../data/services/group_chat_service.dart';
+import '../../routes/app_routes.dart';
+
+/// Điều hướng từ Quản lý bài đăng NTD.
+class PostManagementActions {
+  static final _groups = GroupChatService();
+
+  static void viewDetail(JobPostModel post) {
+    Get.toNamed(AppRoutes.jobDetail, arguments: post);
+  }
+
+  static void editPost(JobPostModel post) {
+    Get.toNamed(AppRoutes.createPost, arguments: post);
+  }
+
+  static void openCandidates(JobPostModel post) {
+    Get.toNamed(
+      AppRoutes.employerCandidates,
+      arguments: {
+        'jobId': post.jobId,
+        'jobType': post.jobType,
+      },
+    );
+  }
+
+  static Future<void> openGroup(JobPostModel post) async {
+    final gid = post.groupChatId;
+    if (gid == null || gid.isEmpty) {
+      Get.snackbar(
+        'Chưa có nhóm',
+        'Duyệt ít nhất một ứng viên để tạo nhóm chat.',
+      );
+      return;
+    }
+    final g = await _groups.getGroup(gid);
+    if (g == null) {
+      Get.snackbar('Lỗi', 'Không tìm thấy nhóm chat');
+      return;
+    }
+    Get.toNamed(AppRoutes.groupManagement, arguments: g);
+  }
+
+  static Future<void> openAttendance(JobPostModel post) async {
+    final gid = post.groupChatId;
+    if (gid == null || gid.isEmpty) {
+      Get.snackbar('Chưa có nhóm', 'Cần nhóm chat để điểm danh');
+      return;
+    }
+    final g = await _groups.getGroup(gid);
+    if (g == null) return;
+    Get.toNamed(
+      AppRoutes.attendance,
+      arguments: {
+        'groupId': g.groupId,
+        'jobId': g.jobId,
+        'jobTitle': g.jobTitle,
+        'memberIds': g.memberIds,
+        'employerId': g.employerId,
+      },
+    );
+  }
+
+  static Future<void> openAttendanceSummary(JobPostModel post) async {
+    final gid = post.groupChatId;
+    if (gid == null || gid.isEmpty) {
+      Get.snackbar('Chưa có nhóm', 'Chưa có dữ liệu điểm danh');
+      return;
+    }
+    final g = await _groups.getGroup(gid);
+    if (g == null) return;
+    Get.toNamed(AppRoutes.jobAttendanceSummary, arguments: g);
+  }
+
+  static void openComplaints() {
+    Get.toNamed(AppRoutes.complaintsCatalog);
+  }
+
+  static Future<void> openDisbursement(JobPostModel post) async {
+    final gid = post.groupChatId;
+    if (gid == null || gid.isEmpty) {
+      Get.snackbar('Chưa có nhóm', 'Hoàn tất tuyển dụng và điểm danh trước');
+      return;
+    }
+    final g = await _groups.getGroup(gid);
+    if (g == null) return;
+    Get.toNamed(
+      AppRoutes.jobDayEndFlow,
+      arguments: {'group': g},
+    );
+  }
+
+  static Future<bool> confirmClose(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Đóng bài đăng?'),
+            content: const Text(
+              'Bài đăng sẽ không nhận ứng viên mới. '
+              'Nhóm chat vẫn hoạt động cho đến khi giải ngân/giải tán.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Hủy'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  static Future<bool> confirmDelete(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Xóa bài đăng?'),
+            content: const Text('Thao tác không thể hoàn tác.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Hủy'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Xóa'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+}

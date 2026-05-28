@@ -6,6 +6,7 @@ import '../data/models/user_model.dart';
 import '../data/models/job_post_model.dart';
 import '../data/services/application_service.dart';
 import '../routes/app_routes.dart';
+import 'login_controller.dart';
 
 class JobDetailController extends GetxController {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -15,6 +16,43 @@ class JobDetailController extends GetxController {
   final Rx<UserModel?> employer = Rx<UserModel?>(null);
   final RxBool isLoadingEmployer = true.obs;
   final RxBool isApplying = false.obs;
+  final RxBool canApply = true.obs;
+  final RxString currentRole = ''.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _syncCurrentRole();
+  }
+
+  Future<void> _syncCurrentRole() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      canApply.value = true; // Chưa đăng nhập: vẫn cho bấm để điều hướng login.
+      currentRole.value = '';
+      return;
+    }
+
+    final authCtrl = Get.isRegistered<AuthController>()
+        ? Get.find<AuthController>()
+        : null;
+    final cachedRole = authCtrl?.currentUser?.role;
+    if (cachedRole != null && cachedRole.isNotEmpty) {
+      currentRole.value = cachedRole;
+      canApply.value = cachedRole == 'candidate';
+      return;
+    }
+
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      final role = (doc.data()?['role'] ?? 'candidate').toString();
+      currentRole.value = role;
+      canApply.value = role == 'candidate';
+    } catch (_) {
+      canApply.value = true;
+      currentRole.value = '';
+    }
+  }
 
   void fetchEmployerInfo(String employerId) async {
     isLoadingEmployer.value = true;
@@ -41,6 +79,17 @@ class JobDetailController extends GetxController {
         colorText: Colors.orange.shade800,
       );
       Get.toNamed(AppRoutes.login);
+      return;
+    }
+    await _syncCurrentRole();
+    if (!canApply.value) {
+      Get.snackbar(
+        'Không thể ứng tuyển',
+        'Tài khoản NTD/Admin không thể ứng tuyển. Hãy dùng tài khoản Ứng viên.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.orange.shade100,
+        colorText: Colors.orange.shade900,
+      );
       return;
     }
 

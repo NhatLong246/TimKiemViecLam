@@ -7,16 +7,28 @@ import 'package:get/get.dart';
 import 'controller/login_controller.dart';
 import 'firebase_options.dart';
 
-void main() async {
+Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-  );
+
+  // Hot restart (R) chạy lại main — tránh init Firebase/Firestore lần 2 gây treo.
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+    );
+  }
+
   await initializeDateFormatting('vi', null);
-  Get.put(AuthController());
+
+  if (!Get.isRegistered<AuthController>()) {
+    Get.put(AuthController(), permanent: true);
+  }
+}
+
+void main() async {
+  await _bootstrap();
   runApp(const MyApp());
   // Khôi phục phiên trên nền — không chặn splash/UI.
   Get.find<AuthController>().prepareSessionOnStartup();

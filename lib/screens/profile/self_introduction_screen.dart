@@ -74,7 +74,7 @@ class _SelfIntroductionScreenState extends State<SelfIntroductionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(context, 'Giới thiệu bản thân'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -91,8 +91,7 @@ class _SelfIntroductionScreenState extends State<SelfIntroductionScreen> {
                       minLines: 6,
                       maxLines: 10,
                       onChanged: (_) => setState(() {}),
-                      decoration: ProfileFormTheme.fieldDecoration(
-                        hintText: 'Giới thiệu ngắn gọn về bản thân',
+                      decoration: ProfileFormTheme.fieldDecoration(hintText: 'Giới thiệu ngắn gọn về bản thân',
                         maxLines: 6,
                       ),
                     ),

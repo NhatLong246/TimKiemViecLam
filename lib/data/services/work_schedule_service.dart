@@ -58,4 +58,16 @@ class WorkScheduleService {
   Future<void> delete(String scheduleId) async {
     await _col.doc(scheduleId).delete();
   }
+
+  /// Danh sách ngày có lịch làm (YYYY-MM-DD) — dùng xác định ngày bắt buộc điểm danh.
+  Future<List<String>> listScheduledDates(String groupId) async {
+    final snap = await _col.where('groupId', isEqualTo: groupId).get();
+    final dates = snap.docs
+        .map((d) => (d.data() as Map<String, dynamic>)['date'] as String? ?? '')
+        .where((d) => d.isNotEmpty)
+        .toSet()
+        .toList();
+    dates.sort();
+    return dates;
+  }
 }

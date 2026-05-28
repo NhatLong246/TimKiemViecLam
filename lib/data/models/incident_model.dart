@@ -8,6 +8,7 @@ class IncidentModel {
   final String reportedBy;       // employerId
   final String workerId;         // candidateId bị khiếu nại
   final String workerName;       // tên nhân viên
+  final String jobTitle;         // tên công việc / ca làm
   final String description;
   final List<String> imageBase64s; // nhiều ảnh minh chứng
   final double deductAmount;     // số tiền trừ lương
@@ -22,6 +23,7 @@ class IncidentModel {
     required this.reportedBy,
     required this.workerId,
     this.workerName = '',
+    this.jobTitle = '',
     required this.description,
     this.imageBase64s = const [],
     required this.deductAmount,
@@ -38,6 +40,7 @@ class IncidentModel {
       reportedBy: map['reportedBy'] as String? ?? '',
       workerId: map['workerId'] as String? ?? '',
       workerName: map['workerName'] as String? ?? '',
+      jobTitle: map['jobTitle'] as String? ?? '',
       description: map['description'] as String? ?? '',
       imageBase64s: List<String>.from(map['imageBase64s'] as List? ?? []),
       deductAmount: (map['deductAmount'] as num?)?.toDouble() ?? 0.0,
@@ -53,6 +56,7 @@ class IncidentModel {
         'reportedBy': reportedBy,
         'workerId': workerId,
         'workerName': workerName,
+        if (jobTitle.isNotEmpty) 'jobTitle': jobTitle,
         'description': description,
         'imageBase64s': imageBase64s,
         'deductAmount': deductAmount,

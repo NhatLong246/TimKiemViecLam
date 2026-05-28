@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../controller/messaging_controller.dart';
+import '../../utils/messaging_bootstrap.dart';
 import '../../data/models/app_notification_model.dart';
 import '../../data/services/notification_service.dart';
+import '../../utils/notification_navigation.dart';
+import '../messaging/chat_room_screen.dart';
 
 enum _SortOrder { newestFirst, oldestFirst }
 
@@ -21,10 +26,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
   _FilterType _filter = _FilterType.all;
 
   static const Color _primary = Color(0xFF2E7D32);
-  static const Color _unreadBg = Color(0xFFF0F7FF);
+
+  Color _unreadBg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? _primary.withValues(alpha: 0.16)
+          : const Color(0xFFF0F7FF);
 
   List<AppNotificationItem> _filterList(List<AppNotificationItem> notifications) {
-    List<AppNotificationItem> list = List.of(notifications);
+    List<AppNotificationItem> list =
+        MessagingBootstrap.ensureController().visibleNotifications(notifications);
     if (_filter == _FilterType.unread) {
       list = list.where((n) => !n.isRead).toList();
     } else if (_filter == _FilterType.read) {
@@ -40,10 +50,39 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Future<void> _markAllRead() async {
     await _service.markAllRead();
+    if (Get.isRegistered<MessagingController>()) {
+      await Get.find<MessagingController>().markAllUnreadConversationsRead();
+    }
   }
 
   Future<void> _markRead(AppNotificationItem item) async {
     if (!item.isRead) await _service.markRead(item.id);
+  }
+
+  Future<void> _onNotificationTap(AppNotificationItem item) async {
+    await _markRead(item);
+    if (!mounted) return;
+
+    if (item.isAttendanceNotification || item.isWorkAssignment) {
+      await NotificationNavigation.handleTap(context, item);
+      return;
+    }
+
+    final groupId = item.messageGroupId;
+    if (item.category == NotificationCategory.message &&
+        groupId != null &&
+        groupId.isNotEmpty) {
+      final mc = MessagingBootstrap.ensureController();
+      await mc.markConversationRead(groupId);
+
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatRoomScreen(groupId: groupId),
+        ),
+      );
+    }
   }
 
   Future<void> _deleteNotification(AppNotificationItem item) async {
@@ -102,7 +141,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<AppNotificationItem>>(
+    MessagingBootstrap.ensureController();
+    return Obx(() {
+      // Cập nhật khi tắt thông báo nhóm (mutedBy).
+      final _ = Get.find<MessagingController>().mutedGroupIds.length;
+      return StreamBuilder<List<AppNotificationItem>>(
       stream: _service.streamNotifications(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
@@ -118,7 +161,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         final unreadCount = notifications.where((n) => !n.isRead).length;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F6F9),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: _buildAppBar(unreadCount, notifications.isNotEmpty),
           body: Column(
             children: [
@@ -138,27 +181,30 @@ class _NotificationScreenState extends State<NotificationScreen> {
         );
       },
     );
+    });
   }
 
   PreferredSizeWidget _buildAppBar(int unreadCount, bool hasAny) {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF444444)),
+        icon: Icon(
+          Icons.arrow_back_ios_new,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'Thông báo',
-            style: TextStyle(
-              color: Color(0xFF1A1A1A),
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
           if (unreadCount > 0) ...[
             const SizedBox(width: 8),
@@ -184,10 +230,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         if (unreadCount > 0)
           TextButton(
             onPressed: _markAllRead,
-            child: const Text(
+            child: Text(
               'Đọc hết',
               style: TextStyle(
-                color: Color(0xFF2E7D32),
+                color: _primary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -213,8 +259,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
       (_FilterType.unread, 'Chưa đọc'),
       (_FilterType.read, 'Đã đọc'),
     ];
+    final chipBg = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: filters.map((f) {
@@ -230,7 +277,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: selected ? _primary : const Color(0xFFF0F0F0),
+                  color: selected ? _primary : chipBg,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -238,7 +285,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: selected ? Colors.white : const Color(0xFF555555),
+                    color: selected
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -251,15 +300,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Widget _buildSortBar() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: [
-          const Icon(Icons.sort, size: 18, color: Color(0xFF777777)),
+          Icon(
+            Icons.sort,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 6),
-          const Text(
+          Text(
             'Sắp xếp:',
-            style: TextStyle(fontSize: 13, color: Color(0xFF777777)),
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
@@ -271,7 +327,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFCCCCCC)),
+                border: Border.all(color: Theme.of(context).dividerColor),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -281,10 +337,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     _sortOrder == _SortOrder.newestFirst
                         ? 'Mới nhất trước'
                         : 'Cũ nhất trước',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF333333),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -335,18 +391,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
       ),
       child: GestureDetector(
-        onTap: () => _markRead(item),
+        onTap: () => _onNotificationTap(item),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: item.isRead ? Colors.white : _unreadBg,
+            color: item.isRead ? Theme.of(context).cardColor : _unreadBg(context),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: item.isRead
-                  ? const Color(0xFFEEEEEE)
-                  : const Color(0xFFBBD9FF),
+                  ? Theme.of(context).dividerColor
+                  : _primary.withValues(alpha: 0.35),
             ),
             boxShadow: [
               BoxShadow(
@@ -383,7 +439,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               fontWeight: item.isRead
                                   ? FontWeight.w600
                                   : FontWeight.w800,
-                              color: const Color(0xFF1A1A1A),
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ),
@@ -393,7 +449,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             height: 8,
                             margin: const EdgeInsets.only(left: 6, top: 4),
                             decoration: const BoxDecoration(
-                              color: Colors.blue,
+                              color: _primary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -402,9 +458,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     const SizedBox(height: 4),
                     Text(
                       item.body,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF666666),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.4,
                       ),
                       maxLines: 2,
@@ -432,17 +488,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           ),
                         ),
                         const Spacer(),
-                        const Icon(
+                        Icon(
                           Icons.access_time,
                           size: 12,
-                          color: Color(0xFFAAAAAA),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           _formatTime(item.createdAt),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFFAAAAAA),
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -466,28 +522,31 @@ class _NotificationScreenState extends State<NotificationScreen> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: const Color(0xFFF0F4F0),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.notifications_off_outlined,
               size: 40,
-              color: Color(0xFFAAAAAA),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Không có thông báo',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF555555),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Bạn đã xem hết thông báo rồi!',
-            style: TextStyle(fontSize: 13, color: Color(0xFFAAAAAA)),
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -523,6 +582,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
           const Color(0xFF6A1B9A),
           const Color(0xFFF3E5F5),
           'Hồ sơ',
+        );
+      case NotificationCategory.message:
+        return _CategoryMeta(
+          Icons.chat_bubble_outline,
+          _primary,
+          const Color(0xFFE8F5E9),
+          'Tin nhắn',
         );
     }
   }

@@ -23,15 +23,28 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   late final CandidatesController _ctrl;
+  String? _forcedJobType;
+
+  String? get _filterJobId => _ctrl.filterJobId;
+  bool get _isSingleTypeView =>
+      _forcedJobType == 'full_time' || _forcedJobType == 'part_time';
+  bool get _singleIsFullTime => _forcedJobType == 'full_time';
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
-    _ctrl = Get.put(CandidatesController());
-    // Rebuild tab bar badges khi dữ liệu thay đổi
-    _ctrl.fullTimeJobs.listen((_) => setState(() {}));
-    _ctrl.partTimeJobs.listen((_) => setState(() {}));
+    _ctrl = Get.isRegistered<CandidatesController>()
+        ? Get.find<CandidatesController>()
+        : Get.put(CandidatesController());
+    final args = Get.arguments;
+    final routeJobId = args is Map ? args['jobId']?.toString() : null;
+    final routeJobType = args is Map ? args['jobType']?.toString() : null;
+    _forcedJobType =
+        (routeJobType == 'full_time' || routeJobType == 'part_time')
+            ? routeJobType
+            : null;
+    _tabs = TabController(length: _isSingleTypeView ? 1 : 2, vsync: this);
+    _ctrl.setFilterJobId(routeJobId);
   }
 
   @override
@@ -43,15 +56,19 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (_, __) => [_buildAppBar()],
         body: TabBarView(
           controller: _tabs,
-          children: [
-            _CandidatesTab(ctrl: _ctrl, isFullTime: true),
-            _CandidatesTab(ctrl: _ctrl, isFullTime: false),
-          ],
+          children: _isSingleTypeView
+              ? [
+                  _CandidatesTab(ctrl: _ctrl, isFullTime: _singleIsFullTime),
+                ]
+              : [
+                  _CandidatesTab(ctrl: _ctrl, isFullTime: true),
+                  _CandidatesTab(ctrl: _ctrl, isFullTime: false),
+                ],
         ),
       ),
     );
@@ -69,9 +86,9 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
         icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
         onPressed: Get.back,
       ),
-      title: const Text(
-        'Ứng viên',
-        style: TextStyle(
+      title: Text(
+        _filterJobId != null ? 'Ứng viên bài đăng' : 'Ứng viên',
+        style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
           fontSize: 18,
@@ -100,27 +117,44 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
                 );
         }),
       ],
-      bottom: TabBar(
-        controller: _tabs,
-        indicatorColor: Colors.white,
-        indicatorWeight: 3,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white60,
-        labelStyle:
-            const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
-        tabs: [
-          _TabLabel(
-            label: 'Full-time',
-            badge: _ctrl.pendingFullTimeCount,
-          ),
-          _TabLabel(
-            label: 'Part-time',
-            badge: _ctrl.pendingPartTimeCount,
-          ),
-        ],
-      ),
+      bottom: _isSingleTypeView
+          ? PreferredSize(
+              preferredSize: const Size.fromHeight(44),
+              child: Container(
+                height: 44,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  _singleIsFullTime ? 'Full-time' : 'Part-time',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            )
+          : TabBar(
+              controller: _tabs,
+              indicatorColor: Colors.white,
+              indicatorWeight: 3,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white60,
+              labelStyle:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              unselectedLabelStyle:
+                  const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+              tabs: [
+                _TabLabel(
+                  label: 'Full-time',
+                  badge: _ctrl.pendingFullTimeCount,
+                ),
+                _TabLabel(
+                  label: 'Part-time',
+                  badge: _ctrl.pendingPartTimeCount,
+                ),
+              ],
+            ),
     );
   }
 }
@@ -137,7 +171,9 @@ class _CandidatesTab extends StatelessWidget {
     return Obx(() {
       final loading =
           isFullTime ? ctrl.isLoadingFullTime.value : ctrl.isLoadingPartTime.value;
-      final jobs = isFullTime ? ctrl.fullTimeJobs : ctrl.partTimeJobs;
+      final jobs = isFullTime
+          ? ctrl.filteredFullTimeJobs()
+          : ctrl.filteredPartTimeJobs();
 
       if (loading && jobs.isEmpty) {
         return const Center(
@@ -146,7 +182,10 @@ class _CandidatesTab extends StatelessWidget {
       }
 
       if (jobs.isEmpty) {
-        return _EmptyState(isFullTime: isFullTime);
+        return _EmptyState(
+          isFullTime: isFullTime,
+          isFilteredByJob: ctrl.filterJobId != null,
+        );
       }
 
       return RefreshIndicator(
@@ -181,8 +220,9 @@ class _JobCardState extends State<_JobCard> {
   @override
   void initState() {
     super.initState();
-    // Tự mở rộng nếu có đơn đang chờ duyệt
-    _expanded = widget.jwA.pendingCount > 0;
+    final filterId = widget.ctrl.filterJobId;
+    _expanded = widget.jwA.pendingCount > 0 ||
+        (filterId != null && filterId == widget.jwA.job.jobId);
   }
 
   @override
@@ -194,7 +234,7 @@ class _JobCardState extends State<_JobCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -822,8 +862,12 @@ class _NoApplicants extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final bool isFullTime;
+  final bool isFilteredByJob;
 
-  const _EmptyState({required this.isFullTime});
+  const _EmptyState({
+    required this.isFullTime,
+    this.isFilteredByJob = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -848,9 +892,11 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              isFullTime
-                  ? 'Chưa có bài đăng Full-time'
-                  : 'Chưa có bài đăng Part-time',
+              isFilteredByJob
+                  ? 'Chưa có ứng viên ứng tuyển'
+                  : (isFullTime
+                      ? 'Chưa có bài đăng Full-time'
+                      : 'Chưa có bài đăng Part-time'),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -859,7 +905,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tạo bài đăng tuyển dụng để bắt đầu\nnhận đơn ứng tuyển từ ứng viên.',
+              isFilteredByJob
+                  ? 'Bài đăng này chưa có đơn ứng tuyển nào.'
+                  : 'Tạo bài đăng tuyển dụng để bắt đầu\nnhận đơn ứng tuyển từ ứng viên.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,

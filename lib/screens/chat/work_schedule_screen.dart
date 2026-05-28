@@ -9,7 +9,7 @@ import '../../data/services/group_chat_service.dart';
 import '../../data/services/work_schedule_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WorkScheduleScreen — Lịch làm việc
+// WorkScheduleScreen — Phân công công việc (ca + nhiệm vụ theo ngày)
 // Argument: GroupChatModel
 // ─────────────────────────────────────────────────────────────────────────────
 class WorkScheduleScreen extends StatefulWidget {
@@ -34,6 +34,7 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
   WorkScheduleModel? _existing;
   bool _loading = true;
   bool _saving = false;
+  bool _sending = false;
 
   String get _dateStr => DateFormat('yyyy-MM-dd').format(_selectedDate);
 
@@ -112,16 +113,13 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
     if (mounted) setState(() { _existing = schedule; _loading = false; });
   }
 
-  Future<void> _save() async {
+  List<UserModel> get _employeeMembers {
+    final all = _members ?? [];
+    return all.where((m) => m.id != _group.employerId).toList();
+  }
+
+  WorkScheduleModel _buildScheduleModel() {
     final members = _members ?? [];
-    if (members.isEmpty) {
-      Get.snackbar('Lỗi', 'Không có thành viên',
-          snackPosition: SnackPosition.BOTTOM);
-      return;
-    }
-
-    setState(() => _saving = true);
-
     final tasks = members
         .map((m) => WorkTask(
               userId: m.id,
@@ -130,7 +128,7 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
             ))
         .toList();
 
-    final schedule = WorkScheduleModel(
+    return WorkScheduleModel(
       scheduleId: _existing?.scheduleId ?? '',
       groupId: _group.groupId,
       jobId: _group.jobId,
@@ -143,28 +141,56 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
       tasks: tasks,
       createdAt: _existing?.createdAt ?? DateTime.now(),
     );
+  }
 
+  List<Map<String, String>> _memberTaskPayload() {
+    return (_members ?? [])
+        .where((m) => m.id != _group.employerId)
+        .map(
+          (m) => {
+            'userId': m.id,
+            'name': '${m.firstName} ${m.lastName}'.trim(),
+            'content': _taskCtrls[m.id]?.text.trim() ?? '',
+          },
+        )
+        .toList();
+  }
+
+  Future<bool> _persistSchedule() async {
+    final id = await _service.saveSchedule(_buildScheduleModel());
+    final s = _buildScheduleModel();
+    setState(() => _existing = WorkScheduleModel(
+          scheduleId: id,
+          groupId: s.groupId,
+          jobId: s.jobId,
+          jobTitle: s.jobTitle,
+          employerId: s.employerId,
+          date: s.date,
+          shiftStart: s.shiftStart,
+          shiftEnd: s.shiftEnd,
+          generalContent: s.generalContent,
+          tasks: s.tasks,
+          createdAt: s.createdAt,
+        ));
+    return true;
+  }
+
+  Future<void> _save() async {
+    if ((_members ?? []).isEmpty) {
+      Get.snackbar('Lỗi', 'Không có thành viên',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    setState(() => _saving = true);
     try {
-      final id = await _service.saveSchedule(schedule);
-      setState(() => _existing = WorkScheduleModel(
-            scheduleId: id,
-            groupId: schedule.groupId,
-            jobId: schedule.jobId,
-            jobTitle: schedule.jobTitle,
-            employerId: schedule.employerId,
-            date: schedule.date,
-            shiftStart: schedule.shiftStart,
-            shiftEnd: schedule.shiftEnd,
-            generalContent: schedule.generalContent,
-            tasks: schedule.tasks,
-            createdAt: schedule.createdAt,
-          ));
-      Get.snackbar('Đã lưu', 'Lịch làm việc đã được cập nhật',
+      await _persistSchedule();
+      Get.snackbar('Đã lưu', 'Đã lưu phân công (chưa gửi cho nhân viên)',
           backgroundColor: Colors.green,
           colorText: Colors.white,
           snackPosition: SnackPosition.BOTTOM);
     } catch (e) {
-      Get.snackbar('Lỗi', 'Không thể lưu lịch làm việc',
+      Get.snackbar('Lỗi', 'Không thể lưu: $e',
           backgroundColor: Colors.red,
           colorText: Colors.white,
           snackPosition: SnackPosition.BOTTOM);
@@ -173,10 +199,82 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
     }
   }
 
+  Future<void> _sendToEmployees() async {
+    final employees = _employeeMembers;
+    if (employees.isEmpty) {
+      Get.snackbar('Lỗi', 'Không có nhân viên trong nhóm',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Gửi phân công?',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+          'Gửi phân công ngày ${DateFormat('dd/MM/yyyy').format(_selectedDate)} '
+          'cho ${employees.length} nhân viên qua thông báo? '
+          'Họ sẽ nhấn thông báo để xem phân công.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.employerPrimary,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Gửi', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _sending = true);
+    try {
+      await _persistSchedule();
+
+      final general = _generalCtrl.text.trim();
+      final tasks = _memberTaskPayload();
+
+      final sent = await _groupChatSvc.notifyWorkAssignmentToMembers(
+        groupId: _group.groupId,
+        jobTitle: _group.jobTitle,
+        date: _dateStr,
+        shiftStart: _shiftStartCtrl.text,
+        shiftEnd: _shiftEndCtrl.text,
+        generalContent: general,
+        memberTasks: tasks,
+        employerId: _group.employerId,
+      );
+
+      Get.snackbar(
+        'Đã gửi',
+        'Đã gửi thông báo phân công cho $sent nhân viên',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar('Lỗi', 'Không gửi được: $e',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: AppColors.employerPrimary,
         flexibleSpace: Container(
@@ -190,7 +288,7 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Lịch làm việc',
+            const Text('Phân công công việc',
                 style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -233,22 +331,103 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
                   const SizedBox(height: 16),
                   // Phân công công việc
                   _buildTaskAssignment(),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _saving ? null : _save,
-        backgroundColor: AppColors.employerPrimary,
-        icon: _saving
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.save_rounded, color: Colors.white),
-        label: Text(_existing != null ? 'Cập nhật' : 'Lưu lịch',
-            style: const TextStyle(color: Colors.white)),
+      bottomNavigationBar: _loading ? null : _buildBottomActions(),
+    );
+  }
+
+  Widget _buildBottomActions() {
+    const barHeight = 56.0;
+    const radius = BorderRadius.all(Radius.circular(14));
+    final busy = _saving || _sending;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: barHeight,
+                  child: OutlinedButton(
+                    onPressed: busy ? null : _save,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.employerPrimary,
+                      side: BorderSide(
+                        color: AppColors.employerPrimary.withValues(alpha: 0.45),
+                        width: 1.5,
+                      ),
+                      shape: const RoundedRectangleBorder(borderRadius: radius),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const _BottomActionLabel(
+                            icon: Icons.save_rounded,
+                            label: 'Lưu nháp',
+                            color: AppColors.employerPrimary,
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: barHeight,
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.employerGradient,
+                      borderRadius: radius,
+                    ),
+                    child: ElevatedButton(
+                      onPressed: busy ? null : _sendToEmployees,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(borderRadius: radius),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: _sending
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const _BottomActionLabel(
+                              icon: Icons.send_rounded,
+                              label: 'Gửi nhân viên',
+                              color: Colors.white,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -370,13 +549,13 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
   }
 
   Widget _buildTaskAssignment() {
-    final members = _members ?? [];
+    final members = _employeeMembers;
     if (members.isEmpty) {
       return const _Card(
         child: Center(
           child: Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Không có thành viên',
+            child: Text('Không có nhân viên trong nhóm',
                 style: TextStyle(color: Colors.grey)),
           ),
         ),
@@ -459,6 +638,43 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
 }
 
 // ── Shared widgets ─────────────────────────────────────────────────────────────
+
+class _BottomActionLabel extends StatelessWidget {
+  const _BottomActionLabel({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 22, color: color),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
+            height: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Card extends StatelessWidget {
   const _Card({required this.child});
   final Widget child;
@@ -468,7 +684,7 @@ class _Card extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(

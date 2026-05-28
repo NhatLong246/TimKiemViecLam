@@ -11,7 +11,7 @@ class ProfileFormTheme {
 
   static AppBar buildAppBar(BuildContext context, String title) {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(

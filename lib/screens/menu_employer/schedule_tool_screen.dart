@@ -10,13 +10,13 @@ class ScheduleToolScreen extends StatelessWidget {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Lịch ca làm',
           style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
@@ -68,7 +68,7 @@ class ScheduleToolScreen extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Column(

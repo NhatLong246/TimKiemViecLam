@@ -12,6 +12,7 @@ class CandidateDashboardController extends GetxController {
   final groups = <WorkGroup>[].obs;
   final summary = Rxn<CandidateEarningsSummary>();
   final isLoading = false.obs;
+  final isWithdrawing = false.obs;
   final errorMessage = ''.obs;
 
   double get profileRating {
@@ -69,6 +70,19 @@ class CandidateDashboardController extends GetxController {
     final g = await _service.joinGroup(code);
     await loadGroups();
     return g;
+  }
+
+  Future<void> withdraw({
+    required int amountVnd,
+    String? note,
+  }) async {
+    isWithdrawing.value = true;
+    try {
+      await _service.withdraw(amountVnd: amountVnd, note: note);
+      await loadBenefits();
+    } finally {
+      isWithdrawing.value = false;
+    }
   }
 
   Future<void> _load(Future<void> Function() action) async {

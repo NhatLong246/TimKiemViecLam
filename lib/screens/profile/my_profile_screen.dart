@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../utils/theme_colors.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:viecnow/controller/update_account_controller.dart';
@@ -28,22 +29,18 @@ class MyProfileScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
+          icon: Icon(Icons.arrow_back_ios_new, color: context.textSecondary),
         ),
-        title: const Text(
+        title: Text(
           'Hồ sơ của tôi',
-          style: TextStyle(
-            color: Color(0xFF222222),
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(context).textTheme.titleLarge,
         ),
       ),
       body: SafeArea(
@@ -112,14 +109,18 @@ class MyProfileScreen extends StatelessWidget {
     final dateOfBirth = _dateValue(data['dateOfBirth']);
     final address = _joinValues([data['companyAddress'], data['address']]);
     final items = <Widget>[
-      if (fullName.isNotEmpty) _buildInfoLine(Icons.people_outline, fullName),
-      if (phone.isNotEmpty) _buildVerifiedInfoLine(Icons.phone_outlined, phone),
-      if (email.isNotEmpty) _buildVerifiedInfoLine(Icons.email_outlined, email),
+      if (fullName.isNotEmpty)
+        _buildInfoLine(context, Icons.people_outline, fullName),
+      if (phone.isNotEmpty)
+        _buildVerifiedInfoLine(context, Icons.phone_outlined, phone),
+      if (email.isNotEmpty)
+        _buildVerifiedInfoLine(context, Icons.email_outlined, email),
       if (address.isNotEmpty)
-        _buildInfoLine(Icons.location_on_outlined, address),
-      if (gender.isNotEmpty) _buildInfoLine(Icons.wc_outlined, gender),
+        _buildInfoLine(context, Icons.location_on_outlined, address),
+      if (gender.isNotEmpty)
+        _buildInfoLine(context, Icons.wc_outlined, gender),
       if (dateOfBirth.isNotEmpty)
-        _buildInfoLine(Icons.cake_outlined, dateOfBirth),
+        _buildInfoLine(context, Icons.cake_outlined, dateOfBirth),
     ];
 
     return _ProfileFormCard(
@@ -143,9 +144,9 @@ class MyProfileScreen extends StatelessWidget {
                     builder: (_) => const SettingsAccountScreen(),
                   ),
                 ),
-                icon: const Icon(
+                icon: Icon(
                   Icons.edit_outlined,
-                  color: Color(0xFF666666),
+                  color: context.textSecondary,
                   size: 28,
                 ),
               ),
@@ -179,17 +180,17 @@ class MyProfileScreen extends StatelessWidget {
     return _stringValue(value);
   }
 
-  Widget _buildInfoLine(IconData icon, String text) {
+  Widget _buildInfoLine(BuildContext context, IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: const Color(0xFF555555)),
+          Icon(icon, size: 20, color: context.textSecondary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF333333)),
+              style: TextStyle(fontSize: 16, color: context.textPrimary),
             ),
           ),
         ],
@@ -197,17 +198,18 @@ class MyProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVerifiedInfoLine(IconData icon, String text) {
+  Widget _buildVerifiedInfoLine(
+      BuildContext context, IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: const Color(0xFF555555)),
+          Icon(icon, size: 20, color: context.textSecondary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF333333)),
+              style: TextStyle(fontSize: 16, color: context.textPrimary),
             ),
           ),
           const Icon(
@@ -227,7 +229,8 @@ class MyProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader({
+  Widget _buildSectionHeader(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required VoidCallback onAction,
@@ -245,13 +248,14 @@ class MyProfileScreen extends StatelessWidget {
         ),
         IconButton(
           onPressed: onAction,
-          icon: Icon(actionIcon, color: const Color(0xFF555555), size: 28),
+          icon: Icon(actionIcon, color: context.textSecondary, size: 28),
         ),
       ],
     );
   }
 
-  Widget _buildListItemCard({
+  Widget _buildListItemCard(
+    BuildContext context, {
     required String title,
     String? subtitle,
     String? meta,
@@ -264,7 +268,7 @@ class MyProfileScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F4F8),
+        color: context.palette.elevatedSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _border),
       ),
@@ -280,19 +284,19 @@ class MyProfileScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF222222),
+                        color: context.textPrimary,
                       ),
                     ),
                     if (subtitle != null && subtitle.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          color: Color(0xFF555555),
+                          color: context.textSecondary,
                         ),
                       ),
                     ],
@@ -300,9 +304,9 @@ class MyProfileScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         meta,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF888888),
+                          color: context.textSecondary,
                         ),
                       ),
                     ],
@@ -313,7 +317,7 @@ class MyProfileScreen extends StatelessWidget {
                 IconButton(
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined, size: 22),
-                  color: const Color(0xFF555555),
+                  color: context.textSecondary,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -335,10 +339,10 @@ class MyProfileScreen extends StatelessWidget {
               body,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 height: 1.35,
-                color: Color(0xFF4B4B4B),
+                color: context.textSecondary,
               ),
             ),
           ],
@@ -397,6 +401,7 @@ class MyProfileScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionHeader(
+            context,
             icon: Icons.favorite_border,
             title: 'Giới thiệu bản thân',
             actionIcon: intro.isEmpty ? Icons.add_circle_outline : Icons.edit_outlined,
@@ -406,10 +411,10 @@ class MyProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               intro,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 height: 1.4,
-                color: Color(0xFF333333),
+                color: context.textPrimary,
               ),
             ),
           ],
@@ -426,6 +431,7 @@ class MyProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildSectionHeader(
+            context,
             icon: Icons.school_outlined,
             title: 'Học vấn',
             actionIcon: Icons.add_circle_outline,
@@ -435,6 +441,7 @@ class MyProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             ...items.map(
               (e) => _buildListItemCard(
+                context,
                 title: e.school,
                 subtitle: [
                   if (e.major.isNotEmpty) e.major,
@@ -467,6 +474,7 @@ class MyProfileScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionHeader(
+            context,
             icon: Icons.bolt_outlined,
             title: 'Kỹ năng',
             actionIcon: Icons.edit_outlined,
@@ -514,6 +522,7 @@ class MyProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildSectionHeader(
+            context,
             icon: Icons.theater_comedy_outlined,
             title: 'Dự án/ Thành tựu',
             actionIcon: Icons.add_circle_outline,
@@ -523,6 +532,7 @@ class MyProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             ...items.map(
               (p) => _buildListItemCard(
+                context,
                 title: p.name,
                 meta: p.dateRange,
                 body: p.description,
@@ -550,6 +560,7 @@ class MyProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildSectionHeader(
+            context,
             icon: Icons.card_membership_outlined,
             title: 'Chứng chỉ/ Bằng cấp',
             actionIcon: Icons.add_circle_outline,
@@ -559,6 +570,7 @@ class MyProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             ...items.map(
               (c) => _buildListItemCard(
+                context,
                 title: c.name,
                 onEdit: () =>
                     _pushScreen(context, CertificateScreen(certificate: c)),
@@ -585,6 +597,7 @@ class MyProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildSectionHeader(
+            context,
             icon: Icons.translate_outlined,
             title: 'Ngoại ngữ',
             actionIcon: Icons.add_circle_outline,
@@ -594,6 +607,7 @@ class MyProfileScreen extends StatelessWidget {
             const SizedBox(height: 12),
             ...items.map(
               (l) => _buildListItemCard(
+                context,
                 title: l.language,
                 subtitle: l.level,
                 onEdit: () => _pushScreen(
@@ -699,9 +713,9 @@ class MyProfileScreen extends StatelessWidget {
               if (!declaredNo)
                 IconButton(
                   onPressed: () => _openWorkExperienceScreen(context),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.add_circle_outline,
-                    color: Color(0xFF555555),
+                    color: context.textSecondary,
                     size: 28,
                   ),
                 ),
@@ -716,15 +730,15 @@ class MyProfileScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF6F4F8),
+                color: context.palette.elevatedSurface,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Bạn đã có kinh nghiệm làm việc chưa?',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF333333)),
+                    style: TextStyle(fontSize: 16, color: context.textPrimary),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -767,7 +781,7 @@ class MyProfileScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F4F8),
+        color: context.palette.elevatedSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _border),
       ),
@@ -783,26 +797,26 @@ class MyProfileScreen extends StatelessWidget {
                   children: [
                     Text(
                       experience.position,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF222222),
+                        color: context.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       experience.company,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF555555),
+                        color: context.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       experience.dateRange,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF888888),
+                        color: context.textSecondary,
                       ),
                     ),
                   ],
@@ -811,9 +825,9 @@ class MyProfileScreen extends StatelessWidget {
               IconButton(
                 onPressed: () =>
                     _openEditWorkExperienceScreen(context, experience),
-                icon: const Icon(
+                icon: Icon(
                   Icons.edit_outlined,
-                  color: Color(0xFF555555),
+                  color: context.textSecondary,
                   size: 22,
                 ),
                 padding: EdgeInsets.zero,
@@ -838,10 +852,10 @@ class MyProfileScreen extends StatelessWidget {
               experience.description,
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 height: 1.35,
-                color: Color(0xFF4B4B4B),
+                color: context.textSecondary,
               ),
             ),
           ],
@@ -905,7 +919,7 @@ class MyProfileScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F4F8),
+        color: context.palette.elevatedSurface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _border),
       ),
@@ -920,25 +934,25 @@ class MyProfileScreen extends StatelessWidget {
                 color: _primary.withValues(alpha: 0.85),
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Bạn chưa có kinh nghiệm làm việc',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF333333),
+                    color: context.textPrimary,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Thông tin này đã được lưu vào hồ sơ của bạn.',
             style: TextStyle(
               fontSize: 14,
               height: 1.35,
-              color: Color(0xFF666666),
+              color: context.textSecondary,
             ),
           ),
           const SizedBox(height: 12),
@@ -1005,7 +1019,7 @@ class _ProfileFormCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE1E1E1)),
         boxShadow: [

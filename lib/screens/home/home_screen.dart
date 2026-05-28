@@ -4,6 +4,10 @@ import '../../widgets/weather_widget.dart';
 import 'package:get/get.dart';
 import '../../controller/login_controller.dart';
 import '../../controller/home_controller.dart';
+import '../../controller/messaging_controller.dart';
+import '../../data/models/app_notification_model.dart';
+import '../../data/services/notification_service.dart';
+import '../../utils/messaging_bootstrap.dart';
 import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
 
@@ -24,6 +28,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _onRefresh() async {
     await _homeController.refreshJobs();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    MessagingBootstrap.startIfLoggedIn();
   }
 
   @override
@@ -184,26 +194,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const WeatherWidget(),
                     const SizedBox(height: 6),
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const NotificationScreen(),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.notifications_none,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+                    GetBuilder<AuthController>(
+                      init: _authController,
+                      builder: (_) => const _NotificationBellButton(),
                     ),
                   ],
                 ),
@@ -677,6 +670,106 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Chuông thông báo: lọc tin nhóm đã tắt thông báo + Obx tin nhắn.
+class _NotificationBellButton extends StatelessWidget {
+  const _NotificationBellButton();
+
+  @override
+  Widget build(BuildContext context) {
+    MessagingBootstrap.ensureController().ensureInboxListening();
+    final notifService = NotificationService();
+
+    return StreamBuilder<List<AppNotificationItem>>(
+      stream: notifService.streamNotifications(),
+      builder: (context, notifSnap) {
+        final notifications = notifSnap.data ?? [];
+
+        Widget bell(int total) {
+          return GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationScreen(),
+              ),
+            ),
+            child: SizedBox(
+              width: 38,
+              height: 38,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      total > 0
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_none,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  if (total > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          maxWidth: 28,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53935),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        alignment: Alignment.center,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            total > 99 ? '99+' : '$total',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (!Get.isRegistered<MessagingController>()) {
+          final count = notifications.where((n) => !n.isRead).length;
+          return bell(count);
+        }
+
+        return Obx(() {
+          final mc = Get.find<MessagingController>();
+          final notifUnread = mc.visibleUnreadNotificationCount(notifications);
+          final chatUnread = mc.unreadTotal.value;
+          final total =
+              notifUnread > chatUnread ? notifUnread : chatUnread;
+          return bell(total);
+        });
+      },
     );
   }
 }

@@ -80,6 +80,7 @@ class ApplicationModel {
 // ── Snapshot của ứng viên (đọc từ `users` collection) ─────────────────────────
 class CandidateSnapshot {
   final String uid;
+  final String role;
   final String firstName;
   final String lastName;
   final String? avatarUrl;
@@ -88,6 +89,7 @@ class CandidateSnapshot {
 
   const CandidateSnapshot({
     required this.uid,
+    this.role = 'candidate',
     required this.firstName,
     required this.lastName,
     this.avatarUrl,
@@ -96,10 +98,12 @@ class CandidateSnapshot {
   });
 
   String get fullName => '$firstName $lastName'.trim();
+  bool get isCandidate => role == 'candidate';
 
   factory CandidateSnapshot.fromMap(String uid, Map<String, dynamic> map) {
     return CandidateSnapshot(
       uid: uid,
+      role: (map['role'] ?? 'candidate').toString(),
       firstName: map['firstName'] as String? ?? '',
       lastName: map['lastName'] as String? ?? '',
       avatarUrl: map['avatarUrl'] as String?,

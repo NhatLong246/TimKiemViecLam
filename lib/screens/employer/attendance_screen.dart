@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,7 +9,12 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/attendance_controller.dart';
 import '../../data/models/attendance_model.dart';
 import '../../data/models/user_model.dart';
+import '../../data/models/group_chat_model.dart';
+import '../../data/services/attendance_auto_notify_service.dart';
 import '../../data/services/group_chat_service.dart';
+import '../../data/services/job_attendance_completion_service.dart';
+import '../../routes/app_routes.dart';
+import '../../widgets/attendance_photo_info.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AttendanceScreen — Điểm danh nhân viên
@@ -27,9 +33,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   late final String _jobId;
   late final String _jobTitle;
   late final List<String> _memberIds;
+  late final String _employerId;
   final _timeCtrl = TextEditingController(text: '08:00');
   final _groupChatSvc = GroupChatService();
+  final _autoNotify = AttendanceAutoNotifyService.instance;
+  final _completionSvc = JobAttendanceCompletionService();
   List<UserModel>? _members;
+  GroupChatModel? _group;
+  Timer? _autoTimer;
+  JobDisbursementReadiness? _readiness;
+
+  List<String> get _candidateIds => _memberIds
+      .where((id) => id.isNotEmpty && id != _employerId)
+      .toList();
 
   @override
   void initState() {
@@ -40,19 +56,66 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _jobId = args['jobId'] as String;
     _jobTitle = args['jobTitle'] as String;
     _memberIds = List<String>.from(args['memberIds'] as List? ?? []);
+    _employerId = (args['employerId'] ?? '').toString();
 
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _ctrl.loadSessionByDate(_jobId, today);
     _loadMembers();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _setupAutoAttendance());
+  }
+
+  Future<void> _setupAutoAttendance() async {
+    _group = await _groupChatSvc.getGroup(_groupId);
+    if (_group == null) return;
+
+    final shift = await _autoNotify.resolveShiftForDisplay(_groupId);
+    if (mounted) _timeCtrl.text = shift.start;
+
+    await _autoNotify.onEmployerOpensAttendance(_group!);
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    await _ctrl.loadSessionByDate(_jobId, today);
+    await _refreshDisbursementReadiness();
+
+    _autoTimer?.cancel();
+    _autoTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+      if (_group == null) return;
+      await _autoNotify.runScheduledForGroup(_group!);
+      if (mounted && _ctrl.currentSession.value == null) {
+        final t = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        await _ctrl.loadSessionByDate(_jobId, t);
+      }
+      if (mounted) await _refreshDisbursementReadiness();
+    });
+  }
+
+  Future<void> _refreshDisbursementReadiness() async {
+    final readiness = await _completionSvc.evaluate(
+      jobId: _jobId,
+      groupId: _groupId,
+      candidateIds: _candidateIds,
+    );
+    if (mounted) setState(() => _readiness = readiness);
   }
 
   Future<void> _loadMembers() async {
-    final list = await _groupChatSvc.getGroupMembers(_memberIds);
-    if (mounted) setState(() => _members = list);
+    var ids = _memberIds;
+    var employerId = _employerId;
+    if (employerId.isEmpty) {
+      final g = await _groupChatSvc.getGroup(_groupId);
+      employerId = g?.employerId ?? '';
+    }
+    final list = await _groupChatSvc.getGroupMembers(ids);
+    if (mounted) {
+      setState(() {
+        _members = list;
+        if (_employerId.isEmpty) _employerId = employerId;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _autoTimer?.cancel();
     _timeCtrl.dispose();
     super.dispose();
   }
@@ -60,7 +123,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: Obx(() {
         if (_ctrl.isLoading.value) {
@@ -127,8 +190,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    'Nhấn "Bắt đầu điểm danh" để tạo phiên hôm nay. '
-                    'Sau đó dùng nút thông báo để nhắc nhân viên chụp ảnh.',
+                    'Nhấn "Bắt đầu điểm danh" để tạo phiên và tự gửi thông báo '
+                    'cho nhân viên. Đến giờ ca (phân công công việc), hệ thống '
+                    'cũng tự gửi nếu bạn chưa bấm bắt đầu.',
                     style: TextStyle(fontSize: 13),
                   ),
                 ),
@@ -195,9 +259,108 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             );
           }),
         ),
+        _buildDayEndBar(),
         _buildSaveBar(),
       ],
     );
+  }
+
+  Widget _buildDayEndBar() {
+    final r = _readiness;
+    if (r == null || r.requiredDays == 0) return const SizedBox.shrink();
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            r.message,
+            style: TextStyle(
+              fontSize: 13,
+              color: r.canDisburse ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (r.requiredDays > 1) ...[
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+              value: r.requiredDays > 0 ? r.completedDays / r.requiredDays : 0,
+              backgroundColor: Colors.grey.shade200,
+              color: AppColors.employerPrimary,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+          const SizedBox(height: 8),
+          if (r.canDisburse)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _openDisbursementFlow(),
+                icon: const Icon(Icons.payments_outlined),
+                label: Text(
+                  r.requiredDays == 1
+                      ? 'Giải ngân & đánh giá'
+                      : 'Giải ngân (${r.requiredDays} ngày đã xong)',
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.employerPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            )
+          else if (r.canRequestDisbursement)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openDisbursementFlow(),
+                icon: const Icon(Icons.send_outlined),
+                label: const Text('Gửi yêu cầu giải ngân (Admin xem xét)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.employerPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.lock_clock_outlined),
+              label: Text(
+                r.requiredDays == 1
+                    ? 'Chưa đủ điểm danh trong ngày'
+                    : 'Còn ${r.requiredDays - r.completedDays} ngày trong lịch',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openDisbursementFlow() async {
+    if (_group == null) return;
+    await _refreshDisbursementReadiness();
+    final r = _readiness;
+    if (r == null || !r.canRequestDisbursement) {
+      Get.snackbar(
+        'Chưa thể giải ngân',
+        r?.message ?? 'Hoàn tất điểm danh trong thời hạn làm việc.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+    final lastDate = r.mandatoryDates.isNotEmpty
+        ? r.mandatoryDates.last
+        : DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final result = await Get.toNamed(
+      AppRoutes.jobDayEndFlow,
+      arguments: {'group': _group!, 'workDate': lastDate},
+    );
+    if (result == true && mounted) await _refreshDisbursementReadiness();
   }
 
   Widget _buildSessionHeader() {
@@ -310,23 +473,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
     if (confirmed != true) return;
 
-    await _groupChatSvc.sendMessage(
-      _groupId,
-      _buildNotifyMessage(
-          '📸 Đã đến giờ điểm danh $type! '
-          'Tất cả nhân viên vui lòng chụp ảnh điểm danh.',
-          type),
-    );
+    final session = _ctrl.currentSession.value;
+    if (session == null) return;
 
+    for (final r in _ctrl.editRecords) {
+      if (r.candidateId.isEmpty) continue;
+      await _groupChatSvc.sendAttendanceRequest(
+        groupId: _groupId,
+        jobId: _jobId,
+        attendanceId: session.attendanceId,
+        targetUserId: r.candidateId,
+        targetName: r.candidateName.isNotEmpty
+            ? r.candidateName
+            : 'Nhân viên',
+        isCheckIn: isCheckIn,
+        expectedStartTime: session.expectedStartTime,
+        allowDuplicate: true,
+      );
+    }
+
+    await _refreshDisbursementReadiness();
     Get.snackbar('Đã gửi', 'Thông báo điểm danh $type đã được gửi',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
         colorText: Colors.white);
-  }
-
-  dynamic _buildNotifyMessage(String content, String type) {
-    // Tạo ChatMessageModel inline
-    return _AttendanceNotifyMessage(content: content);
   }
 
   Widget _buildSaveBar() {
@@ -347,8 +517,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     shadowColor: Colors.transparent,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14))),
-                onPressed:
-                    _ctrl.isSaving.value ? null : _ctrl.saveAll,
+                onPressed: _ctrl.isSaving.value
+                    ? null
+                    : () async {
+                        await _ctrl.saveAll();
+                        await _refreshDisbursementReadiness();
+                      },
                 child: _ctrl.isSaving.value
                     ? const SizedBox(
                         width: 22,
@@ -368,6 +542,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _startSession() async {
     final workers = (_members ?? [])
+        .where((u) => u.id != _employerId)
         .map((u) => AttendanceRecord(
               candidateId: u.id,
               candidateName:
@@ -383,29 +558,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       workers: workers,
       expectedStartTime: _timeCtrl.text,
     );
-  }
-}
 
-// Dummy class to build a notify message to Firestore
-class _AttendanceNotifyMessage {
-  final String content;
-  _AttendanceNotifyMessage({required this.content});
-}
-
-// Override sendMessage for attendance notification
-extension _AttendanceSend on GroupChatService {
-  Future<void> sendAttendanceNotify(String groupId, String content) async {
-    await FirebaseFirestore.instance
-        .collection('groupChats')
-        .doc(groupId)
-        .collection('messages')
-        .add({
-      'senderId': 'system',
-      'senderName': 'Điểm danh',
-      'content': content,
-      'type': 'system',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    final session = _ctrl.currentSession.value;
+    _group ??= await _groupChatSvc.getGroup(_groupId);
+    if (session != null && _group != null) {
+      await _autoNotify.onEmployerStartedSession(
+        group: _group!,
+        session: session,
+      );
+      if (mounted) {
+        Get.snackbar(
+          'Đã bắt đầu',
+          'Đã tạo phiên và gửi thông báo đầu ca cho nhân viên',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    }
   }
 }
 
@@ -565,7 +735,7 @@ class _AttendanceRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
@@ -615,6 +785,9 @@ class _AttendanceRow extends StatelessWidget {
                     label: 'Đầu ca',
                     photoBase64: record.checkInPhotoUrl,
                     time: record.checkInTime,
+                    capturedAt: record.checkInCapturedAt,
+                    locationLabel: record.checkInLocation,
+                    fileName: record.checkInPhotoName,
                     icon: Icons.login_rounded,
                     color: const Color(0xFF1565C0),
                     onNotify: () => _notify(context, isCheckIn: true),
@@ -626,6 +799,9 @@ class _AttendanceRow extends StatelessWidget {
                     label: 'Cuối ca',
                     photoBase64: record.checkOutPhotoUrl,
                     time: record.checkOutTime,
+                    capturedAt: record.checkOutCapturedAt,
+                    locationLabel: record.checkOutLocation,
+                    fileName: record.checkOutPhotoName,
                     icon: Icons.logout_rounded,
                     color: const Color(0xFF2E7D32),
                     onNotify: () => _notify(context, isCheckIn: false),
@@ -711,10 +887,19 @@ class _AttendanceRow extends StatelessWidget {
     );
     if (confirmed != true) return;
 
-    await groupChatSvc.sendAttendanceNotify(
-      groupId,
-      '📸 @${record.candidateName}: Đã đến lúc điểm danh $type! '
-      'Vui lòng chụp ảnh điểm danh.',
+    final session = ctrl.currentSession.value;
+    if (session == null) return;
+
+    await groupChatSvc.sendAttendanceRequest(
+      groupId: groupId,
+      jobId: session.jobId,
+      attendanceId: session.attendanceId,
+      targetUserId: record.candidateId,
+      targetName:
+          record.candidateName.isNotEmpty ? record.candidateName : 'Nhân viên',
+      isCheckIn: isCheckIn,
+      expectedStartTime: session.expectedStartTime,
+      allowDuplicate: true,
     );
 
     Get.snackbar('Đã gửi', 'Thông báo đã được gửi đến ${record.candidateName}',
@@ -768,6 +953,9 @@ class _PhotoCell extends StatelessWidget {
     required this.label,
     required this.photoBase64,
     required this.time,
+    this.capturedAt,
+    this.locationLabel,
+    this.fileName,
     required this.icon,
     required this.color,
     required this.onNotify,
@@ -775,6 +963,9 @@ class _PhotoCell extends StatelessWidget {
   final String label;
   final String? photoBase64;
   final String? time;
+  final String? capturedAt;
+  final String? locationLabel;
+  final String? fileName;
   final IconData icon;
   final Color color;
   final VoidCallback onNotify;
@@ -814,7 +1005,7 @@ class _PhotoCell extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: Image.memory(bytes,
                   width: double.infinity,
-                  height: 60,
+                  height: 72,
                   fit: BoxFit.cover),
             )
           else
@@ -841,12 +1032,14 @@ class _PhotoCell extends StatelessWidget {
                 ),
               ),
             ),
-          if (time != null && time!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(time!,
-                  style: TextStyle(fontSize: 10, color: color)),
-            ),
+          AttendancePhotoInfo(
+            capturedAt: capturedAt,
+            time: time,
+            locationLabel: locationLabel,
+            fileName: fileName,
+            textColor: color,
+            dense: true,
+          ),
         ],
       ),
     );

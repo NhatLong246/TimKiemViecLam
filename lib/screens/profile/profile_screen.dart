@@ -21,6 +21,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const Color _primary = Color(0xFF2E7D32);
   static const Color _headerGreenTop = Color(0xFF81C784);
   static const Color _headerGreenBottom = Color(0xFF2E7D32);
 
@@ -321,8 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 20,
                 MediaQuery.of(context).viewInsets.bottom + 22,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
@@ -563,7 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: selected ? const Color(0xFF5E35B1) : const Color(0xFFE0E0E0),
@@ -591,6 +591,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _onProfileRefresh(
+    BuildContext context,
+    UpdateAccountController updateController,
+  ) async {
+    try {
+      await updateController.refreshProfile();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã cập nhật hồ sơ'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   Widget _buildUserProfile(
     BuildContext context,
     AuthController authController,
@@ -600,6 +628,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return StreamBuilder(
       stream: updateController.getUserData(),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(
+              child: CircularProgressIndicator(color: _primary),
+            ),
+          );
+        }
+
         final data = snapshot.hasData && snapshot.data!.exists
             ? snapshot.data!.data() as Map<String, dynamic>
             : <String, dynamic>{};
@@ -619,47 +657,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return Scaffold(
           backgroundColor: Colors.white,
-          body: RefreshIndicator(
-            color: Colors.white,
-            backgroundColor: _headerGreenBottom,
-            onRefresh: () => updateController.refreshProfile(),
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(
+                context,
+                authController,
+                currentWorkStatus: currentWorkStatus,
+                jobSearchStatus: jobSearchStatus,
               ),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _buildHeader(
-                    context,
-                    authController,
-                    currentWorkStatus: currentWorkStatus,
-                    jobSearchStatus: jobSearchStatus,
-                  ),
-                ),
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: ColoredBox(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        26,
-                        20,
-                        20 + bottomNavPadding + bottomInset,
-                      ),
-                      child: Column(
-                        children: [
-                          _buildOverviewCard(),
-                          _buildVisibilityCard(),
-                          const SizedBox(height: 22),
-                          _buildJobCriteriaCard(),
-                        ],
-                      ),
+              Expanded(
+                child: RefreshIndicator(
+                  color: _primary,
+                  onRefresh: () => _onProfileRefresh(context, updateController),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
                     ),
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      26,
+                      20,
+                      20 + bottomNavPadding + bottomInset,
+                    ),
+                    children: [
+                      _buildOverviewCard(),
+                      _buildVisibilityCard(),
+                      const SizedBox(height: 22),
+                      _buildJobCriteriaCard(),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -1053,7 +1083,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 Widget _buildGuestProfile(BuildContext context) {
   return Scaffold(
-    backgroundColor: AppColors.background,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     body: Column(
       children: [
         Container(
@@ -1106,7 +1136,7 @@ class _ProfileCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE3E3E3)),
         boxShadow: [

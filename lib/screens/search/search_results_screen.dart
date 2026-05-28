@@ -32,7 +32,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -57,7 +57,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -81,7 +81,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: _primary, width: 1.2),
                 ),
@@ -193,8 +193,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         builder: (context, setState) {
           return Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: SingleChildScrollView(
@@ -402,7 +401,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             },
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Column(

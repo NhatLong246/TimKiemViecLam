@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../controller/job_post_controller.dart';
 import '../../data/models/job_post_model.dart';
+import '../../utils/theme_colors.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -39,6 +43,42 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime? _endDate;
   bool _isSubmitting = false;
+  final List<String> _imageBase64s = [];
+  JobPostModel? _editing;
+
+  bool get _isEdit => _editing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final args = Get.arguments;
+    if (args is JobPostModel) {
+      _editing = args;
+      _loadFromPost(args);
+    }
+  }
+
+  void _loadFromPost(JobPostModel p) {
+    _titleCtrl.text = p.title;
+    _descCtrl.text = p.description;
+    _salaryCtrl.text = p.salary.toInt().toString();
+    _slotsCtrl.text = p.slots.toString();
+    _addressCtrl.text = p.location['address'] as String? ?? '';
+    _cityCtrl.text = p.location['city'] as String? ?? '';
+    _districtCtrl.text = p.location['district'] as String? ?? '';
+    _requirementsCtrl.text = p.requirements ?? '';
+    _workHoursCtrl.text =
+        p.workHoursPerDay != null ? p.workHoursPerDay.toString() : '';
+    _startTimeCtrl.text = p.startTime ?? '';
+    _jobType = p.jobType;
+    _category = p.category;
+    _salaryType = p.salaryType;
+    _startDate = p.startDate;
+    _endDate = p.endDate;
+    _imageBase64s
+      ..clear()
+      ..addAll(p.imageUrls);
+  }
 
   final _categories = const [
     {'value': 'boc_vac', 'label': 'Bốc vác'},
@@ -76,9 +116,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       lastDate: DateTime(now.year + 2),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFF7B1FA2),
-          ),
+          colorScheme: Theme.of(ctx).colorScheme.copyWith(
+                primary: const Color(0xFF7B1FA2),
+              ),
         ),
         child: child!,
       ),
@@ -97,8 +137,66 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  static final _timePattern = RegExp(r'^([01]?\d|2[0-3]):[0-5]\d$');
+
+  Future<void> _pickPostImage() async {
+    if (_imageBase64s.length >= 5) {
+      Get.snackbar('Giới hạn', 'Tối đa 5 ảnh minh họa');
+      return;
+    }
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 55,
+      maxWidth: 900,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (bytes.length > 900 * 1024) {
+      Get.snackbar('Ảnh quá lớn', 'Chọn ảnh nhỏ hơn 900KB');
+      return;
+    }
+    setState(() => _imageBase64s.add(base64Encode(bytes)));
+  }
+
+  String? _validateBeforeSubmit() {
+    if (_jobType == 'part_time' && _endDate == null) {
+      return 'Part-time cần chọn ngày kết thúc (số ngày làm việc)';
+    }
+    if (_endDate != null && _endDate!.isBefore(_startDate)) {
+      return 'Ngày kết thúc phải sau ngày bắt đầu';
+    }
+    if (_cityCtrl.text.trim().isEmpty) {
+      return 'Vui lòng nhập Tỉnh/Thành phố';
+    }
+    final st = _startTimeCtrl.text.trim();
+    if (st.isNotEmpty && !_timePattern.hasMatch(st)) {
+      return 'Giờ bắt đầu định dạng HH:mm (vd: 08:00)';
+    }
+    final wh = _workHoursCtrl.text.trim();
+    if (wh.isNotEmpty) {
+      final h = double.tryParse(wh.replaceAll(',', '.'));
+      if (h == null || h <= 0 || h > 24) {
+        return 'Giờ làm/ngày từ 1 đến 24';
+      }
+    }
+    final slots = int.tryParse(_slotsCtrl.text.trim()) ?? 0;
+    if (_editing != null && slots < _editing!.filledSlots) {
+      return 'Số lượng tuyển không được nhỏ hơn số ứng viên đã nhận (${_editing!.filledSlots})';
+    }
+    if (_descCtrl.text.trim().length < 20) {
+      return 'Mô tả công việc tối thiểu 20 ký tự';
+    }
+    return null;
+  }
+
   Future<void> _submit({required bool isDraft}) async {
     if (!_formKey.currentState!.validate()) return;
+    final extraErr = _validateBeforeSubmit();
+    if (extraErr != null) {
+      Get.snackbar('Thiếu thông tin', extraErr,
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -107,8 +205,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         0;
     final slots = int.tryParse(_slotsCtrl.text) ?? 1;
 
+    final newStatus = isDraft
+        ? 'draft'
+        : (_editing?.status == 'rejected' || _editing?.status == 'draft'
+            ? 'pending'
+            : (_editing?.status ?? 'pending'));
+
     final post = JobPostModel(
-      jobId: '',
+      jobId: _editing?.jobId ?? '',
       employerId: uid,
       title: _titleCtrl.text.trim(),
       description: _descCtrl.text.trim(),
@@ -118,33 +222,53 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         'address': _addressCtrl.text.trim(),
         'city': _cityCtrl.text.trim(),
         'district': _districtCtrl.text.trim(),
-        'lat': 0.0,
-        'lng': 0.0,
+        'lat': _editing?.location['lat'] ?? 0.0,
+        'lng': _editing?.location['lng'] ?? 0.0,
       },
       salary: salary,
       salaryType: _salaryType,
       slots: slots,
+      filledSlots: _editing?.filledSlots ?? 0,
       startDate: _startDate,
       endDate: _endDate,
-      workHoursPerDay: double.tryParse(_workHoursCtrl.text),
-      startTime: _startTimeCtrl.text.trim().isEmpty ? null : _startTimeCtrl.text.trim(),
-      requirements: _requirementsCtrl.text.trim().isEmpty ? null : _requirementsCtrl.text.trim(),
-      status: isDraft ? 'draft' : 'pending',
+      workHoursPerDay:
+          double.tryParse(_workHoursCtrl.text.trim().replaceAll(',', '.')),
+      startTime: _startTimeCtrl.text.trim().isEmpty
+          ? null
+          : _startTimeCtrl.text.trim(),
+      requirements: _requirementsCtrl.text.trim().isEmpty
+          ? null
+          : _requirementsCtrl.text.trim(),
+      status: _isEdit ? newStatus : (isDraft ? 'draft' : 'pending'),
       totalBudget: salary * slots,
+      imageUrls: List.from(_imageBase64s),
+      groupChatId: _editing?.groupChatId,
+      createdAt: _editing?.createdAt,
     );
 
-    final controller = Get.find<JobPostController>();
-    final success = await controller.createPost(post);
+    final controller = Get.isRegistered<JobPostController>()
+        ? Get.find<JobPostController>()
+        : Get.put(JobPostController());
+
+    final success = _isEdit
+        ? await controller.updatePost(post)
+        : await controller.createPost(post);
     setState(() => _isSubmitting = false);
 
     if (success) {
       Get.back();
       Get.snackbar(
-        isDraft ? 'Đã lưu nháp' : 'Đã gửi duyệt',
-        isDraft ? 'Bài đăng đã được lưu bản nháp' : 'Bài đăng đang chờ admin duyệt',
+        _isEdit
+            ? (isDraft ? 'Đã cập nhật nháp' : 'Đã cập nhật')
+            : (isDraft ? 'Đã lưu nháp' : 'Đã gửi duyệt'),
+        _isEdit
+            ? 'Bài đăng đã được lưu'
+            : (isDraft
+                ? 'Bài đăng đã được lưu bản nháp'
+                : 'Bài đăng đang chờ admin duyệt'),
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF7B1FA2),
-        colorText: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        colorText: Theme.of(context).colorScheme.onPrimary,
       );
     }
   }
@@ -152,7 +276,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildHeader(),
@@ -226,8 +350,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         Expanded(
                           child: _buildTextField(
                             controller: _cityCtrl,
-                            label: 'Tỉnh/Thành phố',
+                            label: 'Tỉnh/Thành phố *',
                             hint: 'TP.HCM',
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Nhập tỉnh/thành'
+                                : null,
                           ),
                         ),
                       ],
@@ -323,7 +450,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             label: 'Giờ làm/ngày',
                             hint: '8',
                             keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d{0,2}([.,]\d{0,1})?$'),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -336,6 +467,47 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       label: 'Yêu cầu',
                       hint: 'Ví dụ: Có kinh nghiệm, biết tiếng Anh...',
                       maxLines: 3,
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
+                  _buildSection('Hình ảnh minh họa', [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ..._imageBase64s.asMap().entries.map((e) => Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.memory(
+                                    base64Decode(e.value),
+                                    width: 72,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: GestureDetector(
+                                    onTap: () => setState(
+                                        () => _imageBase64s.removeAt(e.key)),
+                                    child: const CircleAvatar(
+                                      radius: 10,
+                                      backgroundColor: Colors.black54,
+                                      child: Icon(Icons.close,
+                                          size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )),
+                        OutlinedButton.icon(
+                          onPressed: _pickPostImage,
+                          icon: const Icon(Icons.add_photo_alternate_outlined),
+                          label: const Text('Thêm ảnh'),
+                        ),
+                      ],
                     ),
                   ]),
                   const SizedBox(height: 24),
@@ -370,10 +542,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 icon: const Icon(Icons.arrow_back_ios_new_rounded,
                     color: Colors.white, size: 20),
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Tạo bài đăng mới',
-                  style: TextStyle(
+                  _isEdit ? 'Sửa bài đăng' : 'Tạo bài đăng mới',
+                  style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.w800),
@@ -391,11 +563,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2)),
         ],
@@ -436,8 +608,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFFBDBDBD), fontSize: 13),
-        labelStyle: const TextStyle(color: Color(0xFF757575), fontSize: 13),
+        hintStyle: TextStyle(color: context.textSecondary, fontSize: 13),
+        labelStyle: TextStyle(color: context.textSecondary, fontSize: 13),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -446,7 +618,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         filled: true,
-        fillColor: const Color(0xFFFAFAFA),
+        fillColor:
+            Theme.of(context).inputDecorationTheme.fillColor ?? context.elevatedSurface,
       ),
     );
   }
@@ -464,7 +637,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Color(0xFF757575), fontSize: 13),
+        labelStyle: TextStyle(color: context.textSecondary, fontSize: 13),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -473,10 +646,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         filled: true,
-        fillColor: const Color(0xFFFAFAFA),
+        fillColor:
+            Theme.of(context).inputDecorationTheme.fillColor ?? context.elevatedSurface,
       ),
-      style: const TextStyle(fontSize: 13.5, color: Color(0xFF212121)),
-      dropdownColor: Colors.white,
+      style: TextStyle(fontSize: 13.5, color: context.textPrimary),
+      dropdownColor: Theme.of(context).cardColor,
     );
   }
 
@@ -491,7 +665,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(color: Color(0xFF757575), fontSize: 13)),
+            style: TextStyle(color: context.textSecondary, fontSize: 13)),
         const SizedBox(height: 8),
         Row(
           children: options.map((opt) {
@@ -512,12 +686,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             colors: _gradientColors,
                           )
                         : null,
-                    color: isSelected ? null : const Color(0xFFF5F5F5),
+                    color: isSelected ? null : context.elevatedSurface,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isSelected
                           ? Colors.transparent
-                          : const Color(0xFFE0E0E0),
+                          : context.borderColor,
                     ),
                   ),
                   child: Text(
@@ -526,7 +700,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white : const Color(0xFF616161),
+                      color: isSelected ? Colors.white : context.textSecondary,
                     ),
                   ),
                 ),
@@ -553,9 +727,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFFAFAFA),
+          color:
+              Theme.of(context).inputDecorationTheme.fillColor ?? context.elevatedSurface,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFBDBDBD)),
+          border: Border.all(color: context.borderColor),
         ),
         child: Row(
           children: [
@@ -564,16 +739,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(label,
-                      style: const TextStyle(
-                          color: Color(0xFF757575), fontSize: 12)),
+                      style: TextStyle(color: context.textSecondary, fontSize: 12)),
                   const SizedBox(height: 2),
                   Text(dateStr,
                       style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                           color: date != null
-                              ? const Color(0xFF212121)
-                              : const Color(0xFFBDBDBD))),
+                              ? context.textPrimary
+                              : context.textSecondary.withValues(alpha: 0.7))),
                 ],
               ),
             ),
@@ -627,7 +801,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7B1FA2).withOpacity(0.3),
+                          color: const Color(0xFF7B1FA2).withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),

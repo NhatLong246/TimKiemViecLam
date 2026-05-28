@@ -7,6 +7,14 @@ class ApplicationsService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Future<void> _assertCandidateRole(String userId) async {
+    final userDoc = await _db.collection('users').doc(userId).get();
+    final role = (userDoc.data()?['role'] ?? 'candidate').toString();
+    if (role != 'candidate') {
+      throw Exception('Chỉ tài khoản ứng viên mới được ứng tuyển.');
+    }
+  }
+
   Future<String> applyToJob({
     required String jobId,
     required String employerId,
@@ -15,6 +23,10 @@ class ApplicationsService {
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
+    if (uid == employerId) {
+      throw Exception('Không thể tự ứng tuyển vào bài đăng của chính mình.');
+    }
+    await _assertCandidateRole(uid);
 
     final dup = await _db
         .collection('applications')
@@ -52,10 +64,25 @@ class ApplicationsService {
 
     final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
     final jobTitle = (jobSnap.data()?['title'] ?? 'Công việc').toString();
+
+    var candidateName = 'Ứng viên';
+    try {
+      final userDoc = await _db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        final d = userDoc.data() ?? {};
+        final combined =
+            '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+        if (combined.isNotEmpty) candidateName = combined;
+      }
+    } catch (_) {}
+
     await NotificationService.notifyNewApplication(
       employerId: employerId,
       jobTitle: jobTitle,
-      candidateName: 'Ứng viên',
+      candidateName: candidateName,
+      jobId: jobId,
+      appId: ref.id,
+      candidateId: uid,
     );
 
     return ref.id;

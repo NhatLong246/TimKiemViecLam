@@ -13,7 +13,7 @@ class EmployerReviewsScreen extends StatelessWidget {
     final ctrl = Get.put(EmployerReviewController());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Obx(() {
         final summary = ctrl.summary.value;
         return CustomScrollView(
@@ -232,7 +232,7 @@ class _ReviewCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

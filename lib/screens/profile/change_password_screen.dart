@@ -63,7 +63,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(context, 'Đổi mật khẩu'),
       body: !_canChangePassword
           ? _buildSocialOnlyMessage()

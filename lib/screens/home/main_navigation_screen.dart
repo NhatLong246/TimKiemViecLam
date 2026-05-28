@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/controller/login_controller.dart';
+import 'package:viecnow/controller/messaging_controller.dart';
 import 'package:viecnow/routes/app_routes.dart';
+import 'package:viecnow/utils/messaging_bootstrap.dart';
 import '../chatbot/chatbot_screen.dart';
 import '../messaging/conversation_list_screen.dart';
 import '../menu_candidate/candidate_benefits_screen.dart';
@@ -10,6 +12,7 @@ import '../menu_candidate/candidate_reviews_screen.dart';
 import 'home_screen.dart';
 import '../profile/profile_screen.dart';
 import '../../widgets/floating_chat_button.dart';
+import '../../widgets/floating_message_bubble.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -23,6 +26,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _previousIndex = 1;
 
   static const Color _primary = Color(0xFF2E7D32);
+
+  @override
+  void initState() {
+    super.initState();
+    MessagingBootstrap.startIfLoggedIn();
+  }
 
   Widget _screenForIndex(int index) {
     switch (index) {
@@ -43,6 +52,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       body: Stack(
         children: [
           _screenForIndex(_currentIndex),
+          const FloatingMessageBubble(),
           const FloatingChatButton(),
         ],
       ),
@@ -220,6 +230,13 @@ class _DashboardPlaceholder extends StatelessWidget {
       requiresAuth: true,
     ),
     _MenuItem(
+      Icons.gavel_outlined,
+      'Sau giải tán',
+      Color(0xFFC62828),
+      Color(0xFFFFEBEE),
+      requiresAuth: true,
+    ),
+    _MenuItem(
       Icons.smart_toy_outlined,
       'Trợ lý AI',
       Color(0xFF00838F),
@@ -266,6 +283,60 @@ class _DashboardPlaceholder extends StatelessWidget {
   }
 
   Widget _buildCard(BuildContext context, _MenuItem item) {
+    final isMessage = item.label == 'Message';
+
+    Widget messageIcon() {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: item.iconColor.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(item.icon, size: 22, color: item.iconColor),
+          ),
+          if (isMessage && Get.isRegistered<MessagingController>())
+            Obx(() {
+              final n = Get.find<MessagingController>().unreadTotal.value;
+              if (n <= 0) return const SizedBox.shrink();
+              return Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  constraints: const BoxConstraints(minWidth: 18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE53935),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Text(
+                    n > 99 ? '99+' : '$n',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      );
+    }
+
     return GestureDetector(
       onTap: item.tappable ? () => _onTap(context, item) : null,
       child: Container(
@@ -278,22 +349,7 @@ class _DashboardPlaceholder extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: item.iconColor.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Icon(item.icon, size: 22, color: item.iconColor),
-            ),
+            messageIcon(),
             Text(
               item.label,
               style: TextStyle(
@@ -332,6 +388,9 @@ class _DashboardPlaceholder extends StatelessWidget {
       case 'Đánh giá':
         screen = const CandidateReviewsScreen();
         break;
+      case 'Sau giải tán':
+        Navigator.pushNamed(context, AppRoutes.complaintsCatalog);
+        return;
       case 'Trợ lý AI':
         Navigator.push(
           context,

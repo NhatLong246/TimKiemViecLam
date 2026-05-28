@@ -16,6 +16,7 @@ class CallScreen extends StatefulWidget {
   final String userName;
   final String userId;
   final String callId;
+  final Future<void> Function()? onCallEnded;
 
   const CallScreen({
     super.key,
@@ -24,6 +25,7 @@ class CallScreen extends StatefulWidget {
     required this.userId,
     required this.callId,
     this.userName = 'Người dùng',
+    this.onCallEnded,
     // ignore: unused_element
     String roomUrl = '',
   });
@@ -143,8 +145,11 @@ class _CallScreenState extends State<CallScreen> {
 
   void _switchCamera() => _engine?.switchCamera();
 
-  void _endCall() {
-    _engine?.leaveChannel();
+  Future<void> _endCall() async {
+    try {
+      await widget.onCallEnded?.call();
+    } catch (_) {}
+    await _engine?.leaveChannel();
     if (mounted) Navigator.pop(context);
   }
 

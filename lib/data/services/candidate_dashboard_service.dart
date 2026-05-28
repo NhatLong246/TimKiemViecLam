@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/candidate_dashboard_models.dart';
+import 'notification_service.dart';
 import '../models/job_post_model.dart';
 
 class CandidateDashboardService {
@@ -246,13 +247,63 @@ class CandidateDashboardService {
       }
     }
 
+    final walletBalance = await _fetchWalletBalance();
+
     return CandidateEarningsSummary(
       totalPaidVnd: paid,
       pendingVnd: pending,
+      walletBalanceVnd: walletBalance.round(),
       jobCount: payments.where((p) => p.status == 'paid').length,
       hoursWorked: hours.round(),
       avgRating: profileRating,
     );
+  }
+
+  Future<double> _fetchWalletBalance() async {
+    final uid = _uid;
+    if (uid == null) return 0;
+    final userDoc = await _firestore.collection('users').doc(uid).get();
+    return (userDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0;
+  }
+
+  Future<void> withdraw({
+    required int amountVnd,
+    String? note,
+  }) async {
+    final uid = _uid;
+    if (uid == null) throw Exception('Chưa đăng nhập');
+    if (amountVnd <= 0) throw Exception('Số tiền rút phải lớn hơn 0');
+
+    final userRef = _firestore.collection('users').doc(uid);
+    final txRef = _firestore.collection('walletTransactions').doc();
+
+    await _firestore.runTransaction((tx) async {
+      final userSnap = await tx.get(userRef);
+      final balance = (userSnap.data()?['walletBalance'] as num?)?.toDouble() ?? 0;
+      if (balance < amountVnd) {
+        throw Exception('Số dư không đủ để rút');
+      }
+
+      tx.set(txRef, {
+        'userId': uid,
+        'type': 'withdraw',
+        'amount': amountVnd,
+        'status': 'completed',
+        'description': (note != null && note.trim().isNotEmpty)
+            ? note.trim()
+            : 'Rút tiền về tài khoản',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      tx.set(
+        userRef,
+        {
+          'walletBalance': FieldValue.increment(-amountVnd),
+          'totalWithdrawn': FieldValue.increment(amountVnd),
+        },
+        SetOptions(merge: true),
+      );
+    });
   }
 
   Future<void> submitReview({
@@ -277,6 +328,30 @@ class CandidateDashboardService {
       if (tags.isNotEmpty) 'tags': tags,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    var jobTitle = 'Công việc';
+    var candidateName = 'Ứng viên';
+    try {
+      final jobDoc = await _firestore.collection('jobPosts').doc(jobId).get();
+      if (jobDoc.exists) {
+        jobTitle = (jobDoc.data()?['title'] ?? jobTitle).toString();
+      }
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        final d = userDoc.data() ?? {};
+        final combined =
+            '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+        if (combined.isNotEmpty) candidateName = combined;
+      }
+    } catch (_) {}
+
+    await NotificationService.notifyEmployerReview(
+      employerId: employerId,
+      candidateName: candidateName,
+      jobTitle: jobTitle,
+      rating: rating,
+      jobId: jobId,
+    );
   }
 
   Future<WorkGroup> createGroup(String name) async {

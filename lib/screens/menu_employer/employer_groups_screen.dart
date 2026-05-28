@@ -11,13 +11,13 @@ class EmployerGroupsScreen extends StatelessWidget {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Nhóm chat việc làm',
           style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
       ),

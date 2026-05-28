@@ -95,7 +95,7 @@ class _ForeignLanguageScreenState extends State<ForeignLanguageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(context, 'Ngoại ngữ'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
@@ -104,8 +104,7 @@ class _ForeignLanguageScreenState extends State<ForeignLanguageScreen> {
           children: [
             ProfileFormTheme.requiredLabel('Tên ngoại ngữ'),
             const SizedBox(height: 8),
-            ProfileFormTheme.selectField(
-              value: _language ?? '',
+            ProfileFormTheme.selectField(value: _language ?? '',
               placeholder: 'Chọn ngoại ngữ',
               onTap: () async {
                 final picked = await showProfileOptionSheet(
@@ -120,8 +119,7 @@ class _ForeignLanguageScreenState extends State<ForeignLanguageScreen> {
             const SizedBox(height: 24),
             ProfileFormTheme.requiredLabel('Mức độ'),
             const SizedBox(height: 10),
-            ProfileFormTheme.levelPills(
-              options: _levelOptions,
+            ProfileFormTheme.levelPills(options: _levelOptions,
               selected: _level,
               onSelect: (v) => setState(() => _level = v),
             ),

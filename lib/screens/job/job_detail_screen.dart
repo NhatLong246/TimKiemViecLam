@@ -4,7 +4,8 @@ import 'package:intl/intl.dart';
 import '../../controller/job_detail_controller.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/job_post_model.dart';
-import '../messaging/conversation_list_screen.dart';
+import '../../data/services/messaging_service.dart';
+import '../messaging/chat_room_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -15,6 +16,7 @@ class JobDetailScreen extends StatefulWidget {
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
   final JobDetailController _controller = Get.put(JobDetailController());
+  final MessagingService _messagingService = MessagingService();
   late JobPostModel job;
 
   @override
@@ -59,7 +61,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final slotsStr = '${job.filledSlots} / ${job.slots} người';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -336,34 +338,45 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               ),
               child: SafeArea(
                 top: false,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: primaryColor),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.chat_bubble_outline,
-                          color: primaryColor,
-                        ),
-                        onPressed: () => _openMessages(context),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(
+                child: Obx(
+                  () => Row(
+                    children: [
+                      Container(
+                        width: 50,
                         height: 50,
-                        child: Obx(
-                          () => ElevatedButton(
-                            onPressed: _controller.isApplying.value
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _controller.canApply.value
+                                ? primaryColor
+                                : Colors.grey.shade500,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.chat_bubble_outline,
+                            color: _controller.canApply.value
+                                ? primaryColor
+                                : Colors.grey.shade500,
+                          ),
+                          onPressed: _controller.canApply.value
+                              ? () => _openMessages(context)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _controller.isApplying.value ||
+                                    !_controller.canApply.value
                                 ? null
                                 : () => _controller.applyJob(job),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
+                              backgroundColor: _controller.canApply.value
+                                  ? primaryColor
+                                  : Colors.grey.shade500,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -378,9 +391,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text(
-                                    'Ứng tuyển ngay',
-                                    style: TextStyle(
+                                : Text(
+                                    _controller.canApply.value
+                                        ? 'Ứng tuyển ngay'
+                                        : 'Không khả dụng',
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
@@ -389,18 +404,44 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+          if (!_controller.canApply.value)
+            Positioned(
+              bottom: 78,
+              left: 16,
+              right: 16,
+              child: IgnorePointer(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Text(
+                    'Chỉ tài khoản Ứng viên mới có thể ứng tuyển.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.orange.shade900,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  void _openMessages(BuildContext context) {
+  Future<void> _openMessages(BuildContext context) async {
     final auth = Get.find<AuthController>();
     if (auth.currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -408,10 +449,39 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       );
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ConversationListScreen()),
-    );
+    if (auth.currentUser?.role != 'candidate') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chỉ tài khoản Ứng viên mới nhắn tin từ màn này')),
+      );
+      return;
+    }
+    try {
+      final groupId = await _messagingService.getOrCreateDirectChat(
+        jobId: job.jobId,
+        jobTitle: job.title,
+        employerId: job.employerId,
+        candidateId: auth.currentUser!.id,
+      );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatRoomScreen(
+            groupId: groupId,
+            isEmployer: false,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Không thể mở trò chuyện: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildDetailRow(IconData icon, String title, String value) {

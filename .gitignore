@@ -43,6 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+android/.gradle/
+android/.cxx/
+**/.cxx/
+**/build/
+*.lock
+!.gitignore
 
 # Firebase - sensitive config files (chứa API keys)
 google-services.json
@@ -54,6 +60,17 @@ api_keys.json
 
 # Android local properties (chứa đường dẫn SDK local)
 android/local.properties
+key.properties
+*.jks
+*.keystore
+
+# Local env / secrets
+.env
+.env.*
+
+# Windows/macOS local files
+Thumbs.db
+Desktop.ini
 
 # Flutter generated plugin files
 .flutter-plugins

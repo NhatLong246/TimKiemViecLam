@@ -27,6 +27,16 @@
 | Bank Account (CRUD) | `screens/bank_account/` | |
 | Shipping Address (CRUD) | `screens/shipping_address/` | Legacy từ template cũ |
 | Main Navigation | `screens/home/main_navigation_screen.dart` | Bottom nav skeleton |
+| Job feed + detail + apply | `home_screen.dart`, `job_detail_screen.dart` | C1–C4 |
+| Employer post/manage jobs | `post/create_post_screen.dart`, `post_management_screen.dart` | E2–E3 |
+| Employer candidates accept | `employer_candidates_screen.dart`, `candidates_controller.dart` | E4–E5, auto group chat |
+| Chat nhóm + messaging hub | `group_chat_screen.dart`, `chat_room_screen.dart`, `conversation_list_screen.dart` | CH1–CH7 |
+| Peer chat, swipe reply, mute, wallpaper | `messaging_service.dart`, `group_management_screen.dart` | CH7–CH12 |
+| Attendance (NTD + UV) | `attendance_screen.dart`, `candidate_attendance_screen.dart` | E7, C16 |
+| Stats + market reference | `employer_stats_screen.dart`, `*_market_rate_screen.dart` | E9, E16, C8, C10 |
+| Chatbot + floating bubbles | `chatbot_screen.dart`, `floating_*_bubble.dart` | S18, CH15–CH16 |
+
+> **Bản đồ đầy đủ:** xem `feature_map.md` (đã rà soát 2026-05-20).
 
 ---
 
@@ -47,6 +57,7 @@
 | 2026-05-13 | E2 — Quản lý Bài đăng | Tạo `data/models/job_post_model.dart`, `data/services/job_post_service.dart`, `controller/job_post_controller.dart`, `screens/post/post_management_screen.dart`, `screens/post/create_post_screen.dart`. Thêm route `postManagement`, `createPost`. Kết nối nút "Bài đăng" trong employer_home_screen. |
 | 2026-05-12 | E16 — Employer Tham khảo giá | Tạo `data/models/market_rate_model.dart`, `data/services/market_rate_service.dart`, `controller/employer_reference_controller.dart`, `screens/reference/employer_market_rate_screen.dart`. Route: `employerReference = /employer-reference`. Quick tool "Tham khảo" trên Home đã navigate đến màn này. |
 | 2026-05-13 | E9 — Employer Thống kê | Tạo `data/models/employer_stats_model.dart`, `data/services/employer_stats_service.dart`, `controller/employer_stats_controller.dart`, `screens/stats/employer_stats_screen.dart`. Package fl_chart thêm vào pubspec. Route: `employerStats = /employer-stats`. Thêm tab "Thống kê" vào EmployerMainNavigationScreen (index 2). Gồm: 6 stat cards, 3 biểu đồ (Bar+Line chi tiêu & tuyển dụng, Area nạp tiền, Bar bài đăng), filter Ngày/Tuần/Tháng/Năm, date range picker. |
+| 2026-05-20 | Rà soát `feature_map.md` | Đánh dấu ✅ toàn bộ tính năng đã làm (auth, candidate home/search/apply, employer post/candidates/stats, chat CH1–CH19, attendance, notifications, chatbot). |
 
 ---
 

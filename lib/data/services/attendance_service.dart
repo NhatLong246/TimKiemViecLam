@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../models/attendance_model.dart';
+import '../../utils/attendance_capture_helper.dart';
 
 class AttendanceService {
   final _db = FirebaseFirestore.instance;
@@ -70,6 +72,149 @@ class AttendanceService {
   }
 
   // ─── Lấy phiên điểm danh theo ngày + job ─────────────────────────────────
+  /// Ứng viên gửi ảnh điểm danh sau khi NTD yêu cầu.
+  Future<AttendanceRecord> submitAttendancePhoto({
+    required String attendanceId,
+    required String candidateId,
+    required bool isCheckIn,
+    required String photoBase64,
+    required String expectedStartTime,
+    required AttendanceCaptureMeta captureMeta,
+  }) async {
+    final doc = await _col.doc(attendanceId).get();
+    if (!doc.exists) throw Exception('Không tìm thấy phiên điểm danh');
+
+    final data = doc.data() as Map<String, dynamic>;
+    final rawRecords = List<Map<String, dynamic>>.from(
+      (data['records'] as List?)?.map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ) ??
+          [],
+    );
+
+    final idx = rawRecords.indexWhere(
+      (r) => (r['candidateId'] ?? '').toString() == candidateId,
+    );
+    if (idx < 0) throw Exception('Bạn không có trong danh sách điểm danh');
+
+    final now = DateTime.now();
+    final timeStr = DateFormat('HH:mm').format(now);
+    final record = Map<String, dynamic>.from(rawRecords[idx]);
+
+    if (isCheckIn) {
+      final lateMin = _lateMinutes(now, expectedStartTime);
+      final status = lateMin <= 0 ? 'on_time' : 'late';
+      record['checkInTime'] = timeStr;
+      record['checkInAt'] = Timestamp.fromDate(now);
+      record['checkInPhotoUrl'] = photoBase64;
+      record['checkInPhotoName'] = captureMeta.fileName;
+      record['checkInCapturedAt'] = captureMeta.capturedAt;
+      record['checkInLocation'] = captureMeta.locationLabel;
+      if (captureMeta.latitude != null) {
+        record['checkInLat'] = captureMeta.latitude;
+      }
+      if (captureMeta.longitude != null) {
+        record['checkInLng'] = captureMeta.longitude;
+      }
+      record['status'] = status;
+      record['lateMinutes'] = lateMin > 0 ? lateMin : 0;
+    } else {
+      if ((record['checkInTime'] ?? '').toString().isEmpty) {
+        throw Exception('Hãy điểm danh đầu ca trước');
+      }
+      record['checkOutTime'] = timeStr;
+      record['checkOutAt'] = Timestamp.fromDate(now);
+      record['checkOutPhotoUrl'] = photoBase64;
+      record['checkOutPhotoName'] = captureMeta.fileName;
+      record['checkOutCapturedAt'] = captureMeta.capturedAt;
+      record['checkOutLocation'] = captureMeta.locationLabel;
+      if (captureMeta.latitude != null) {
+        record['checkOutLat'] = captureMeta.latitude;
+      }
+      if (captureMeta.longitude != null) {
+        record['checkOutLng'] = captureMeta.longitude;
+      }
+      if ((record['status'] ?? 'not_marked') == 'not_marked') {
+        record['status'] = 'on_time';
+      }
+    }
+
+    rawRecords[idx] = record;
+    await _col.doc(attendanceId).update({'records': rawRecords});
+
+    return AttendanceRecord.fromMap(record);
+  }
+
+  /// Phút trễ so với giờ bắt đầu ca (0 nếu đúng giờ hoặc sớm).
+  static int _lateMinutes(DateTime now, String expectedHHmm) {
+    final parts = expectedHHmm.split(':');
+    if (parts.length < 2) return 0;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final expected = DateTime(now.year, now.month, now.day, h, m);
+    final diff = now.difference(expected).inMinutes;
+    return diff > 0 ? diff : 0;
+  }
+
+  /// Đảm bảo nhân viên có trong phiên điểm danh hôm nay (tạo phiên nếu chưa có).
+  Future<String> ensureCandidateRecord({
+    required String jobId,
+    required String groupId,
+    required String employerId,
+    required String candidateId,
+    required String candidateName,
+  }) async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    var session = await getSessionByDate(jobId, today);
+
+    if (session == null) {
+      return createSession(
+        AttendanceModel(
+          attendanceId: '',
+          jobId: jobId,
+          groupId: groupId,
+          employerId: employerId,
+          date: today,
+          expectedStartTime: DateFormat('HH:mm').format(DateTime.now()),
+          records: [
+            AttendanceRecord(
+              candidateId: candidateId,
+              candidateName: candidateName,
+              status: 'not_marked',
+              lateMinutes: 0,
+            ),
+          ],
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+
+    final has = session.records.any((r) => r.candidateId == candidateId);
+    if (has) return session.attendanceId;
+
+    final updated = [
+      ...session.records,
+      AttendanceRecord(
+        candidateId: candidateId,
+        candidateName: candidateName,
+        status: 'not_marked',
+        lateMinutes: 0,
+      ),
+    ];
+    await saveAllRecords(session.attendanceId, updated);
+    return session.attendanceId;
+  }
+
+  Future<List<AttendanceModel>> fetchAllByJob(String jobId) async {
+    final snap = await _col.where('jobId', isEqualTo: jobId).get();
+    final list = snap.docs
+        .map((d) =>
+            AttendanceModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return list;
+  }
+
   Future<AttendanceModel?> getSessionByDate(String jobId, String date) async {
     final snap = await _col
         .where('jobId', isEqualTo: jobId)

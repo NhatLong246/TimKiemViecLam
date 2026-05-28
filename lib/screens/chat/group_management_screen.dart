@@ -9,7 +9,14 @@ import '../../controller/login_controller.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/group_chat_service.dart';
+import '../../data/services/messaging_service.dart';
+import '../../utils/messaging_bootstrap.dart';
 import '../../routes/app_routes.dart';
+import '../messaging/chat_room_screen.dart';
+import '../attendance/candidate_attendance_screen.dart';
+import '../../data/services/attendance_auto_notify_service.dart';
+import '../attendance/candidate_work_assignment_screen.dart';
+import '../../widgets/chat_wallpaper_picker_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GroupManagementScreen
@@ -24,6 +31,7 @@ class GroupManagementScreen extends StatefulWidget {
 
 class _GroupManagementScreenState extends State<GroupManagementScreen> {
   late final GroupChatModel _initGroup;
+  late final bool _isCandidateTheme;
   final _service = GroupChatService();
   final _auth = Get.find<AuthController>();
   bool _isUploadingAvatar = false;
@@ -32,10 +40,50 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _initGroup = Get.arguments as GroupChatModel;
+    final args = Get.arguments;
+    if (args is Map) {
+      _initGroup = args['group'] as GroupChatModel;
+      _isCandidateTheme = args['isCandidate'] == true;
+    } else {
+      _initGroup = args as GroupChatModel;
+      final uid = _auth.currentUser?.id ?? '';
+      _isCandidateTheme =
+          uid.isNotEmpty && _initGroup.employerId != uid;
+    }
   }
 
   String get _currentUserId => _auth.currentUser?.id ?? '';
+
+  bool get _showLeaveGroup =>
+      _isCandidateTheme || _initGroup.employerId != _currentUserId;
+
+  Color get _accent => _isCandidateTheme
+      ? AppColors.candidatePrimary
+      : AppColors.employerPrimary;
+
+  LinearGradient get _headerGradient => _isCandidateTheme
+      ? const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1B5E20),
+            Color(0xFF2E7D32),
+            Color(0xFF43A047),
+            Color(0xFF66BB6A),
+          ],
+          stops: [0.0, 0.35, 0.70, 1.0],
+        )
+      : const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF6A0DAD),
+            Color(0xFF7B1FA2),
+            Color(0xFF1565C0),
+            Color(0xFF0D47A1),
+          ],
+          stops: [0.0, 0.35, 0.70, 1.0],
+        );
 
   // ── Thay ảnh đại diện nhóm ────────────────────────────────────────────────
   Future<void> _changeAvatar(GroupChatModel group) async {
@@ -55,8 +103,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2))),
             ListTile(
-              leading: const Icon(Icons.camera_alt_rounded,
-                  color: Color(0xFF7B1FA2)),
+              leading: Icon(Icons.camera_alt_rounded, color: _accent),
               title: const Text('Chụp ảnh'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
@@ -111,7 +158,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   void _openMembers(GroupChatModel group) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, anim, __) => _MembersScreen(group: group),
+        pageBuilder: (_, anim, __) => _MembersScreen(
+              group: group,
+              isCandidateTheme: _isCandidateTheme,
+            ),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position:
               Tween(begin: const Offset(1, 0), end: Offset.zero).animate(anim),
@@ -121,11 +171,22 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     );
   }
 
+  Future<void> _openWallpaperPicker(GroupChatModel group) async {
+    await showChatWallpaperPicker(
+      context: context,
+      groupId: group.groupId,
+      isCandidateTheme: _isCandidateTheme,
+    );
+  }
+
   // ── Mở biệt danh ────────────────────────────────────────────────────────
   void _openNicknames(GroupChatModel group) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, anim, __) => _NicknamesScreen(group: group),
+        pageBuilder: (_, anim, __) => _NicknamesScreen(
+              group: group,
+              isCandidateTheme: _isCandidateTheme,
+            ),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position:
               Tween(begin: const Offset(1, 0), end: Offset.zero).animate(anim),
@@ -188,26 +249,14 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
       expandedHeight: 240,
       pinned: true,
       stretch: true,
-      backgroundColor: AppColors.employerPrimary,
+      backgroundColor: _accent,
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [
           StretchMode.zoomBackground,
           StretchMode.blurBackground,
         ],
         background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF6A0DAD),
-                Color(0xFF7B1FA2),
-                Color(0xFF1565C0),
-                Color(0xFF0D47A1),
-              ],
-              stops: [0.0, 0.35, 0.70, 1.0],
-            ),
-          ),
+          decoration: BoxDecoration(gradient: _headerGradient),
           child: Stack(
             children: [
               Positioned(
@@ -238,13 +287,18 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: avatarBytes == null
-                                  ? const LinearGradient(
+                                  ? LinearGradient(
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
-                                      colors: [
-                                        Color(0xFFCE93D8),
-                                        Color(0xFF7B1FA2)
-                                      ],
+                                      colors: _isCandidateTheme
+                                          ? const [
+                                              Color(0xFFA5D6A7),
+                                              Color(0xFF2E7D32),
+                                            ]
+                                          : const [
+                                              Color(0xFFCE93D8),
+                                              Color(0xFF7B1FA2),
+                                            ],
                                     )
                                   : null,
                               border:
@@ -286,13 +340,15 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                                   ],
                                 ),
                                 child: _isUploadingAvatar
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(4),
+                                    ? Padding(
+                                        padding: const EdgeInsets.all(4),
                                         child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Color(0xFF7B1FA2)))
-                                    : const Icon(Icons.camera_alt_rounded,
-                                        size: 16, color: Color(0xFF7B1FA2)),
+                                          strokeWidth: 2,
+                                          color: _accent,
+                                        ),
+                                      )
+                                    : Icon(Icons.camera_alt_rounded,
+                                        size: 16, color: _accent),
                               ),
                             ),
                           ),
@@ -368,30 +424,60 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         onTap: () => _openNicknames(group),
       ),
       _Tool(
+        icon: Icons.wallpaper_rounded,
+        label: 'Hình nền',
+        gradient: LinearGradient(
+          colors: _isCandidateTheme
+              ? const [Color(0xFF2E7D32), Color(0xFF81C784)]
+              : const [Color(0xFF5E35B1), Color(0xFF9575CD)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        onTap: () => _openWallpaperPicker(group),
+      ),
+      _Tool(
         icon: Icons.fact_check_rounded,
         label: 'Điểm danh',
         gradient: const LinearGradient(
             colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight),
-        onTap: () => Get.toNamed(
-          AppRoutes.attendance,
-          arguments: {
-            'groupId': group.groupId,
-            'jobId': group.jobId,
-            'jobTitle': group.jobTitle,
-            'memberIds': group.memberIds,
-          },
-        ),
+        onTap: () async {
+          if (_isCandidateTheme) {
+            Get.to(
+              () => CandidateAttendanceScreen(group: group),
+              transition: Transition.rightToLeft,
+            );
+          } else {
+            await AttendanceAutoNotifyService.instance
+                .onEmployerOpensAttendance(group);
+            Get.toNamed(
+              AppRoutes.attendance,
+              arguments: {
+                'groupId': group.groupId,
+                'jobId': group.jobId,
+                'jobTitle': group.jobTitle,
+                'memberIds': group.memberIds,
+                'employerId': group.employerId,
+              },
+            );
+          }
+        },
       ),
       _Tool(
-        icon: Icons.calendar_month_rounded,
-        label: 'Lịch làm việc',
+        icon: Icons.assignment_rounded,
+        label: 'Phân công công việc',
         gradient: const LinearGradient(
             colors: [Color(0xFFE65100), Color(0xFFFFB74D)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight),
-        onTap: () => Get.toNamed(AppRoutes.workSchedule, arguments: group),
+        onTap: () {
+          if (_isCandidateTheme) {
+            Get.to(() => CandidateWorkAssignmentScreen(group: group));
+          } else {
+            Get.toNamed(AppRoutes.workSchedule, arguments: group);
+          }
+        },
       ),
       _Tool(
         icon: Icons.report_problem_rounded,
@@ -400,8 +486,29 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
             colors: [Color(0xFFC62828), Color(0xFFEF9A9A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight),
-        onTap: () => Get.toNamed(AppRoutes.complaint, arguments: group),
+        onTap: () {
+          if (group.isDissolved) {
+            Get.toNamed(AppRoutes.postDissolutionComplaint, arguments: group);
+          } else {
+            if (_isCandidateTheme) {
+              Get.toNamed(AppRoutes.candidateJobComplaint, arguments: group);
+            } else {
+              Get.toNamed(AppRoutes.complaint, arguments: group);
+            }
+          }
+        },
       ),
+      if (!_isCandidateTheme)
+        _Tool(
+          icon: Icons.table_chart_rounded,
+          label: 'Bảng điểm danh',
+          gradient: const LinearGradient(
+              colors: [Color(0xFF1565C0), Color(0xFF64B5F6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight),
+          onTap: () =>
+              Get.toNamed(AppRoutes.jobAttendanceSummary, arguments: group),
+        ),
       _Tool(
         icon: Icons.search_rounded,
         label: 'Tìm tin nhắn',
@@ -415,7 +522,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -442,8 +549,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     if (_togglingMute) return;
     setState(() => _togglingMute = true);
     final isMuted = group.mutedBy.contains(_currentUserId);
+    final willMute = !isMuted;
     try {
       await _service.toggleMute(group.groupId, _currentUserId, isMuted);
+      if (willMute) {
+        final mc = MessagingBootstrap.ensureController();
+        await mc.dismissNotificationsForMutedGroup(group.groupId);
+      }
     } finally {
       if (mounted) setState(() => _togglingMute = false);
     }
@@ -454,6 +566,15 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     final isMuted = group.mutedBy.contains(_currentUserId);
     return _FeatureCard(
       items: [
+        _FeatureItem(
+          icon: Icons.wallpaper_rounded,
+          iconBg: _isCandidateTheme
+              ? const Color(0xFF2E7D32)
+              : const Color(0xFF5E35B1),
+          title: 'Hình nền chat',
+          subtitle: 'Đổi nền khung hội thoại (chỉ bạn thấy)',
+          onTap: () => _openWallpaperPicker(group),
+        ),
         _FeatureItem(
           icon: isMuted
               ? Icons.notifications_off_outlined
@@ -469,24 +590,31 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
               : Switch(
                   value: !isMuted,
                   onChanged: (_) => _toggleMute(group),
-                  activeColor: AppColors.employerPrimary,
+                  activeColor: _accent,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
           onTap: () => _toggleMute(group),
         ),
+        if (!_isCandidateTheme)
+          _FeatureItem(
+            icon: Icons.edit_outlined,
+            iconBg: const Color(0xFF6A1B9A),
+            title: 'Đổi tên nhóm',
+            subtitle: group.jobTitle,
+            onTap: () => _renameGroup(group),
+          ),
         _FeatureItem(
-          icon: Icons.edit_outlined,
-          iconBg: const Color(0xFF6A1B9A),
-          title: 'Đổi tên nhóm',
-          subtitle: group.jobTitle,
-          onTap: () => _renameGroup(group),
-        ),
-        _FeatureItem(
-          icon: Icons.delete_forever_outlined,
+          icon: _showLeaveGroup
+              ? Icons.logout_rounded
+              : Icons.delete_forever_outlined,
           iconBg: const Color(0xFFC62828),
-          title: 'Giải tán nhóm',
-          subtitle: 'Xóa nhóm và toàn bộ dữ liệu',
+          title: _showLeaveGroup ? 'Rời khỏi nhóm' : 'Giải tán nhóm',
+          subtitle: _showLeaveGroup
+              ? 'Thoát nhóm chat này'
+              : 'Xóa nhóm và toàn bộ dữ liệu',
           titleColor: const Color(0xFFC62828),
-          onTap: () => _confirmDisband(group),
+          onTap: () => _showLeaveGroup
+              ? _confirmLeave(group)
+              : _confirmDisband(group),
           isLast: true,
         ),
       ],
@@ -499,11 +627,11 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.edit_rounded, color: Color(0xFF6A1B9A), size: 22),
-            SizedBox(width: 8),
-            Text('Đổi tên nhóm',
+            Icon(Icons.edit_rounded, color: _accent, size: 22),
+            const SizedBox(width: 8),
+            const Text('Đổi tên nhóm',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
           ],
         ),
@@ -527,7 +655,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
               child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.employerPrimary,
+                backgroundColor: _accent,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10))),
             icon: const Icon(Icons.check_rounded,
@@ -551,6 +679,73 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                   colorText: Colors.white,
                   duration: const Duration(seconds: 2));
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmLeave(GroupChatModel group) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFC62828), size: 26),
+            SizedBox(width: 8),
+            Text(
+              'Rời khỏi nhóm',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFFC62828),
+                fontSize: 17,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Bạn sẽ không còn trong nhóm chat này và không nhận tin nhắn mới. '
+          'Lịch sử tin nhắn của nhóm vẫn được giữ cho các thành viên khác.',
+          style: TextStyle(fontSize: 14, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC62828),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () async {
+              Get.back();
+              try {
+                await _service.leaveGroup(group.groupId, _currentUserId);
+                Get.close(2);
+                Get.snackbar(
+                  'Đã rời nhóm',
+                  'Bạn đã rời khỏi "${group.jobTitle}"',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: _accent,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 2),
+                );
+              } catch (e) {
+                Get.snackbar(
+                  'Lỗi',
+                  'Không thể rời nhóm: $e',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              }
+            },
+            child: const Text('Rời nhóm',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -697,7 +892,11 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 class _MembersScreen extends StatefulWidget {
   final GroupChatModel group;
-  const _MembersScreen({required this.group});
+  final bool isCandidateTheme;
+  const _MembersScreen({
+    required this.group,
+    this.isCandidateTheme = false,
+  });
 
   @override
   State<_MembersScreen> createState() => _MembersScreenState();
@@ -708,15 +907,34 @@ class _MembersScreenState extends State<_MembersScreen> {
   List<UserModel>? _members;
   bool _loading = true;
 
+  Color get _accent => widget.isCandidateTheme
+      ? AppColors.candidatePrimary
+      : AppColors.employerPrimary;
+
+  LinearGradient get _headerGradient => widget.isCandidateTheme
+      ? AppColors.candidateGradient
+      : AppColors.employerGradient;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  bool _isGroupAdmin(UserModel member) =>
+      member.id == widget.group.employerId || member.role == 'employer';
+
   Future<void> _load() async {
     final members =
         await _service.getGroupMembers(widget.group.memberIds);
+    members.sort((a, b) {
+      final aAdmin = _isGroupAdmin(a);
+      final bAdmin = _isGroupAdmin(b);
+      if (aAdmin != bAdmin) return aAdmin ? -1 : 1;
+      final an = '${a.firstName} ${a.lastName}'.trim().toLowerCase();
+      final bn = '${b.firstName} ${b.lastName}'.trim().toLowerCase();
+      return an.compareTo(bn);
+    });
     if (mounted) setState(() { _members = members; _loading = false; });
   }
 
@@ -724,10 +942,10 @@ class _MembersScreenState extends State<_MembersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.employerPrimary,
+        backgroundColor: _accent,
         flexibleSpace: Container(
-            decoration:
-                const BoxDecoration(gradient: AppColors.employerGradient)),
+          decoration: BoxDecoration(gradient: _headerGradient),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new,
               color: Colors.white, size: 20),
@@ -739,9 +957,9 @@ class _MembersScreenState extends State<_MembersScreen> {
               color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: _accent))
           : _members == null || _members!.isEmpty
               ? Center(
                   child: Text('Chưa có thành viên',
@@ -749,17 +967,121 @@ class _MembersScreenState extends State<_MembersScreen> {
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _members!.length,
-                  itemBuilder: (_, i) =>
-                      _MemberCard(member: _members![i], group: widget.group),
+                  itemBuilder: (_, i) => _MemberCard(
+                    member: _members![i],
+                    group: widget.group,
+                    isCandidateTheme: widget.isCandidateTheme,
+                  ),
                 ),
     );
   }
 }
 
-class _MemberCard extends StatelessWidget {
+class _MemberCard extends StatefulWidget {
   final UserModel member;
   final GroupChatModel group;
-  const _MemberCard({required this.member, required this.group});
+  final bool isCandidateTheme;
+  const _MemberCard({
+    required this.member,
+    required this.group,
+    this.isCandidateTheme = false,
+  });
+
+  @override
+  State<_MemberCard> createState() => _MemberCardState();
+}
+
+class _MemberCardState extends State<_MemberCard> {
+  bool _openingChat = false;
+
+  UserModel get member => widget.member;
+  GroupChatModel get group => widget.group;
+
+  Color get _accent => widget.isCandidateTheme
+      ? AppColors.candidatePrimary
+      : AppColors.employerPrimary;
+
+  Color get _chatIconColor => widget.isCandidateTheme
+      ? AppColors.candidatePrimary
+      : const Color(0xFF1565C0);
+
+  bool get _isAdmin =>
+      member.id == group.employerId || member.role == 'employer';
+
+  String get _currentUid => Get.find<AuthController>().currentUser?.id ?? '';
+
+  bool get _isSelf => _currentUid.isNotEmpty && member.id == _currentUid;
+
+  /// Nhắn riêng: NTD ↔ ứng viên hoặc hai thành viên khác trong cùng nhóm.
+  bool get _canDirectChat {
+    if (_isSelf || _currentUid.isEmpty) return false;
+    if (!group.memberIds.contains(_currentUid) ||
+        !group.memberIds.contains(member.id)) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Chat NTD–ứng viên (direct); còn lại dùng peer trong cùng job.
+  bool get _useEmployerDirectChat {
+    final employerId = group.employerId;
+    if (employerId.isEmpty) return false;
+    if (_currentUid == employerId) {
+      return member.id != employerId && member.role != 'employer';
+    }
+    return member.id == employerId || member.role == 'employer';
+  }
+
+  Future<void> _openDirectChat() async {
+    if (!_canDirectChat || _openingChat) return;
+
+    final employerId = group.employerId;
+    final messaging = MessagingService();
+
+    setState(() => _openingChat = true);
+    try {
+      final String groupId;
+      if (_useEmployerDirectChat) {
+        final candidateId =
+            _currentUid == employerId ? member.id : _currentUid;
+        groupId = await messaging.getOrCreateDirectChat(
+          jobId: group.jobId,
+          jobTitle: group.jobTitle,
+          employerId: employerId,
+          candidateId: candidateId,
+          excludeGroupId: group.groupId,
+        );
+      } else {
+        groupId = await messaging.getOrCreatePeerChat(
+          jobId: group.jobId,
+          jobTitle: group.jobTitle,
+          employerId: employerId,
+          memberAId: _currentUid,
+          memberBId: member.id,
+          parentGroupId: group.groupId,
+          excludeGroupId: group.groupId,
+        );
+      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatRoomScreen(
+            groupId: groupId,
+            isEmployer: _currentUid == employerId,
+          ),
+        ),
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Không mở được chat',
+        e.toString().replaceFirst('Exception: ', ''),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      if (mounted) setState(() => _openingChat = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -770,7 +1092,7 @@ class _MemberCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -784,13 +1106,12 @@ class _MemberCard extends StatelessWidget {
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           radius: 24,
-          backgroundColor:
-              AppColors.employerPrimary.withOpacity(0.15),
+          backgroundColor: _accent.withOpacity(0.15),
           child: Text(
             displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-            style: const TextStyle(
+            style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: AppColors.employerPrimary,
+                color: _accent,
                 fontSize: 18),
           ),
         ),
@@ -799,30 +1120,80 @@ class _MemberCard extends StatelessWidget {
           style: const TextStyle(
               fontWeight: FontWeight.w700, fontSize: 15),
         ),
-        subtitle: nick != null && nick.isNotEmpty
-            ? Text(displayName,
-                style: TextStyle(
-                    fontSize: 12, color: Colors.grey.shade500))
-            : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chat_bubble_outline_rounded,
-                  color: Color(0xFF1565C0), size: 22),
-              tooltip: 'Chat cá nhân',
-              onPressed: () {
-                // TODO: Chuyển đến chat cá nhân khi implement
-                Get.snackbar(
-                  'Chat cá nhân',
-                  'Tính năng đang phát triển',
-                  snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 2),
-                );
-              },
-            ),
-          ],
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (nick != null && nick.isNotEmpty)
+                Text(
+                  displayName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              if (nick != null && nick.isNotEmpty) const SizedBox(height: 4),
+              _MemberRoleChip(isAdmin: _isAdmin, accent: _accent),
+            ],
+          ),
         ),
+        trailing: !_canDirectChat
+            ? null
+            : IconButton(
+                icon: _openingChat
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: _chatIconColor,
+                        size: 22,
+                      ),
+                tooltip: 'Nhắn tin riêng',
+                onPressed: _openingChat ? null : _openDirectChat,
+              ),
+      ),
+    );
+  }
+}
+
+class _MemberRoleChip extends StatelessWidget {
+  final bool isAdmin;
+  final Color accent;
+  const _MemberRoleChip({required this.isAdmin, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isAdmin ? accent.withOpacity(0.12) : const Color(0xFFE8EAF0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isAdmin ? accent.withOpacity(0.35) : const Color(0xFFCFD4DC),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAdmin ? Icons.admin_panel_settings_outlined : Icons.person_outline,
+            size: 13,
+            color: isAdmin ? accent : const Color(0xFF607080),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isAdmin ? 'Quản trị viên' : 'Thành viên',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isAdmin ? accent : const Color(0xFF607080),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -833,7 +1204,11 @@ class _MemberCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _NicknamesScreen extends StatefulWidget {
   final GroupChatModel group;
-  const _NicknamesScreen({required this.group});
+  final bool isCandidateTheme;
+  const _NicknamesScreen({
+    required this.group,
+    this.isCandidateTheme = false,
+  });
 
   @override
   State<_NicknamesScreen> createState() => _NicknamesScreenState();
@@ -843,6 +1218,14 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
   final _service = GroupChatService();
   List<UserModel>? _members;
   bool _loading = true;
+
+  Color get _accent => widget.isCandidateTheme
+      ? AppColors.candidatePrimary
+      : AppColors.employerPrimary;
+
+  LinearGradient get _headerGradient => widget.isCandidateTheme
+      ? AppColors.candidateGradient
+      : AppColors.employerGradient;
 
   @override
   void initState() {
@@ -884,16 +1267,40 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                   style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7B1FA2),
+                backgroundColor: _accent,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10))),
             onPressed: () async {
               final nick = ctrl.text.trim();
+              final displayName =
+                  '${user.firstName} ${user.lastName}'.trim();
+              final auth = Get.find<AuthController>();
+              final cu = auth.currentUser;
+              var setterName =
+                  '${cu?.firstName ?? ''} ${cu?.lastName ?? ''}'.trim();
+              if (setterName.isEmpty) {
+                setterName =
+                    (cu?.companyName ?? '').trim();
+              }
+              if (setterName.isEmpty) {
+                setterName = cu?.role == 'employer'
+                    ? 'Nhà tuyển dụng'
+                    : 'Thành viên';
+              }
               await _service.setNickname(
-                  widget.group.groupId, user.id, nick);
+                widget.group.groupId,
+                user.id,
+                nick,
+                memberDisplayName:
+                    displayName.isNotEmpty ? displayName : 'Thành viên',
+                setterDisplayName: setterName,
+              );
               Get.back();
-              Get.snackbar('Đã lưu', 'Biệt danh đã cập nhật',
-                  snackPosition: SnackPosition.BOTTOM);
+              Get.snackbar(
+                'Đã lưu',
+                'Biệt danh đã cập nhật — mọi người sẽ thấy trong khung chat',
+                snackPosition: SnackPosition.BOTTOM,
+              );
             },
             child: const Text('Lưu',
                 style: TextStyle(color: Colors.white)),
@@ -911,10 +1318,10 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
         final liveGroup = snap.data ?? widget.group;
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: AppColors.employerPrimary,
+            backgroundColor: _accent,
             flexibleSpace: Container(
-                decoration: const BoxDecoration(
-                    gradient: AppColors.employerGradient)),
+              decoration: BoxDecoration(gradient: _headerGradient),
+            ),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new,
                   color: Colors.white, size: 20),
@@ -924,9 +1331,9 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                 style: TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ),
-          backgroundColor: const Color(0xFFF2F4F8),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator(color: _accent))
               : _members == null || _members!.isEmpty
                   ? Center(
                       child: Text('Chưa có thành viên',
@@ -945,7 +1352,7 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
@@ -959,15 +1366,14 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                                 horizontal: 16, vertical: 8),
                             leading: CircleAvatar(
                               radius: 22,
-                              backgroundColor: AppColors.employerPrimary
-                                  .withOpacity(0.15),
+                              backgroundColor: _accent.withOpacity(0.15),
                               child: Text(
                                 displayName.isNotEmpty
                                     ? displayName[0].toUpperCase()
                                     : '?',
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.employerPrimary),
+                                    color: _accent),
                               ),
                             ),
                             title: Text(displayName,
@@ -976,13 +1382,12 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                                     fontSize: 14)),
                             subtitle: nick.isNotEmpty
                                 ? Row(children: [
-                                    const Icon(Icons.label_outline,
-                                        size: 13,
-                                        color: Color(0xFF7B1FA2)),
+                                    Icon(Icons.label_outline,
+                                        size: 13, color: _accent),
                                     const SizedBox(width: 4),
                                     Text(nick,
-                                        style: const TextStyle(
-                                            color: Color(0xFF7B1FA2),
+                                        style: TextStyle(
+                                            color: _accent,
                                             fontSize: 12,
                                             fontStyle: FontStyle.italic)),
                                   ])
@@ -991,8 +1396,8 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                                         color: Colors.grey.shade400,
                                         fontSize: 12)),
                             trailing: IconButton(
-                              icon: const Icon(Icons.edit_rounded,
-                                  color: Color(0xFF7B1FA2), size: 20),
+                              icon: Icon(Icons.edit_rounded,
+                                  color: _accent, size: 20),
                               onPressed: () =>
                                   _editNickname(context, member, nick),
                             ),
@@ -1094,7 +1499,7 @@ class _FeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(

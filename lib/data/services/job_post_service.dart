@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/job_post_model.dart';
+import 'job_workflow_service.dart';
 import 'sqlite_cache_service.dart';
 
 class JobPostService {
@@ -206,8 +207,14 @@ class JobPostService {
     await _db.collection(_collection).doc(post.jobId).update(data);
   }
 
-  // ── Xóa bài đăng (chỉ draft) ─────────────────────────────────────────────
+  // ── Xóa bài đăng ─────────────────────────────────────────────────────────
   Future<void> deleteJobPost(String jobId) async {
+    final blocked = await JobWorkflowService().hasBlockingDisbursementNotice(jobId);
+    if (blocked) {
+      throw Exception(
+        'Không thể xóa: còn thông báo giải ngân chưa được Admin và NTD xác nhận.',
+      );
+    }
     await _db.collection(_collection).doc(jobId).delete();
   }
 

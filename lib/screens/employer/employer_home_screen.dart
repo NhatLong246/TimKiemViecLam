@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controller/employer_home_controller.dart';
 import '../../controller/employer_notification_controller.dart';
+import '../../controller/messaging_controller.dart';
+import '../../utils/messaging_bootstrap.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
@@ -25,16 +27,19 @@ class EmployerHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final homeCtrl = Get.put(EmployerHomeController());
-    final notifCtrl = Get.put(EmployerNotificationController());
+    if (!Get.isRegistered<EmployerNotificationController>()) {
+      Get.put(EmployerNotificationController(), permanent: true);
+    }
+    MessagingBootstrap.startIfLoggedIn();
     return GetBuilder<AuthController>(
       builder: (authCtrl) {
         final user = authCtrl.currentUser;
         return Scaffold(
-          backgroundColor: const Color(0xFFF2F4F8),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: Obx(() => CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _buildHeader(user)),
-              SliverToBoxAdapter(child: _buildQuickTools()),
+              SliverToBoxAdapter(child: _buildHeader(context, user)),
+              SliverToBoxAdapter(child: _buildQuickTools(context)),
               SliverToBoxAdapter(child: _buildQuickStats(homeCtrl, user)),
               SliverToBoxAdapter(child: _buildSectionTitle()),
               if (homeCtrl.isLoading.value)
@@ -55,8 +60,8 @@ class EmployerHomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) =>
-                          _buildJobCard(homeCtrl.displayedPosts[index]),
+                      (ctx, index) =>
+                          _buildJobCard(ctx, homeCtrl.displayedPosts[index]),
                       childCount: homeCtrl.displayedPosts.length,
                     ),
                   ),
@@ -75,7 +80,7 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
-  Widget _buildHeader(UserModel? user) {
+  Widget _buildHeader(BuildContext context, UserModel? user) {
     final name = (user?.companyName?.isNotEmpty == true)
         ? user!.companyName!
         : (user?.firstName.isNotEmpty == true ? user!.firstName : 'Bạn');
@@ -206,8 +211,17 @@ class EmployerHomeScreen extends StatelessWidget {
                     ),
                     // Notification bell — realtime
                     Obx(() {
-                      final count = Get.find<EmployerNotificationController>()
-                          .unreadCount;
+                      final notifCtrl =
+                          Get.find<EmployerNotificationController>();
+                      notifCtrl.notifications.length;
+                      var count = notifCtrl.notifications
+                          .where((n) => !n.isRead)
+                          .length;
+                      if (Get.isRegistered<MessagingController>()) {
+                        final chat =
+                            Get.find<MessagingController>().unreadTotal.value;
+                        if (chat > count) count = chat;
+                      }
                       return GestureDetector(
                         onTap: () =>
                             Get.toNamed(AppRoutes.employerNotifications),
@@ -301,7 +315,7 @@ class EmployerHomeScreen extends StatelessWidget {
                         child: Container(
                           height: 50,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
@@ -371,12 +385,12 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   // ── QUICK TOOLS ────────────────────────────────────────────────────────────
-  Widget _buildQuickTools() {
+  Widget _buildQuickTools(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 3)),
@@ -626,7 +640,7 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   // ── JOB CARD ───────────────────────────────────────────────────────────────
-  Widget _buildJobCard(JobPostModel job) {
+  Widget _buildJobCard(BuildContext context, JobPostModel job) {
     final typeLabel = job.jobType == 'part_time' ? 'Part-time' : 'Full-time';
     final statusColor = _statusColor(job.status);
     final statusLabel = _statusLabel(job.status);
@@ -634,7 +648,7 @@ class EmployerHomeScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2)),

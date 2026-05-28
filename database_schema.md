@@ -196,6 +196,42 @@
 
 ---
 
+### Collection: `disbursementNotices`
+**Path:** `disbursementNotices/{noticeId}`  
+Sau giải ngân — `employerAck` và `adminAck` phải `true` trước khi NTD xóa `jobPosts`.
+
+| Field | Kiểu | Mô tả |
+|---|---|---|
+| `jobId` | `String` | ✅ |
+| `groupId` | `String` | ✅ |
+| `employerId` | `String` | ✅ |
+| `workDate` | `String` | `YYYY-MM-DD` |
+| `amount` | `double` | Số tiền giải ngân |
+| `status` | `String` | `pending_ack` \| `cleared` |
+| `employerAck` | `bool` | NTD đã xác nhận |
+| `adminAck` | `bool` | Admin đã xác nhận |
+| `createdAt` | `Timestamp` | ✅ |
+
+### Collection: `jobComplaints`
+**Path:** `jobComplaints/{complaintId}`  
+Khiếu nại công việc từ ứng viên sau khi hoàn thành.
+
+| Field | Kiểu | Mô tả |
+|---|---|---|
+| `jobId` | `String` | ✅ |
+| `groupId` | `String` | ✅ |
+| `employerId` | `String` | ✅ |
+| `candidateId` | `String` | ✅ |
+| `jobTitle` | `String` | ✅ |
+| `description` | `String` | ✅ |
+| `imageBase64s` | `List<String>` | Minh chứng |
+| `status` | `String` | `pending` \| … |
+| `createdAt` | `Timestamp` | ✅ |
+
+**`jobPosts` thêm field:** `imageUrls` (`List<String>`) — ảnh minh họa bài đăng (base64 hoặc URL).
+
+---
+
 ### Collection: `reviews`
 **Path:** `reviews/{reviewId}`
 **PK:** `reviewId`

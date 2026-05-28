@@ -2,13 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/job_post_model.dart';
-import 'messaging_service.dart';
+import 'group_chat_service.dart';
 import 'notification_service.dart';
 
 class CandidatesService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
-  final _messaging = MessagingService();
+  final _groupChat = GroupChatService();
 
   // ── Fetch tất cả job theo loại + đơn ứng tuyển của employer ──────────────
   /// Trả về danh sách job (theo jobType) kèm đơn ứng tuyển đã join với thông
@@ -79,6 +79,8 @@ class CandidatesService {
     for (final app in allApps) {
       final candidate = candidateMap[app.candidateId];
       if (candidate == null) continue; // bỏ qua nếu user đã bị xóa
+      if (!candidate.isCandidate) continue; // chỉ cho phép ứng viên thật
+      if (app.candidateId == app.employerId) continue; // chặn tự ứng tuyển
       appsByJob
           .putIfAbsent(app.jobId, () => [])
           .add(ApplicationEntry(application: app, candidate: candidate));
@@ -127,12 +129,11 @@ class CandidatesService {
     final employerId = (appData['employerId'] ?? '').toString();
 
     if (candidateId.isNotEmpty && employerId.isNotEmpty) {
-      await _messaging.getOrCreateDirectChat(
+      await _groupChat.ensureJobGroup(
         jobId: jobId,
         jobTitle: jobTitle,
         employerId: employerId,
         candidateId: candidateId,
-        applicationId: appId,
       );
       await NotificationService.notifyApplicationAccepted(
         candidateId: candidateId,

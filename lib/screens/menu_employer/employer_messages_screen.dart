@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import '../../common/styles/app_colors.dart';
-import '../../controller/group_chat_controller.dart';
-import '../../data/models/group_chat_model.dart';
-import '../../routes/app_routes.dart';
+import '../../controller/messaging_controller.dart';
+import '../../utils/messaging_bootstrap.dart';
 import '../messaging/conversation_list_screen.dart';
 
-class EmployerMessagesScreen extends StatelessWidget {
+class EmployerMessagesScreen extends StatefulWidget {
   const EmployerMessagesScreen({super.key});
+
+  @override
+  State<EmployerMessagesScreen> createState() => _EmployerMessagesScreenState();
+}
+
+class _EmployerMessagesScreenState extends State<EmployerMessagesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    MessagingBootstrap.startIfLoggedIn();
+    MessagingBootstrap.ensureController().loadInbox();
+  }
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF2F4F8),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           backgroundColor: AppColors.employerPrimary,
           flexibleSpace: Container(
@@ -26,14 +36,43 @@ class EmployerMessagesScreen extends StatelessWidget {
                 color: Colors.white, size: 20),
             onPressed: () => Get.back(),
           ),
-          title: const Text(
-            'Message',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
+          title: Obx(() {
+            final total = Get.isRegistered<MessagingController>()
+                ? Get.find<MessagingController>().unreadTotal.value
+                : 0;
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Message',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                if (total > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      total > 99 ? '99+' : '$total',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          }),
           bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,
@@ -57,154 +96,17 @@ class EmployerMessagesScreen extends StatelessWidget {
         ),
         body: const TabBarView(
           children: [
-            _GroupChatTab(),
-            ConversationListScreen(isEmployer: true),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Tab 1: Nhóm chat ────────────────────────────────────────────────────────
-class _GroupChatTab extends StatelessWidget {
-  const _GroupChatTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final ctrl = Get.isRegistered<GroupChatController>()
-        ? Get.find<GroupChatController>()
-        : Get.put(GroupChatController());
-
-    return Obx(() {
-      if (ctrl.isLoadingGroups.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (ctrl.groups.isEmpty) {
-        return _buildEmpty();
-      }
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        itemCount: ctrl.groups.length,
-        itemBuilder: (_, i) => _GroupChatCard(
-          group: ctrl.groups[i],
-          onTap: () {
-            ctrl.openGroup(ctrl.groups[i]);
-            Get.toNamed(AppRoutes.groupChat, arguments: ctrl.groups[i]);
-          },
-        ),
-      );
-    });
-  }
-
-  Widget _buildEmpty() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.group_outlined, size: 72, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'Chưa có nhóm nào',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+            ConversationListScreen(
+              isEmployer: true,
+              embedded: true,
+              inboxFilter: ConversationInboxFilter.groupsOnly,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Nhóm chat được tạo tự động\nkhi bạn duyệt ứng viên',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Card nhóm chat ───────────────────────────────────────────────────────────
-class _GroupChatCard extends StatelessWidget {
-  const _GroupChatCard({required this.group, required this.onTap});
-
-  final GroupChatModel group;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+            ConversationListScreen(
+              isEmployer: true,
+              embedded: true,
+              inboxFilter: ConversationInboxFilter.directOnly,
             ),
           ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: AppColors.employerGradient,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.group, color: Colors.white, size: 26),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      group.jobTitle,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.people_outline,
-                            size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${group.memberIds.length} thành viên',
-                          style: TextStyle(
-                              fontSize: 13, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    DateFormat('dd/MM').format(group.createdAt),
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
-                  const SizedBox(height: 6),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );

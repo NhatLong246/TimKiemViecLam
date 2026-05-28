@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// type: 'application' | 'post_approved' | 'post_rejected' | 'message' | 'system'
+/// type: 'application' | 'post_approved' | 'post_rejected' | 'message' | 'attendance_result' | 'system'
 class NotificationModel {
   final String notifId;
   final String recipientId;    // employerId

@@ -91,7 +91,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: ProfileFormTheme.buildAppBar(context, 'Kỹ năng'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

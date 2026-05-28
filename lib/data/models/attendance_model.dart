@@ -10,6 +10,12 @@ class AttendanceRecord {
   final String? checkOutTime;
   final String? checkInPhotoUrl;
   final String? checkOutPhotoUrl;
+  final String? checkInPhotoName;
+  final String? checkOutPhotoName;
+  final String? checkInCapturedAt;
+  final String? checkOutCapturedAt;
+  final String? checkInLocation;
+  final String? checkOutLocation;
 
   const AttendanceRecord({
     required this.candidateId,
@@ -20,6 +26,12 @@ class AttendanceRecord {
     this.checkOutTime,
     this.checkInPhotoUrl,
     this.checkOutPhotoUrl,
+    this.checkInPhotoName,
+    this.checkOutPhotoName,
+    this.checkInCapturedAt,
+    this.checkOutCapturedAt,
+    this.checkInLocation,
+    this.checkOutLocation,
   });
 
   factory AttendanceRecord.fromMap(Map<String, dynamic> map) {
@@ -32,6 +44,12 @@ class AttendanceRecord {
       checkOutTime: map['checkOutTime'] as String?,
       checkInPhotoUrl: map['checkInPhotoUrl'] as String?,
       checkOutPhotoUrl: map['checkOutPhotoUrl'] as String?,
+      checkInPhotoName: map['checkInPhotoName'] as String?,
+      checkOutPhotoName: map['checkOutPhotoName'] as String?,
+      checkInCapturedAt: map['checkInCapturedAt'] as String?,
+      checkOutCapturedAt: map['checkOutCapturedAt'] as String?,
+      checkInLocation: map['checkInLocation'] as String?,
+      checkOutLocation: map['checkOutLocation'] as String?,
     );
   }
 
@@ -44,6 +62,12 @@ class AttendanceRecord {
         if (checkOutTime != null) 'checkOutTime': checkOutTime,
         if (checkInPhotoUrl != null) 'checkInPhotoUrl': checkInPhotoUrl,
         if (checkOutPhotoUrl != null) 'checkOutPhotoUrl': checkOutPhotoUrl,
+        if (checkInPhotoName != null) 'checkInPhotoName': checkInPhotoName,
+        if (checkOutPhotoName != null) 'checkOutPhotoName': checkOutPhotoName,
+        if (checkInCapturedAt != null) 'checkInCapturedAt': checkInCapturedAt,
+        if (checkOutCapturedAt != null) 'checkOutCapturedAt': checkOutCapturedAt,
+        if (checkInLocation != null) 'checkInLocation': checkInLocation,
+        if (checkOutLocation != null) 'checkOutLocation': checkOutLocation,
       };
 
   AttendanceRecord copyWith({
@@ -53,6 +77,12 @@ class AttendanceRecord {
     String? checkOutTime,
     String? checkInPhotoUrl,
     String? checkOutPhotoUrl,
+    String? checkInPhotoName,
+    String? checkOutPhotoName,
+    String? checkInCapturedAt,
+    String? checkOutCapturedAt,
+    String? checkInLocation,
+    String? checkOutLocation,
   }) {
     return AttendanceRecord(
       candidateId: candidateId,
@@ -63,6 +93,12 @@ class AttendanceRecord {
       checkOutTime: checkOutTime ?? this.checkOutTime,
       checkInPhotoUrl: checkInPhotoUrl ?? this.checkInPhotoUrl,
       checkOutPhotoUrl: checkOutPhotoUrl ?? this.checkOutPhotoUrl,
+      checkInPhotoName: checkInPhotoName ?? this.checkInPhotoName,
+      checkOutPhotoName: checkOutPhotoName ?? this.checkOutPhotoName,
+      checkInCapturedAt: checkInCapturedAt ?? this.checkInCapturedAt,
+      checkOutCapturedAt: checkOutCapturedAt ?? this.checkOutCapturedAt,
+      checkInLocation: checkInLocation ?? this.checkInLocation,
+      checkOutLocation: checkOutLocation ?? this.checkOutLocation,
     );
   }
 }
