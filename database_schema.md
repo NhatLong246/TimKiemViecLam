@@ -54,7 +54,17 @@
 | Field | Kiểu | Mô tả |
 |---|---|---|
 | `skills` | `List<String>` | Kỹ năng (default: []) |
-| `cvUrl` | `String?` | URL file CV |
+| `cvUrl` | `String?` | URL file CV (PDF/DOC trên Storage) |
+| `cvFileName` | `String?` | Tên file CV đã upload |
+| `cvUpdatedAt` | `Timestamp?` | Lần upload CV gần nhất |
+| `selfIntroduction` | `String?` | Giới thiệu bản thân |
+| `workExperiences` | `List<Map>` | Kinh nghiệm: `{id, company, position, startDate, endDate?, currentlyWorking, description}` |
+| `hasWorkExperience` | `bool?` | `false` = khai báo chưa có kinh nghiệm |
+| `educations` | `List<Map>` | Học vấn |
+| `projects` | `List<Map>` | Dự án |
+| `certificates` | `List<Map>` | Chứng chỉ |
+| `languages` | `List<Map>` | Ngoại ngữ |
+| `allowEmployerDiscovery` | `bool?` | Cho NTD tìm thấy hồ sơ |
 | `averageRating` | `double` | Đánh giá trung bình (default: 0.0) |
 | `totalJobsDone` | `int` | Tổng số job đã hoàn thành (default: 0) |
 

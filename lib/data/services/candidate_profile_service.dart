@@ -83,10 +83,14 @@ class CandidateProfileService {
   }
 
   Future<void> addLanguage(LanguageModel item) async {
-    await _firestore.collection('users').doc(_uid).update({
-      'languages': FieldValue.arrayUnion([item.toMap()]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final list = await _readList('languages');
+    final exists = list.any((e) => e['id']?.toString() == item.id);
+    if (exists) {
+      await updateLanguage(item);
+      return;
+    }
+    list.add(item.toMap());
+    await _writeList('languages', list);
   }
 
   Future<void> updateLanguage(LanguageModel item) async {

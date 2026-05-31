@@ -69,7 +69,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
     }
     setState(() => _saving = true);
     try {
-      final ctrl = Get.find<UpdateAccountController>();
+      final ctrl = Get.put(UpdateAccountController());
       final model = ProjectModel(
         id: widget.project?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),

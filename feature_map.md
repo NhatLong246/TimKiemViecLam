@@ -45,7 +45,7 @@
 | C6 | Danh sách đã ứng tuyển | `screens/application/my_applications_screen.dart` | ❌ | |
 | C7 | Lịch làm việc | `screens/schedule/candidate_schedule_screen.dart` | ✅ | Firestore `schedules`, tuần + ca theo ngày |
 | C8 | Thống kê thu nhập | `screens/stats/candidate_stats_screen.dart` | ❌ | Tổng job, tổng thu nhập |
-| C9 | CV cá nhân | `screens/profile/cv_screen.dart` | ❌ | Dành cho full-time |
+| C9 | CV cá nhân | `screens/profile/cv_screen.dart` | ✅ | Hub CV + upload PDF, `users` Firestore, Home → Hồ sơ |
 | C10 | Tham khảo giá thị trường | `screens/reference/market_rate_screen.dart` | ❌ | So sánh lương theo loại job + khu vực |
 | C11 | Đánh giá Employer | `controller/review_controller.dart` | ❌ | Sau khi hoàn thành job |
 | C12 | Xem đánh giá cá nhân | `screens/profile/my_ratings_screen.dart` | ❌ | |

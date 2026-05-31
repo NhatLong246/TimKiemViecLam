@@ -299,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
       {
         'asset': 'assets/images/icons/icons8-avatar-48.png',
         'label': 'Hồ sơ',
-        'route': AppRoutes.profile,
+        'route': AppRoutes.cv,
       },
       {
         'asset': 'assets/images/icons/icons8-calendar-48.png',
