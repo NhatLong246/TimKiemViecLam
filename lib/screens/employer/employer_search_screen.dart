@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
+import 'candidate_discovery_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerSearchScreen
@@ -387,6 +388,28 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                   ],
                 ),
               ),
+              if (_postJobType == 'full_time') ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.person_search_rounded, size: 20),
+                    label: const Text('Tìm ứng viên Full-time',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1565C0),
+                      side: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Get.back(); // close bottom sheet
+                      Get.to(() => const CandidateDiscoveryScreen());
+                    },
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
 
               // ─── Người làm filters ────────────────────────────────────

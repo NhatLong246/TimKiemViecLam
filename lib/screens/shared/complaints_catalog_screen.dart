@@ -120,7 +120,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
       appBar: AppBar(
         backgroundColor: _accent,
         foregroundColor: Colors.white,
-        title: const Text('Khiếu nại sau giải tán'),
+        title: const Text('Danh mục khiếu nại'),
         bottom: TabBar(
           controller: _tabs,
           indicatorColor: Colors.white,
@@ -198,7 +198,13 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        'Dành cho oan ức / thắc mắc sau khi nhóm làm việc đã giải tán.',
+        _isCandidate
+            ? 'Theo dõi khiếu nại bạn gửi và khiếu nại NTD gửi về ca làm của bạn. '
+                'Gửi khiếu nại mới sau khi nhóm công việc đã giải tán.'
+            : _isEmployer
+                ? 'Theo dõi khiếu nại bạn gửi về nhân viên và khiếu nại UV gửi về tin đăng. '
+                    'Gửi khiếu nại mới sau khi nhóm đã giải tán.'
+                : 'Tất cả khiếu nại nhân viên và công việc trong hệ thống.',
         style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
       ),
     );

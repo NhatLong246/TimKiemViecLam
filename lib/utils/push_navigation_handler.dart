@@ -1,0 +1,159 @@
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../controller/login_controller.dart';
+import '../controller/messaging_controller.dart';
+import '../data/models/app_notification_model.dart';
+import '../routes/app_routes.dart';
+import '../screens/messaging/chat_room_screen.dart';
+import '../screens/notification/notification_screen.dart';
+import 'messaging_bootstrap.dart';
+import 'notification_navigation.dart';
+
+/// Điều hướng khi người dùng chạm push notification (FCM / local).
+class PushNavigationHandler {
+  PushNavigationHandler._();
+
+  static Map<String, dynamic>? _pendingPayload;
+
+  static void setPending(Map<String, dynamic> data) {
+    if (data.isEmpty) return;
+    _pendingPayload = Map<String, dynamic>.from(data);
+  }
+
+  static void setPendingFromJson(String? json) {
+    if (json == null || json.isEmpty) return;
+    try {
+      final decoded = jsonDecode(json);
+      if (decoded is Map) {
+        setPending(Map<String, dynamic>.from(decoded));
+      }
+    } catch (_) {}
+  }
+
+  /// Gọi sau khi đăng nhập / khôi phục phiên — khi navigator đã sẵn sàng.
+  static Future<void> processPendingIfAny() async {
+    final payload = _pendingPayload;
+    if (payload == null || payload.isEmpty) return;
+
+    final user = Get.find<AuthController>().currentUser;
+    if (user == null) return;
+
+    _pendingPayload = null;
+    await _navigate(payload, user.role);
+  }
+
+  static Future<void> handlePayload(Map<String, dynamic> data) async {
+    final user = Get.find<AuthController>().currentUser;
+    if (user == null) {
+      setPending(data);
+      return;
+    }
+    await _navigate(data, user.role);
+  }
+
+  static Future<void> _navigate(
+    Map<String, dynamic> data,
+    String role,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+
+    final type = data['type']?.toString() ?? '';
+    final groupId = data['groupId']?.toString() ?? '';
+
+    if (type == 'message' && groupId.isNotEmpty) {
+      if (Get.isRegistered<MessagingController>()) {
+        await Get.find<MessagingController>().markConversationRead(groupId);
+      } else {
+        MessagingBootstrap.ensureController().markConversationRead(groupId);
+      }
+      await Get.to(() => ChatRoomScreen(groupId: groupId));
+      return;
+    }
+
+    if (type == 'attendance_request' ||
+        type == 'attendance_result' ||
+        data['phase']?.toString() == 'check_in' ||
+        data['phase']?.toString() == 'check_out') {
+      if (groupId.isEmpty) {
+        _openNotificationHub(role);
+        return;
+      }
+      final item = AppNotificationItem(
+        id: '',
+        title: data['title']?.toString() ?? '',
+        body: data['body']?.toString() ?? '',
+        createdAt: DateTime.now(),
+        category: NotificationCategory.job,
+        data: data,
+      );
+      final ctx = Get.context;
+      if (ctx != null && ctx.mounted) {
+        await NotificationNavigation.handleTap(ctx, item);
+      }
+      return;
+    }
+
+    if (type == 'work_assignment' && groupId.isNotEmpty) {
+      final item = AppNotificationItem(
+        id: '',
+        title: data['title']?.toString() ?? '',
+        body: data['body']?.toString() ?? '',
+        createdAt: DateTime.now(),
+        category: NotificationCategory.job,
+        data: data,
+      );
+      await NotificationNavigation.openWorkAssignment(item);
+      return;
+    }
+
+    if (role == 'employer') {
+      if (type == 'application' &&
+          data['jobId']?.toString().isNotEmpty == true) {
+        await Get.toNamed(
+          AppRoutes.employerCandidates,
+          arguments: {'jobId': data['jobId']},
+        );
+        return;
+      }
+      if (type.startsWith('disbursement') && groupId.isNotEmpty) {
+        final snap = await FirebaseFirestore.instance
+            .collection('groupChats')
+            .doc(groupId)
+            .get();
+        if (snap.exists) {
+          await Get.toNamed(AppRoutes.jobDayEndFlow, arguments: snap.data());
+          return;
+        }
+      }
+      await Get.toNamed(AppRoutes.employerNotifications);
+      return;
+    }
+
+    if (role == 'admin') {
+      if (type.startsWith('disbursement')) {
+        await Get.toNamed(AppRoutes.adminDisbursements);
+        return;
+      }
+      if (type.contains('complaint')) {
+        await Get.toNamed(AppRoutes.complaintsCatalog);
+        return;
+      }
+      await Get.toNamed(AppRoutes.adminHome);
+      return;
+    }
+
+    _openNotificationHub(role);
+  }
+
+  static void _openNotificationHub(String role) {
+    if (role == 'employer') {
+      Get.toNamed(AppRoutes.employerNotifications);
+    } else {
+      Get.to(() => const NotificationScreen());
+    }
+  }
+}

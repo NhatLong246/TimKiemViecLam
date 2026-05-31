@@ -56,8 +56,8 @@ class _CandidateJobComplaintScreenState extends State<CandidateJobComplaintScree
   }
 
   Future<void> _submit() async {
-    if (_descCtrl.text.trim().isEmpty) {
-      Get.snackbar('Thiếu thông tin', 'Nhập nội dung khiếu nại');
+    if (_descCtrl.text.trim().length < 10) {
+      Get.snackbar('Thiếu thông tin', 'Mô tả ít nhất 10 ký tự');
       return;
     }
     setState(() => _submitting = true);
@@ -71,6 +71,7 @@ class _CandidateJobComplaintScreenState extends State<CandidateJobComplaintScree
         'description': _descCtrl.text.trim(),
         'imageBase64s': _images,
         'status': 'pending',
+        'complaintKind': 'candidate_active_job',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -85,6 +86,21 @@ class _CandidateJobComplaintScreenState extends State<CandidateJobComplaintScree
             'groupId': _group.groupId,
             'jobId': _group.jobId,
           },
+        );
+      }
+
+      final admins = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .limit(10)
+          .get();
+      for (final a in admins.docs) {
+        await NotificationService().create(
+          recipientId: a.id,
+          type: 'complaint_received',
+          title: 'Khiếu nại công việc mới',
+          body: 'UV khiếu nại về "${_group.jobTitle}".',
+          data: {'groupId': _group.groupId, 'jobId': _group.jobId},
         );
       }
 

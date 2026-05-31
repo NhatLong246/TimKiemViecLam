@@ -63,7 +63,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     await _markRead(item);
     if (!mounted) return;
 
-    if (item.isAttendanceNotification || item.isWorkAssignment) {
+    if (item.isAttendanceNotification || item.isWorkAssignment || item.isEmployerInterest) {
       await NotificationNavigation.handleTap(context, item);
       return;
     }

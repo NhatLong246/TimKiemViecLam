@@ -31,7 +31,7 @@
 | S14 | Thêm/sửa tài khoản NH | `screens/bank_account/add_edit_bank_account_screen.dart` | ✅ | |
 | S15 | Main Navigation (bottom nav) | `screens/home/main_navigation_screen.dart` | ✅ | Ứng viên; NTD: `employer_main_navigation_screen.dart` |
 | S16 | Hồ sơ / cập nhật tài khoản | `screens/profile/profile_screen.dart`, `update_account_screen.dart` | ✅ | |
-| S17 | Thông báo (chuông) | `screens/notification/notification_screen.dart` | ✅ | Lọc mute nhóm chat |
+| S17 | Thông báo (chuông) | `screens/notification/notification_screen.dart` | ✅ | In-app + FCM push (cần deploy Functions) |
 | S18 | Chatbot AI (Gemini) | `screens/chatbot/chatbot_screen.dart` | ✅ | FAB nổi trên home |
 
 ---

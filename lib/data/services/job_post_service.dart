@@ -27,24 +27,9 @@ class JobPostService {
     }
 
     final docRef = _db.collection(_collection).doc();
-    final newPost = JobPostModel(
+    final newPost = post.copyWith(
       jobId: docRef.id,
-      employerId: post.employerId,
-      title: post.title,
-      description: post.description,
-      category: post.category,
-      jobType: post.jobType,
-      location: post.location,
-      salary: post.salary,
-      salaryType: post.salaryType,
-      slots: post.slots,
       filledSlots: 0,
-      startDate: post.startDate,
-      endDate: post.endDate,
-      workHoursPerDay: post.workHoursPerDay,
-      startTime: post.startTime,
-      requirements: post.requirements,
-      status: post.status,
       totalBudget: post.salary * post.slots,
     );
 

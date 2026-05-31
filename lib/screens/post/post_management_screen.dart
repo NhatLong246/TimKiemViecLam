@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../data/constants/full_time_policy.dart';
 import '../../controller/job_post_controller.dart';
 import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
@@ -520,8 +521,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     final city = post.location['city'] as String? ?? '';
     final district = post.location['district'] as String? ?? '';
     final locationStr = [district, city].where((s) => s.isNotEmpty).join(', ');
-    final hasGroup =
-        post.groupChatId != null && post.groupChatId!.isNotEmpty;
+    final hasGroup = post.isPartTimeManaged &&
+        post.groupChatId != null &&
+        post.groupChatId!.isNotEmpty;
     final isEndingSoon = post.endDate != null &&
         post.endDate!.difference(DateTime.now()).inDays <= 2 &&
         post.endDate!.isAfter(DateTime.now()) &&
@@ -577,6 +579,14 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                           Row(
                             children: [
                               _buildStatusBadge(context, post.status),
+                              if (post.isFullTimeReferral) ...[
+                                const SizedBox(width: 6),
+                                _buildInlineWarningChip(
+                                  context,
+                                  kFullTimeReferralBadge,
+                                  color: const Color(0xFF1565C0),
+                                ),
+                              ],
                               if (isEndingSoon) ...[
                                 const SizedBox(width: 6),
                                 _buildInlineWarningChip(context, 'Sắp hết hạn'),
@@ -631,13 +641,13 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                         'Ứng viên',
                         () => PostManagementActions.openCandidates(post),
                       ),
-                      if (hasGroup)
+                      if (hasGroup && post.isPartTimeManaged)
                         _quickChip(
                           Icons.groups_outlined,
                           'Nhóm',
                           () => PostManagementActions.openGroup(post),
                         ),
-                      if (hasGroup)
+                      if (hasGroup && post.isPartTimeManaged)
                         _quickChip(
                           Icons.fact_check_outlined,
                           'Điểm danh',
@@ -741,28 +751,38 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     );
   }
 
-  Widget _buildInlineWarningChip(BuildContext context, String text) {
-    const warn = Color(0xFFE65100);
+  Widget _buildInlineWarningChip(
+    BuildContext context,
+    String text, {
+    Color? color,
+  }) {
+    final chipColor = color ?? const Color(0xFFE65100);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
-            ? warn.withValues(alpha: 0.2)
-            : const Color(0xFFFFF3E0),
+            ? chipColor.withValues(alpha: 0.2)
+            : chipColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: warn.withValues(alpha: 0.3)),
+        border: Border.all(color: chipColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning_amber_rounded, size: 12, color: warn),
+          Icon(
+            color == null
+                ? Icons.warning_amber_rounded
+                : Icons.info_outline_rounded,
+            size: 12,
+            color: chipColor,
+          ),
           const SizedBox(width: 4),
           Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
-              color: warn,
+              color: chipColor,
             ),
           ),
         ],
@@ -880,8 +900,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     JobPostModel post,
     String tabType,
   ) {
-    final hasGroup =
-        post.groupChatId != null && post.groupChatId!.isNotEmpty;
+    final hasGroup = post.isPartTimeManaged &&
+        post.groupChatId != null &&
+        post.groupChatId!.isNotEmpty;
     final items = <PopupMenuEntry<String>>[];
 
     items.add(_menuItem('view', 'Xem chi tiết', icon: Icons.visibility_outlined));
@@ -1014,7 +1035,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         if (ok) await controller.deletePost(post.jobId);
         break;
       case 'close':
-        final ok = await PostManagementActions.confirmClose(context);
+        final ok = await PostManagementActions.confirmClose(context, post);
         if (ok) await controller.closePost(post.jobId);
         break;
       case 'retract':

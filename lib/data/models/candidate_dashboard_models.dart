@@ -191,6 +191,7 @@ class WorkGroup {
 
 class CandidateEarningsSummary {
   final int totalPaidVnd;
+  final int monthPaidVnd;
   final int pendingVnd;
   final int walletBalanceVnd;
   final int jobCount;
@@ -199,6 +200,7 @@ class CandidateEarningsSummary {
 
   const CandidateEarningsSummary({
     required this.totalPaidVnd,
+    this.monthPaidVnd = 0,
     required this.pendingVnd,
     this.walletBalanceVnd = 0,
     required this.jobCount,

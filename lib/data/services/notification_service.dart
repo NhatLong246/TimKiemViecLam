@@ -24,6 +24,7 @@ class NotificationService {
     required String title,
     required String body,
     Map<String, dynamic> data = const {},
+    bool suppressPush = false,
   }) async {
     await _legacyCol.add({
       'recipientId': recipientId,
@@ -32,6 +33,7 @@ class NotificationService {
       'body': body,
       'data': data,
       'isRead': false,
+      if (suppressPush) 'suppressPush': true,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -344,6 +346,7 @@ class NotificationService {
       title: title,
       body: body,
       data: data,
+      suppressPush: true,
     );
 
     await sendToUser(
@@ -438,15 +441,19 @@ class NotificationService {
     required String candidateId,
     required String jobTitle,
     String? employerName,
+    bool isFullTimeReferral = false,
   }) async {
     final svc = NotificationService();
     final name =
         employerName?.trim().isNotEmpty == true ? employerName! : 'Nhà tuyển dụng';
     await svc.sendToUser(
       userId: candidateId,
-      title: 'Đơn ứng tuyển được chấp nhận',
-      body:
-          '$name đã chấp nhận bạn cho vị trí "$jobTitle". Mở tin nhắn để trao đổi.',
+      title: isFullTimeReferral
+          ? 'NTD đã ghi nhận đơn Full-time'
+          : 'Đơn ứng tuyển được chấp nhận',
+      body: isFullTimeReferral
+          ? '$name đã ghi nhận bạn cho vị trí "$jobTitle". Họ sẽ liên hệ trực tiếp — ViecNow không quản lý việc Full-time.'
+          : '$name đã chấp nhận bạn cho vị trí "$jobTitle". Mở tin nhắn để trao đổi.',
       category: NotificationCategory.job,
     );
   }

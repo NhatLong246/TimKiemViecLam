@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import '../data/models/app_notification_model.dart';
 import '../data/models/messaging_models.dart';
+import '../data/models/notification_model.dart';
 import '../data/services/messaging_service.dart';
 import '../data/services/notification_service.dart';
 import '../utils/attendance_capture_helper.dart';
@@ -37,7 +38,11 @@ class MessagingController extends GetxController {
   List<ConversationThread> _employerOwnedInbox = [];
   StreamSubscription<List<JobChatMessage>>? _messagesSub;
   StreamSubscription? _notifUnreadSub;
+  StreamSubscription<List<NotificationModel>>? _legacyNotifSub;
   final Set<String> _groupsWithUnreadNotif = {};
+  final Map<String, _MessageNotifHint> _inboxMessageHints = {};
+  final Map<String, _MessageNotifHint> _legacyMessageHints = {};
+  final Map<String, _MessageNotifHint> _unreadMessageHints = {};
   /// Giữ badge tắt sau khi đọc cho tới khi Firestore đồng bộ.
   final Set<String> _optimisticReadGroupIds = {};
   Map<String, int> _readWatermarks = {};
@@ -104,32 +109,141 @@ class MessagingController extends GetxController {
 
   void _bindNotificationUnreadListener() {
     _notifUnreadSub?.cancel();
+    _legacyNotifSub?.cancel();
     final uid = currentUid;
     if (uid.isEmpty) return;
 
     _notifUnreadSub = NotificationService().streamNotifications().listen(
       (list) {
-        final muted = mutedGroupIds;
-        _groupsWithUnreadNotif
-          ..clear()
-          ..addAll(
-            list
-                .where(
-                  (n) =>
-                      !n.isRead &&
-                      n.category == NotificationCategory.message &&
-                      (n.messageGroupId ?? '').isNotEmpty &&
-                      !muted.contains(n.messageGroupId),
-                )
-                .map((n) => n.messageGroupId!),
-          );
-        if (conversations.isNotEmpty) {
-          _applyInboxFromServer(conversations.toList(growable: false));
-        } else if (_groupsWithUnreadNotif.isNotEmpty) {
-          unreadTotal.value = _groupsWithUnreadNotif.length;
-        }
-        unreadNotifTick.value++;
+        _syncInboxMessageHints(list);
+        _recomputeUnreadMessageState();
       },
+    );
+
+    if (isEmployer) {
+      _legacyNotifSub =
+          NotificationService().streamByRecipient(uid).listen((list) {
+        _syncLegacyMessageHints(list);
+        _recomputeUnreadMessageState();
+      });
+    }
+  }
+
+  void _syncInboxMessageHints(List<AppNotificationItem> list) {
+    final muted = mutedGroupIds;
+    _inboxMessageHints.clear();
+    for (final n in list) {
+      if (n.isRead) continue;
+      if (n.category != NotificationCategory.message) continue;
+      final gid = n.messageGroupId ?? '';
+      if (gid.isEmpty || muted.contains(gid)) continue;
+      _inboxMessageHints[gid] = _hintFromAppNotification(n);
+    }
+  }
+
+  void _syncLegacyMessageHints(List<NotificationModel> list) {
+    final muted = mutedGroupIds;
+    _legacyMessageHints.clear();
+    for (final n in list) {
+      if (n.isRead) continue;
+      if (n.type != 'message') continue;
+      final gid = (n.data['groupId'] ?? '').toString();
+      if (gid.isEmpty || muted.contains(gid)) continue;
+      _legacyMessageHints[gid] = _hintFromLegacyNotification(n);
+    }
+  }
+
+  void _recomputeUnreadMessageState() {
+    _mergeUnreadHintsIntoGroups();
+
+    if (conversations.isNotEmpty) {
+      _applyInboxFromServer(
+        conversations.toList(growable: false),
+        skipHintMerge: true,
+      );
+    } else if (_groupsWithUnreadNotif.isNotEmpty) {
+      unreadTotal.value = _groupsWithUnreadNotif.length;
+    }
+    unreadNotifTick.value++;
+  }
+
+  void _mergeUnreadHintsIntoGroups() {
+    final muted = mutedGroupIds;
+    _groupsWithUnreadNotif.clear();
+    _unreadMessageHints.clear();
+
+    void mergeHint(String gid, _MessageNotifHint hint) {
+      if (muted.contains(gid)) return;
+      _groupsWithUnreadNotif.add(gid);
+      final existing = _unreadMessageHints[gid];
+      if (existing == null || hint.at.isAfter(existing.at)) {
+        _unreadMessageHints[gid] = hint;
+      }
+    }
+
+    for (final e in _inboxMessageHints.entries) {
+      mergeHint(e.key, e.value);
+    }
+    for (final e in _legacyMessageHints.entries) {
+      mergeHint(e.key, e.value);
+    }
+  }
+
+  _MessageNotifHint _hintFromAppNotification(AppNotificationItem n) {
+    final gid = n.messageGroupId ?? '';
+    final isGroup = n.data['isGroupChat'] == true;
+    final jobTitle = (n.data['groupName'] ?? n.data['jobTitle'] ?? n.title)
+        .toString();
+    final preview =
+        (n.data['preview'] ?? n.body).toString().trim().isNotEmpty
+            ? (n.data['preview'] ?? n.body).toString()
+            : n.body;
+    return _MessageNotifHint(
+      groupId: gid,
+      title: n.title,
+      preview: preview,
+      jobTitle: jobTitle,
+      isGroupChat: isGroup,
+      at: n.createdAt,
+    );
+  }
+
+  _MessageNotifHint _hintFromLegacyNotification(NotificationModel n) {
+    final gid = (n.data['groupId'] ?? '').toString();
+    final isGroup =
+        n.data['isGroupChat'] == true || n.title.toLowerCase().contains('nhóm');
+    var jobTitle = (n.data['groupName'] ?? n.data['jobTitle'] ?? '').toString();
+    if (jobTitle.isEmpty && n.title.contains('·')) {
+      jobTitle = n.title.split('·').last.trim();
+    }
+    if (jobTitle.isEmpty) jobTitle = n.title;
+    final preview =
+        (n.data['preview'] ?? n.body).toString().trim().isNotEmpty
+            ? (n.data['preview'] ?? n.body).toString()
+            : n.body;
+    return _MessageNotifHint(
+      groupId: gid,
+      title: n.title,
+      preview: preview,
+      jobTitle: jobTitle,
+      isGroupChat: isGroup,
+      at: n.createdAt,
+    );
+  }
+
+  ConversationThread _threadFromHint(_MessageNotifHint hint) {
+    return ConversationThread(
+      groupId: hint.groupId,
+      jobId: '',
+      jobTitle: hint.jobTitle,
+      employerId: isEmployer ? currentUid : '',
+      memberIds: const [],
+      lastMessageText: hint.preview,
+      lastMessageAt: hint.at,
+      peerId: '',
+      peerName: hint.preview,
+      chatType: hint.isGroupChat ? 'group' : 'direct',
+      unreadCount: 1,
     );
   }
 
@@ -138,20 +252,31 @@ class MessagingController extends GetxController {
     final unread = conversations
         .where((c) => c.unreadCount > 0 && !c.notificationsMuted)
         .toList(growable: false);
-    if (unread.isEmpty) {
-      for (final gid in _groupsWithUnreadNotif) {
-        for (final c in conversations) {
-          if (c.groupId == gid && !c.notificationsMuted) return c;
+    if (unread.isNotEmpty) {
+      unread.sort((a, b) {
+        final da = a.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = b.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return db.compareTo(da);
+      });
+      return unread.first;
+    }
+
+    for (final gid in _groupsWithUnreadNotif) {
+      for (final c in conversations) {
+        if (c.groupId == gid && !c.notificationsMuted) {
+          return c.copyWith(
+            unreadCount: c.unreadCount > 0 ? c.unreadCount : 1,
+          );
         }
       }
-      return null;
     }
-    unread.sort((a, b) {
-      final da = a.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final db = b.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return db.compareTo(da);
-    });
-    return unread.first;
+
+    if (_unreadMessageHints.isEmpty) return null;
+
+    final best = _unreadMessageHints.values.reduce(
+      (a, b) => a.at.isAfter(b.at) ? a : b,
+    );
+    return _threadFromHint(best);
   }
 
   AuthController get _auth => Get.find<AuthController>();
@@ -167,6 +292,7 @@ class MessagingController extends GetxController {
     _inboxSub?.cancel();
     _employerOwnedInboxSub?.cancel();
     _notifUnreadSub?.cancel();
+    _legacyNotifSub?.cancel();
     _messagesSub?.cancel();
     activeThread.value = null;
     super.onClose();
@@ -256,7 +382,10 @@ class MessagingController extends GetxController {
     loadInbox();
   }
 
-  void _applyInboxFromServer(List<ConversationThread> list) {
+  void _applyInboxFromServer(
+    List<ConversationThread> list, {
+    bool skipHintMerge = false,
+  }) {
     final uid = currentUid;
     final patched = list.map((t) {
       if (t.notificationsMuted) {
@@ -290,7 +419,22 @@ class MessagingController extends GetxController {
       return unread == t.unreadCount ? t : t.copyWith(unreadCount: unread);
     }).toList();
     conversations.assignAll(patched);
+    if (!skipHintMerge) {
+      _syncInboxMessageHintsFromMutedChange();
+      _syncLegacyMessageHintsFromMutedChange();
+      unreadNotifTick.value++;
+    }
     _syncUnreadTotal();
+  }
+
+  void _syncInboxMessageHintsFromMutedChange() {
+    final muted = mutedGroupIds;
+    _inboxMessageHints.removeWhere((gid, _) => muted.contains(gid));
+  }
+
+  void _syncLegacyMessageHintsFromMutedChange() {
+    final muted = mutedGroupIds;
+    _legacyMessageHints.removeWhere((gid, _) => muted.contains(gid));
   }
 
   Future<void> _persistReadState(String groupId) async {
@@ -819,4 +963,22 @@ class MessagingController extends GetxController {
       isSending.value = false;
     }
   }
+}
+
+class _MessageNotifHint {
+  final String groupId;
+  final String title;
+  final String preview;
+  final String jobTitle;
+  final bool isGroupChat;
+  final DateTime at;
+
+  const _MessageNotifHint({
+    required this.groupId,
+    required this.title,
+    required this.preview,
+    required this.jobTitle,
+    required this.isGroupChat,
+    required this.at,
+  });
 }

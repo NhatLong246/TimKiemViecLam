@@ -133,13 +133,20 @@ class _CandidateBenefitsScreenState extends State<CandidateBenefitsScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            s.formatVnd(s.totalPaidVnd),
+            s.formatVnd(s.monthPaidVnd),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 30,
               fontWeight: FontWeight.w800,
             ),
           ),
+          if (s.totalPaidVnd != s.monthPaidVnd) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Tổng đã nhận: ${s.formatVnd(s.totalPaidVnd)}',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [
@@ -347,9 +354,9 @@ class _CandidateBenefitsScreenState extends State<CandidateBenefitsScreen> {
   Widget _paymentTile(CandidatePayment p) {
     final statusColor = p.status == 'paid'
         ? candidateMenuPrimary
-        : p.status == 'pending'
-            ? Colors.orange
-            : Colors.red;
+        : p.status == 'disputed'
+            ? Colors.red
+            : Colors.orange;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),

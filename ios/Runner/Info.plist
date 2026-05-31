@@ -72,5 +72,10 @@
 	<string>Ứng dụng cần quyền micro để gọi thoại và gọi video.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ứng dụng cần quyền thư viện ảnh để chọn ảnh đại diện.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

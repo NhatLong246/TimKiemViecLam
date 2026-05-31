@@ -4,12 +4,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/candidate_dashboard_models.dart';
-import 'notification_service.dart';
+import '../models/disbursement_notice_model.dart';
 import '../models/job_post_model.dart';
+import 'attendance_service.dart';
+import 'notification_service.dart';
 
 class CandidateDashboardService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AttendanceService _attendance = AttendanceService();
 
   String? get _uid => _auth.currentUser?.uid;
 
@@ -111,26 +114,174 @@ class CandidateDashboardService {
     return result;
   }
 
-  CandidatePayment _rowToPayment(_AcceptedJobRow row) {
-    final jobClosed = row.job.status == 'closed';
-    final paidAt = jobClosed
-        ? (row.application.updatedAt ?? row.application.appliedAt)
-        : null;
+  CandidatePayment _rowToPayment(
+    _AcceptedJobRow row, {
+    DisbursementNoticeModel? notice,
+    DateTime? completedAt,
+    bool isDisputed = false,
+  }) {
+    final completed = notice?.status == 'completed';
+
+    String status;
+    if (isDisputed) {
+      status = 'disputed';
+    } else if (completed) {
+      status = 'paid';
+    } else {
+      status = 'pending';
+    }
+
+    final amountVnd = completed && notice != null
+        ? notice.amount.round()
+        : row.job.salary.round();
 
     return CandidatePayment(
       id: row.application.appId,
       jobTitle: row.job.title,
       employerName: row.employerName,
-      amountVnd: row.job.salary.round(),
-      status: jobClosed ? 'paid' : 'pending',
-      paidAt: paidAt,
+      amountVnd: amountVnd,
+      status: status,
+      paidAt: completed ? completedAt : null,
       benefitNote: row.job.salaryDisplay,
     );
   }
 
+  Future<Map<String, DisbursementNoticeModel>> _fetchLatestNoticeByJob(
+    List<String> jobIds,
+  ) async {
+    final result = <String, DisbursementNoticeModel>{};
+    if (jobIds.isEmpty) return result;
+
+    for (var i = 0; i < jobIds.length; i += 30) {
+      final chunk = jobIds.sublist(
+        i,
+        i + 30 > jobIds.length ? jobIds.length : i + 30,
+      );
+      final snap = await _firestore
+          .collection('disbursementNotices')
+          .where('jobId', whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        final notice = DisbursementNoticeModel.fromMap(doc.data(), doc.id);
+        final existing = result[notice.jobId];
+        if (existing == null || notice.createdAt.isAfter(existing.createdAt)) {
+          result[notice.jobId] = notice;
+        }
+      }
+    }
+    return result;
+  }
+
+  Future<Map<String, DateTime?>> _fetchCompletedAtByJob(
+    List<String> jobIds,
+  ) async {
+    final result = <String, DateTime?>{};
+    if (jobIds.isEmpty) return result;
+
+    for (var i = 0; i < jobIds.length; i += 30) {
+      final chunk = jobIds.sublist(
+        i,
+        i + 30 > jobIds.length ? jobIds.length : i + 30,
+      );
+      final snap = await _firestore
+          .collection('disbursementNotices')
+          .where('jobId', whereIn: chunk)
+          .where('status', isEqualTo: 'completed')
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final jobId = data['jobId'] as String? ?? '';
+        if (jobId.isEmpty) continue;
+        final completedAt = _parseTimestamp(data['completedAt']);
+        final existing = result[jobId];
+        if (existing == null ||
+            (completedAt != null && completedAt.isAfter(existing))) {
+          result[jobId] = completedAt;
+        }
+      }
+    }
+    return result;
+  }
+
+  Future<Set<String>> _fetchDisputedJobIds(String uid) async {
+    final disputed = <String>{};
+
+    final incidents = await _firestore
+        .collection('incidents')
+        .where('workerId', isEqualTo: uid)
+        .where('status', isEqualTo: 'pending')
+        .limit(50)
+        .get();
+    for (final doc in incidents.docs) {
+      final jobId = doc.data()['jobId'] as String? ?? '';
+      if (jobId.isNotEmpty) disputed.add(jobId);
+    }
+
+    final jobComplaints = await _firestore
+        .collection('jobComplaints')
+        .where('candidateId', isEqualTo: uid)
+        .where('status', isEqualTo: 'pending')
+        .limit(50)
+        .get();
+    for (final doc in jobComplaints.docs) {
+      final jobId = doc.data()['jobId'] as String? ?? '';
+      if (jobId.isNotEmpty) disputed.add(jobId);
+    }
+
+    return disputed;
+  }
+
+  Future<double> _computeHoursWorked(String uid, List<_AcceptedJobRow> rows) async {
+    var total = 0.0;
+    for (final row in rows) {
+      final hoursPerDay = row.job.workHoursPerDay ?? 4.0;
+      final sessions = await _attendance.fetchAllByJob(row.job.jobId);
+      for (final session in sessions) {
+        for (final rec in session.records) {
+          if (rec.candidateId != uid) continue;
+          if (rec.status == 'absent' || rec.status == 'not_marked') continue;
+          total += hoursPerDay;
+        }
+      }
+    }
+    return total;
+  }
+
+  static DateTime? _parseTimestamp(dynamic v) {
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
+    if (v is DateTime) return v;
+    return null;
+  }
+
+  static bool _isInCurrentMonth(DateTime? date) {
+    if (date == null) return false;
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month;
+  }
+
   Future<List<CandidatePayment>> fetchPayments() async {
+    final uid = _uid;
+    if (uid == null) return [];
+
     final rows = await _fetchAcceptedRows();
-    return rows.map(_rowToPayment).toList();
+    if (rows.isEmpty) return [];
+
+    final jobIds = rows.map((r) => r.job.jobId).toList();
+    final notices = await _fetchLatestNoticeByJob(jobIds);
+    final completedAtByJob = await _fetchCompletedAtByJob(jobIds);
+    final disputedJobs = await _fetchDisputedJobIds(uid);
+
+    return rows
+        .map(
+          (row) => _rowToPayment(
+            row,
+            notice: notices[row.job.jobId],
+            completedAt: completedAtByJob[row.job.jobId],
+            isDisputed: disputedJobs.contains(row.job.jobId),
+          ),
+        )
+        .toList();
   }
 
   Future<List<ReviewableJob>> fetchReviewableJobs() async {
@@ -228,29 +379,28 @@ class CandidateDashboardService {
     required double profileRating,
   }) async {
     var paid = 0;
+    var monthPaid = 0;
     var pending = 0;
-    var hours = 0.0;
-
-    final rows = await _fetchAcceptedRows();
-    final hoursByAppId = <String, double>{};
-    for (final row in rows) {
-      hoursByAppId[row.application.appId] =
-          row.job.workHoursPerDay ?? 4.0;
-    }
 
     for (final p in payments) {
       if (p.status == 'paid') {
         paid += p.amountVnd;
-        hours += hoursByAppId[p.id] ?? 4.0;
+        if (_isInCurrentMonth(p.paidAt)) {
+          monthPaid += p.amountVnd;
+        }
       } else if (p.status == 'pending') {
         pending += p.amountVnd;
       }
     }
 
+    final rows = await _fetchAcceptedRows();
+    final uid = _uid ?? '';
+    final hours = uid.isEmpty ? 0.0 : await _computeHoursWorked(uid, rows);
     final walletBalance = await _fetchWalletBalance();
 
     return CandidateEarningsSummary(
       totalPaidVnd: paid,
+      monthPaidVnd: monthPaid,
       pendingVnd: pending,
       walletBalanceVnd: walletBalance.round(),
       jobCount: payments.where((p) => p.status == 'paid').length,

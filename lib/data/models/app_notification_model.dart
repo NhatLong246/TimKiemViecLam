@@ -44,6 +44,10 @@ class AppNotificationItem {
 
   String? get messageGroupId => data['groupId']?.toString();
 
+  bool get isEmployerInterest => data['type']?.toString() == 'employer_interest';
+
+  String? get interestJobId => data['jobId']?.toString();
+
   bool get isWorkAssignment => data['type']?.toString() == 'work_assignment';
 
   String? get workAssignmentGroupId => data['groupId']?.toString();

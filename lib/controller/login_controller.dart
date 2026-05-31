@@ -4,7 +4,9 @@ import '../data/models/user_model.dart';
 import '../utils/preferences_helper.dart';
 import 'package:get/get.dart';
 import '../data/services/attendance_auto_notify_service.dart';
+import '../data/services/push_notification_service.dart';
 import '../utils/messaging_bootstrap.dart';
+import '../utils/push_navigation_handler.dart';
 
 class AuthController extends GetxController {
   final LoginAuthService _authService = LoginAuthService();
@@ -42,6 +44,8 @@ class AuthController extends GetxController {
       update();
       MessagingBootstrap.startIfLoggedIn();
       _startAttendanceAutoIfEmployer();
+      await PushNotificationService.instance.bindToUser(user.id);
+      await PushNavigationHandler.processPendingIfAny();
     }
   }
 
@@ -59,6 +63,8 @@ class AuthController extends GetxController {
     update();
     MessagingBootstrap.startIfLoggedIn();
     _startAttendanceAutoIfEmployer();
+    await PushNotificationService.instance.bindToUser(user.id);
+    await PushNavigationHandler.processPendingIfAny();
     return user;
   }
 
@@ -68,6 +74,8 @@ class AuthController extends GetxController {
     update();
     MessagingBootstrap.startIfLoggedIn();
     _startAttendanceAutoIfEmployer();
+    await PushNotificationService.instance.bindToUser(user.id);
+    await PushNavigationHandler.processPendingIfAny();
     return user;
   }
 
@@ -77,11 +85,17 @@ class AuthController extends GetxController {
     update();
     MessagingBootstrap.startIfLoggedIn();
     _startAttendanceAutoIfEmployer();
+    await PushNotificationService.instance.bindToUser(user.id);
+    await PushNavigationHandler.processPendingIfAny();
     return user;
   }
 
   Future<void> logout() async {
+    final uid = currentUser?.id;
     await PreferencesHelper.saveRememberMe(false, '');
+    if (uid != null && uid.isNotEmpty) {
+      await PushNotificationService.instance.unbindUser(uid);
+    }
     await _authService.logout();
     currentUser = null;
     MessagingBootstrap.stop();

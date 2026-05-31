@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'controller/login_controller.dart';
+import 'data/services/push_notification_service.dart';
 import 'firebase_options.dart';
 
 Future<void> _bootstrap() async {
@@ -21,6 +22,8 @@ Future<void> _bootstrap() async {
   }
 
   await initializeDateFormatting('vi', null);
+
+  await PushNotificationService.instance.initialize();
 
   if (!Get.isRegistered<AuthController>()) {
     Get.put(AuthController(), permanent: true);

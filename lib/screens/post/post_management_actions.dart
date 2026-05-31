@@ -14,7 +14,11 @@ class PostManagementActions {
   }
 
   static void editPost(JobPostModel post) {
-    Get.toNamed(AppRoutes.createPost, arguments: post);
+    if (post.jobType == 'full_time') {
+      Get.toNamed(AppRoutes.createFulltimePost, arguments: post);
+    } else {
+      Get.toNamed(AppRoutes.createPost, arguments: post);
+    }
   }
 
   static void openCandidates(JobPostModel post) {
@@ -28,6 +32,13 @@ class PostManagementActions {
   }
 
   static Future<void> openGroup(JobPostModel post) async {
+    if (post.isFullTimeReferral) {
+      Get.snackbar(
+        'Không khả dụng',
+        'Full-time chỉ giới thiệu tin — ViecNow không quản lý nhóm chat.',
+      );
+      return;
+    }
     final gid = post.groupChatId;
     if (gid == null || gid.isEmpty) {
       Get.snackbar(
@@ -45,6 +56,13 @@ class PostManagementActions {
   }
 
   static Future<void> openAttendance(JobPostModel post) async {
+    if (post.isFullTimeReferral) {
+      Get.snackbar(
+        'Không khả dụng',
+        'Full-time chỉ giới thiệu tin — ViecNow không quản lý điểm danh.',
+      );
+      return;
+    }
     final gid = post.groupChatId;
     if (gid == null || gid.isEmpty) {
       Get.snackbar('Chưa có nhóm', 'Cần nhóm chat để điểm danh');
@@ -65,6 +83,13 @@ class PostManagementActions {
   }
 
   static Future<void> openAttendanceSummary(JobPostModel post) async {
+    if (post.isFullTimeReferral) {
+      Get.snackbar(
+        'Không khả dụng',
+        'Full-time chỉ giới thiệu tin — không có điểm danh trên ViecNow.',
+      );
+      return;
+    }
     final gid = post.groupChatId;
     if (gid == null || gid.isEmpty) {
       Get.snackbar('Chưa có nhóm', 'Chưa có dữ liệu điểm danh');
@@ -80,6 +105,13 @@ class PostManagementActions {
   }
 
   static Future<void> openDisbursement(JobPostModel post) async {
+    if (post.isFullTimeReferral) {
+      Get.snackbar(
+        'Không khả dụng',
+        'Full-time chỉ giới thiệu tin — ViecNow không giải ngân lương Full-time.',
+      );
+      return;
+    }
     final gid = post.groupChatId;
     if (gid == null || gid.isEmpty) {
       Get.snackbar('Chưa có nhóm', 'Hoàn tất tuyển dụng và điểm danh trước');
@@ -93,14 +125,20 @@ class PostManagementActions {
     );
   }
 
-  static Future<bool> confirmClose(BuildContext context) async {
+  static Future<bool> confirmClose(
+    BuildContext context,
+    JobPostModel post,
+  ) async {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Đóng bài đăng?'),
-            content: const Text(
-              'Bài đăng sẽ không nhận ứng viên mới. '
-              'Nhóm chat vẫn hoạt động cho đến khi giải ngân/giải tán.',
+            content: Text(
+              post.isFullTimeReferral
+                  ? 'Bài đăng sẽ không nhận ứng viên mới. '
+                      'Ứng viên đã apply vẫn do NTD tự liên hệ — ViecNow không quản lý Full-time.'
+                  : 'Bài đăng sẽ không nhận ứng viên mới. '
+                      'Nhóm chat vẫn hoạt động cho đến khi giải ngân/giải tán.',
             ),
             actions: [
               TextButton(

@@ -6,12 +6,19 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../../data/constants/full_time_policy.dart';
+import '../../data/constants/job_categories.dart';
 import '../../controller/job_post_controller.dart';
+import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
+import '../../routes/app_routes.dart';
 import '../../utils/theme_colors.dart';
 
 class CreatePostScreen extends StatefulWidget {
-  const CreatePostScreen({super.key});
+  const CreatePostScreen({super.key, this.initialJobType = 'part_time'});
+
+  /// `part_time` — màn tạo Part-time; `full_time` — màn tạo Full-time.
+  final String initialJobType;
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -35,6 +42,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _requirementsCtrl = TextEditingController();
   final _workHoursCtrl = TextEditingController();
   final _startTimeCtrl = TextEditingController();
+  final _benefitsCtrl = TextEditingController();
+  final _probationCtrl = TextEditingController();
 
   // State
   String _jobType = 'part_time';
@@ -43,10 +52,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
   DateTime? _endDate;
   bool _isSubmitting = false;
+  bool _requiresCv = true;
+  bool _interviewRequired = true;
+  int _payDayOfMonth = 5;
+  String _workShift = 'flexible';
+  String _minEducation = 'none';
+  String _minExperience = 'none';
+  final Set<String> _workingDays = {'mon', 'tue', 'wed', 'thu', 'fri'};
   final List<String> _imageBase64s = [];
   JobPostModel? _editing;
 
   bool get _isEdit => _editing != null;
+  bool get _isFullTimeScreen => widget.initialJobType == 'full_time';
+
+  List<Map<String, String>> get _categories => categoryOptionsFor(
+        isFullTime: _isFullTimeScreen,
+        selected: _category,
+      );
 
   @override
   void initState() {
@@ -54,7 +76,44 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     final args = Get.arguments;
     if (args is JobPostModel) {
       _editing = args;
+      if (args.jobType == 'full_time' && !_isFullTimeScreen) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.offNamed(AppRoutes.createFulltimePost, arguments: args);
+        });
+        return;
+      }
+      if (args.jobType == 'part_time' && _isFullTimeScreen) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.offNamed(AppRoutes.createPost, arguments: args);
+        });
+        return;
+      }
       _loadFromPost(args);
+      return;
+    }
+    _jobType = widget.initialJobType;
+    if (_isFullTimeScreen) {
+      _category = 'ban_hang';
+      _salaryType = 'per_month';
+      _workHoursCtrl.text = '8';
+      _startTimeCtrl.text = '08:00';
+    }
+  }
+
+  void _onJobTypeTap(String v) {
+    if (v == _jobType) return;
+    if (_isEdit) {
+      Get.snackbar(
+        'Không đổi loại',
+        'Không thể đổi loại công việc khi đang sửa bài đăng',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    if (v == 'full_time') {
+      Get.offNamed(AppRoutes.createFulltimePost);
+    } else {
+      Get.offNamed(AppRoutes.createPost);
     }
   }
 
@@ -73,24 +132,32 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _jobType = p.jobType;
     _category = p.category;
     _salaryType = p.salaryType;
+    if (p.jobType == 'full_time' &&
+        _salaryType != 'per_month' &&
+        _salaryType != 'per_hour') {
+      _salaryType = 'per_month';
+    }
     _startDate = p.startDate;
     _endDate = p.endDate;
     _imageBase64s
       ..clear()
       ..addAll(p.imageUrls);
+    final ft = p.fullTimeDetails;
+    if (ft != null) {
+      _requiresCv = ft.requiresCv;
+      _interviewRequired = ft.interviewRequired;
+      _payDayOfMonth = ft.payDayOfMonth;
+      _workShift = ft.workShift;
+      _minEducation = ft.minEducation ?? 'none';
+      _minExperience = ft.minExperience ?? 'none';
+      _benefitsCtrl.text = ft.benefits ?? '';
+      _probationCtrl.text =
+          ft.probationDays != null ? ft.probationDays.toString() : '';
+      _workingDays
+        ..clear()
+        ..addAll(ft.workingDays);
+    }
   }
-
-  final _categories = const [
-    {'value': 'boc_vac', 'label': 'Bốc vác'},
-    {'value': 'lau_don', 'label': 'Lau dọn'},
-    {'value': 'bung_be', 'label': 'Bưng bê'},
-    {'value': 'phuc_vu', 'label': 'Phục vụ'},
-    {'value': 'pha_che', 'label': 'Pha chế'},
-    {'value': 'tiep_thi', 'label': 'Tiếp thị'},
-    {'value': 'van_chuyen', 'label': 'Vận chuyển'},
-    {'value': 'bao_ve', 'label': 'Bảo vệ'},
-    {'value': 'other', 'label': 'Khác'},
-  ];
 
   @override
   void dispose() {
@@ -104,6 +171,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _requirementsCtrl.dispose();
     _workHoursCtrl.dispose();
     _startTimeCtrl.dispose();
+    _benefitsCtrl.dispose();
+    _probationCtrl.dispose();
     super.dispose();
   }
 
@@ -169,6 +238,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return 'Vui lòng nhập Tỉnh/Thành phố';
     }
     final st = _startTimeCtrl.text.trim();
+    if (_isFullTimeScreen) {
+      if (st.isEmpty) return 'Full-time cần nhập giờ bắt đầu làm việc';
+      if (_workingDays.isEmpty) {
+        return 'Chọn ít nhất một ngày làm trong tuần';
+      }
+      if (_payDayOfMonth < 1 || _payDayOfMonth > 28) {
+        return 'Ngày trả lương phải từ 1 đến 28';
+      }
+      final wh = _workHoursCtrl.text.trim();
+      if (wh.isEmpty) return 'Full-time cần nhập số giờ làm/ngày';
+    }
     if (st.isNotEmpty && !_timePattern.hasMatch(st)) {
       return 'Giờ bắt đầu định dạng HH:mm (vd: 08:00)';
     }
@@ -230,7 +310,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       slots: slots,
       filledSlots: _editing?.filledSlots ?? 0,
       startDate: _startDate,
-      endDate: _endDate,
+      endDate: _isFullTimeScreen ? null : _endDate,
       workHoursPerDay:
           double.tryParse(_workHoursCtrl.text.trim().replaceAll(',', '.')),
       startTime: _startTimeCtrl.text.trim().isEmpty
@@ -242,6 +322,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       status: _isEdit ? newStatus : (isDraft ? 'draft' : 'pending'),
       totalBudget: salary * slots,
       imageUrls: List.from(_imageBase64s),
+      fullTimeDetails: _isFullTimeScreen ? _buildFullTimeDetails() : null,
       groupChatId: _editing?.groupChatId,
       createdAt: _editing?.createdAt,
     );
@@ -273,6 +354,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  FullTimeJobDetails _buildFullTimeDetails() {
+    final probation = int.tryParse(_probationCtrl.text.trim());
+    return FullTimeJobDetails(
+      requiresCv: _requiresCv,
+      interviewRequired: _interviewRequired,
+      payDayOfMonth: _payDayOfMonth,
+      workingDays: _workingDays.toList()..sort(),
+      workShift: _workShift,
+      probationDays: probation,
+      minEducation: _minEducation == 'none' ? null : _minEducation,
+      minExperience: _minExperience == 'none' ? null : _minExperience,
+      benefits: _benefitsCtrl.text.trim().isEmpty
+          ? null
+          : _benefitsCtrl.text.trim(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -286,7 +384,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 children: [
+                  if (_isFullTimeScreen) ...[
+                    _buildFullTimeBanner(),
+                    const SizedBox(height: 16),
+                  ],
                   _buildSection('Thông tin cơ bản', [
+                    _buildSegmentedControl(
+                      label: 'Loại công việc',
+                      options: const [
+                        {'value': 'part_time', 'label': 'Part-time'},
+                        {'value': 'full_time', 'label': 'Full-time'},
+                      ],
+                      selected: _jobType,
+                      onTap: _onJobTypeTap,
+                    ),
+                    const SizedBox(height: 12),
                     _buildTextField(
                       controller: _titleCtrl,
                       label: 'Tiêu đề bài đăng *',
@@ -304,16 +416,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               value: c['value'], child: Text(c['label']!)))
                           .toList(),
                       onChanged: (v) => setState(() => _category = v!),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSegmentedControl(
-                      label: 'Loại công việc',
-                      options: const [
-                        {'value': 'part_time', 'label': 'Part-time'},
-                        {'value': 'full_time', 'label': 'Full-time'},
-                      ],
-                      selected: _jobType,
-                      onTap: (v) => setState(() => _jobType = v),
                     ),
                     const SizedBox(height: 12),
                     _buildTextField(
@@ -369,7 +471,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           child: _buildTextField(
                             controller: _salaryCtrl,
                             label: 'Mức lương *',
-                            hint: '250000',
+                            hint: _isFullTimeScreen ? '8000000' : '250000',
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             validator: (v) {
@@ -385,12 +487,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           child: _buildDropdown(
                             label: 'Đơn vị',
                             value: _salaryType,
-                            items: const [
-                              DropdownMenuItem(value: 'per_day', child: Text('/ngày')),
-                              DropdownMenuItem(value: 'per_hour', child: Text('/giờ')),
-                              DropdownMenuItem(value: 'per_month', child: Text('/tháng')),
-                              DropdownMenuItem(value: 'fixed', child: Text('Cố định')),
-                            ],
+                            items: _isFullTimeScreen
+                                ? const [
+                                    DropdownMenuItem(
+                                        value: 'per_month', child: Text('/tháng')),
+                                    DropdownMenuItem(
+                                        value: 'per_hour', child: Text('/giờ')),
+                                  ]
+                                : const [
+                                    DropdownMenuItem(
+                                        value: 'per_day', child: Text('/ngày')),
+                                    DropdownMenuItem(
+                                        value: 'per_hour', child: Text('/giờ')),
+                                    DropdownMenuItem(
+                                        value: 'per_month', child: Text('/tháng')),
+                                    DropdownMenuItem(
+                                        value: 'fixed', child: Text('Cố định')),
+                                  ],
                             onChanged: (v) => setState(() => _salaryType = v!),
                           ),
                         ),
@@ -411,64 +524,73 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                   ]),
                   const SizedBox(height: 16),
-                  _buildSection('Thời gian làm việc', [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDatePicker(
-                            label: 'Ngày bắt đầu *',
-                            date: _startDate,
-                            onTap: () => _pickDate(isStart: true),
+                  if (_isFullTimeScreen) ...[
+                    _buildFullTimeScheduleSection(),
+                    const SizedBox(height: 16),
+                    _buildFullTimePayrollSection(),
+                    const SizedBox(height: 16),
+                    _buildFullTimeRequirementsSection(),
+                    const SizedBox(height: 16),
+                    _buildFullTimeBenefitsSection(),
+                  ] else ...[
+                    _buildSection('Thời gian làm việc', [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDatePicker(
+                              label: 'Ngày bắt đầu *',
+                              date: _startDate,
+                              onTap: () => _pickDate(isStart: true),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildDatePicker(
-                            label: 'Ngày kết thúc',
-                            date: _endDate,
-                            onTap: () => _pickDate(isStart: false),
-                            isOptional: true,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildDatePicker(
+                              label: 'Ngày kết thúc *',
+                              date: _endDate,
+                              onTap: () => _pickDate(isStart: false),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _startTimeCtrl,
-                            label: 'Giờ bắt đầu',
-                            hint: '08:00',
-                            keyboardType: TextInputType.datetime,
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _startTimeCtrl,
+                              label: 'Giờ bắt đầu',
+                              hint: '08:00',
+                              keyboardType: TextInputType.datetime,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _workHoursCtrl,
-                            label: 'Giờ làm/ngày',
-                            hint: '8',
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                RegExp(r'^\d{0,2}([.,]\d{0,1})?$'),
-                              ),
-                            ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _workHoursCtrl,
+                              label: 'Giờ làm/ngày',
+                              hint: '8',
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d{0,2}([.,]\d{0,1})?$'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-                  _buildSection('Yêu cầu ứng viên (tùy chọn)', [
-                    _buildTextField(
-                      controller: _requirementsCtrl,
-                      label: 'Yêu cầu',
-                      hint: 'Ví dụ: Có kinh nghiệm, biết tiếng Anh...',
-                      maxLines: 3,
-                    ),
-                  ]),
+                        ],
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
+                    _buildSection('Yêu cầu ứng viên (tùy chọn)', [
+                      _buildTextField(
+                        controller: _requirementsCtrl,
+                        label: 'Yêu cầu',
+                        hint: 'Ví dụ: Có kinh nghiệm, biết tiếng Anh...',
+                        maxLines: 3,
+                      ),
+                    ]),
+                  ],
                   const SizedBox(height: 16),
                   _buildSection('Hình ảnh minh họa', [
                     Wrap(
@@ -521,6 +643,214 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
+  // ── FULL-TIME SECTIONS ─────────────────────────────────────────────────────
+  Widget _buildFullTimeBanner() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1565C0).withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.work_history_outlined,
+              color: Color(0xFF1565C0), size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              kFullTimeEmployerNotice,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: context.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFullTimeScheduleSection() {
+    return _buildSection('Lịch & ca làm việc', [
+      Text('Ngày làm trong tuần *',
+          style: TextStyle(color: context.textSecondary, fontSize: 13)),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: FullTimeJobDetails.weekdayOptions.map((opt) {
+          final value = opt['value']!;
+          final selected = _workingDays.contains(value);
+          return FilterChip(
+            label: Text(opt['label']!),
+            selected: selected,
+            onSelected: (on) {
+              setState(() {
+                if (on) {
+                  _workingDays.add(value);
+                } else {
+                  _workingDays.remove(value);
+                }
+              });
+            },
+            selectedColor: const Color(0xFF7B1FA2).withValues(alpha: 0.15),
+            checkmarkColor: const Color(0xFF7B1FA2),
+            labelStyle: TextStyle(
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? const Color(0xFF7B1FA2) : context.textSecondary,
+            ),
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 12),
+      _buildDropdown(
+        label: 'Ca làm việc *',
+        value: _workShift,
+        items: FullTimeJobDetails.shiftOptions
+            .map((s) => DropdownMenuItem(
+                  value: s['value'],
+                  child: Text(s['label']!),
+                ))
+            .toList(),
+        onChanged: (v) => setState(() => _workShift = v!),
+      ),
+      const SizedBox(height: 12),
+      _buildDatePicker(
+        label: 'Ngày bắt đầu làm việc *',
+        date: _startDate,
+        onTap: () => _pickDate(isStart: true),
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: _buildTextField(
+              controller: _startTimeCtrl,
+              label: 'Giờ bắt đầu *',
+              hint: '08:00',
+              keyboardType: TextInputType.datetime,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildTextField(
+              controller: _workHoursCtrl,
+              label: 'Giờ làm/ngày *',
+              hint: '8',
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'^\d{0,2}([.,]\d{0,1})?$'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _buildFullTimePayrollSection() {
+    return _buildSection('Thông tin lương (tham khảo)', [
+      _buildDropdown(
+        label: 'Ngày trả lương dự kiến *',
+        value: _payDayOfMonth,
+        items: List.generate(
+          28,
+          (i) => DropdownMenuItem(
+            value: i + 1,
+            child: Text('Ngày ${i + 1}'),
+          ),
+        ),
+        onChanged: (v) => setState(() => _payDayOfMonth = v!),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Chỉ để ứng viên tham khảo. NTD tự thỏa thuận và chi trả lương — ViecNow không can thiệp.',
+        style: TextStyle(fontSize: 12, color: context.textSecondary),
+      ),
+    ]);
+  }
+
+  Widget _buildFullTimeRequirementsSection() {
+    return _buildSection('Yêu cầu ứng viên', [
+      _buildDropdown(
+        label: 'Học vấn tối thiểu',
+        value: _minEducation,
+        items: FullTimeJobDetails.educationOptions
+            .map((e) => DropdownMenuItem(
+                  value: e['value'],
+                  child: Text(e['label']!),
+                ))
+            .toList(),
+        onChanged: (v) => setState(() => _minEducation = v!),
+      ),
+      const SizedBox(height: 12),
+      _buildDropdown(
+        label: 'Kinh nghiệm',
+        value: _minExperience,
+        items: FullTimeJobDetails.experienceOptions
+            .map((e) => DropdownMenuItem(
+                  value: e['value'],
+                  child: Text(e['label']!),
+                ))
+            .toList(),
+        onChanged: (v) => setState(() => _minExperience = v!),
+      ),
+      const SizedBox(height: 12),
+      _buildTextField(
+        controller: _requirementsCtrl,
+        label: 'Yêu cầu khác',
+        hint: 'Kỹ năng, chứng chỉ, ngoại ngữ...',
+        maxLines: 3,
+      ),
+      const SizedBox(height: 4),
+      SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Bắt buộc nộp CV',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: Text('Ứng viên phải đính kèm CV khi ứng tuyển',
+            style: TextStyle(fontSize: 12, color: context.textSecondary)),
+        value: _requiresCv,
+        activeThumbColor: const Color(0xFF7B1FA2),
+        onChanged: (v) => setState(() => _requiresCv = v),
+      ),
+      SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Phỏng vấn trực tiếp',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: Text('NTD sẽ liên hệ phỏng vấn trước khi nhận việc',
+            style: TextStyle(fontSize: 12, color: context.textSecondary)),
+        value: _interviewRequired,
+        activeThumbColor: const Color(0xFF7B1FA2),
+        onChanged: (v) => setState(() => _interviewRequired = v),
+      ),
+    ]);
+  }
+
+  Widget _buildFullTimeBenefitsSection() {
+    return _buildSection('Phúc lợi & thử việc', [
+      _buildTextField(
+        controller: _probationCtrl,
+        label: 'Thời gian thử việc (ngày)',
+        hint: '60',
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      ),
+      const SizedBox(height: 12),
+      _buildTextField(
+        controller: _benefitsCtrl,
+        label: 'Quyền lợi',
+        hint: 'Bảo hiểm, thưởng, ăn trưa, nghỉ phép...',
+        maxLines: 3,
+      ),
+    ]);
+  }
+
   // ── HEADER ─────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
@@ -544,7 +874,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
               Expanded(
                 child: Text(
-                  _isEdit ? 'Sửa bài đăng' : 'Tạo bài đăng mới',
+                  _isEdit
+                      ? 'Sửa bài đăng'
+                      : (_isFullTimeScreen
+                          ? 'Tạo bài đăng Full-time'
+                          : 'Tạo bài đăng Part-time'),
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,

@@ -1,5 +1,7 @@
 /// Model: MarketRateItem — Mặt bằng lương tham khảo theo danh mục + khu vực
 /// Được tính toán từ jobPosts (status: approved | active) trong Firestore.
+export '../constants/job_categories.dart';
+
 class MarketRateItem {
   final String category; // "phuc_vu", "pha_che", ...
   final String categoryLabel; // "Phục vụ", "Pha chế", ...
@@ -103,30 +105,3 @@ class MarketRateItem {
         demandLevel: row['demandLevel'] as String,
       );
 }
-
-// ── Category mapping constants ───────────────────────────────────────────────
-
-const Map<String, String> kCategoryLabels = {
-  'all': 'Tất cả',
-  'boc_vac': 'Bốc vác',
-  'lau_don': 'Lau dọn',
-  'bung_be': 'Bưng bê',
-  'phuc_vu': 'Phục vụ',
-  'pha_che': 'Pha chế',
-  'tiep_thi': 'Tiếp thị',
-  'van_chuyen': 'Vận chuyển',
-  'bao_ve': 'Bảo vệ',
-  'other': 'Khác',
-};
-
-const Map<String, String> kCategoryIcons = {
-  'boc_vac': '🏋️',
-  'lau_don': '🧹',
-  'bung_be': '🍽️',
-  'phuc_vu': '👔',
-  'pha_che': '☕',
-  'tiep_thi': '📢',
-  'van_chuyen': '🚚',
-  'bao_ve': '🛡️',
-  'other': '💼',
-};

@@ -21,6 +21,13 @@ class NotificationNavigation {
       await openAttendance(context, item);
       return;
     }
+    if (item.isEmployerInterest) {
+      final jobId = item.interestJobId;
+      if (jobId != null && jobId.isNotEmpty) {
+        Get.toNamed(AppRoutes.jobDetail, arguments: {'jobId': jobId});
+      }
+      return;
+    }
     if (item.isWorkAssignment) {
       await openWorkAssignment(item);
       return;

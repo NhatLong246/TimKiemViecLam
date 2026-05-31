@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../common/styles/app_colors.dart';
+import '../controller/employer_notification_controller.dart';
 import '../controller/login_controller.dart';
 import '../controller/messaging_controller.dart';
 import '../data/models/messaging_models.dart';
@@ -51,6 +52,8 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
   late final AnimationController _popCtrl;
   late final Animation<double> _popAnim;
 
+  String? _boundUserId;
+
   @override
   void initState() {
     super.initState();
@@ -61,8 +64,22 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     );
     _popAnim = CurvedAnimation(parent: _popCtrl, curve: Curves.easeOutBack);
     _popCtrl.forward();
+    _reloadPrefsForCurrentUser();
+  }
+
+  void _reloadPrefsForCurrentUser() {
     final uid = Get.find<AuthController>().currentUser?.id ?? '';
-    if (uid.isNotEmpty) unawaited(_loadDismissState(uid));
+    if (uid.isEmpty) {
+      setState(() {
+        _prefsLoaded = true;
+        _isHidden = false;
+        _hiddenSnapshotPending = false;
+      });
+      return;
+    }
+    if (uid == _boundUserId && _prefsLoaded) return;
+    _boundUserId = uid;
+    unawaited(_loadDismissState(uid));
   }
 
   Future<void> _loadDismissState(String uid) async {
@@ -74,9 +91,19 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     setState(() {
       _isHidden = state.hidden;
       _hiddenWhileUnread = state.hiddenWhileUnread;
-      _hiddenSnapshotPending = state.hidden;
+      // Không chặn hiện lại vì snapshot — sẽ chụp ngay frame đầu nếu cần.
+      _hiddenSnapshotPending = false;
       _prefsLoaded = true;
     });
+    if (state.hidden) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_isHidden) return;
+        if (!Get.isRegistered<MessagingController>()) return;
+        setState(
+          () => _captureHiddenSnapshot(Get.find<MessagingController>()),
+        );
+      });
+    }
   }
 
   void _captureHiddenSnapshot(MessagingController mc) {
@@ -214,167 +241,188 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
 
   @override
   Widget build(BuildContext context) {
-    final auth = Get.find<AuthController>();
-    if (auth.currentUser == null) return const SizedBox.shrink();
-    if (!_prefsLoaded) return const SizedBox.shrink();
+    return GetBuilder<AuthController>(
+      builder: (auth) {
+        if (auth.currentUser == null) return const SizedBox.shrink();
+        _reloadPrefsForCurrentUser();
+        if (!_prefsLoaded) return const SizedBox.shrink();
 
-    MessagingBootstrap.ensureController().ensureInboxListening();
+        MessagingBootstrap.ensureController().ensureInboxListening();
 
-    return Obx(() {
-      final messaging = Get.find<MessagingController>();
-      // ignore: unused_local_variable — kích Obx khi thông báo tin đổi
-      final _ = messaging.unreadNotifTick.value;
-      final total = messaging.bubbleUnreadCount;
-      final thread = messaging.primaryUnreadThread;
+        return Obx(() {
+          final messaging = Get.find<MessagingController>();
+          // ignore: unused_local_variable — kích Obx khi thông báo tin đổi
+          final _ = messaging.unreadNotifTick.value;
+          final inboxUnread = messaging.unreadTotal.value;
+          if (widget.isEmployer &&
+              Get.isRegistered<EmployerNotificationController>()) {
+            // ignore: unused_local_variable
+            final employerBadgeTick = Get.find<EmployerNotificationController>()
+                .unreadBadgeCount
+                .value;
+          }
+          final total = messaging.bubbleUnreadCount;
+          final thread = messaging.primaryUnreadThread;
 
-      if (_isHidden) {
-        if (_hiddenSnapshotPending) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || !_isHidden) return;
-            setState(
-              () => _captureHiddenSnapshot(Get.find<MessagingController>()),
-            );
-          });
-        } else if (_hasNewMessageSinceDismiss(messaging)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || !_isHidden) return;
-            final mc = Get.find<MessagingController>();
-            if (_hasNewMessageSinceDismiss(mc)) {
-              unawaited(_restoreFromNewMessage(mc.bubbleUnreadCount));
+          // Hết tin chưa đọc → luôn hiện lại icon (không giữ trạng thái ẩn cũ).
+          if (_isHidden && total == 0 && inboxUnread == 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_isHidden) return;
+              unawaited(_restoreFromNewMessage(0));
+            });
+          }
+
+          if (_isHidden) {
+            if (_hasNewMessageSinceDismiss(messaging)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || !_isHidden) return;
+                final mc = Get.find<MessagingController>();
+                if (_hasNewMessageSinceDismiss(mc)) {
+                  unawaited(_restoreFromNewMessage(mc.bubbleUnreadCount));
+                }
+              });
             }
-          });
-        }
-        return const SizedBox.shrink();
-      }
+            return const SizedBox.shrink();
+          }
 
-      final showAlert = total > 0;
-      if (showAlert) {
+          return _buildBubbleBody(context, total, thread);
+        });
+      },
+    );
+  }
+
+  Widget _buildBubbleBody(
+    BuildContext context,
+    int total,
+    ConversationThread? thread,
+  ) {
+    final showAlert = total > 0;
+    if (showAlert) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_popCtrl.isCompleted) {
+          _popCtrl.forward(from: 0.85);
+        }
+      });
+    }
+
+    final size = MediaQuery.sizeOf(context);
+
+    if (!_userMoved) {
+      if (!_initialized) {
+        _initPosition(size, showAlert: showAlert);
+        _initialized = true;
+      }
+      final targetY = FloatingOverlayLayout.messageTop(size);
+      if ((_y - targetY).abs() > 1) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_popCtrl.isCompleted) {
-            _popCtrl.forward(from: 0.85);
+          if (!mounted || _userMoved) return;
+          setState(() {
+            _y = targetY;
+            _lastShowAlert = showAlert;
+          });
+        });
+      }
+    } else if (showAlert != _lastShowAlert) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          if (_userMoved) {
+            _syncXForAlertChange(size, showAlert);
+          } else {
+            _lastShowAlert = showAlert;
           }
         });
-      }
+      });
+    }
 
-      final size = MediaQuery.sizeOf(context);
+    final title = thread == null
+        ? 'Tin nhắn mới'
+        : (thread.isGroupChat ? thread.jobTitle : thread.peerName);
+    final preview = thread?.lastMessageText ?? 'Bạn có tin nhắn mới';
+    final letter = showAlert && thread != null
+        ? thread.listAvatarLetter(groupTab: thread.isGroupChat)
+        : null;
+    final badge = showAlert ? (total > 99 ? '99+' : '$total') : null;
 
-      if (!_userMoved) {
-        if (!_initialized) {
-          _initPosition(size, showAlert: showAlert);
-          _initialized = true;
-        }
-        final targetY = FloatingOverlayLayout.messageTop(size);
-        if ((_y - targetY).abs() > 1) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || _userMoved) return;
-            setState(() {
-              _y = targetY;
-              _lastShowAlert = showAlert;
-            });
-          });
-        }
-      } else if (showAlert != _lastShowAlert) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          setState(() {
-            if (_userMoved) {
-              _syncXForAlertChange(size, showAlert);
-            } else {
-              _lastShowAlert = showAlert;
-            }
-          });
-        });
-      }
-
-      final title = thread == null
-          ? 'Tin nhắn mới'
-          : (thread.isGroupChat ? thread.jobTitle : thread.peerName);
-      final preview = thread?.lastMessageText ?? 'Bạn có tin nhắn mới';
-      final letter = showAlert && thread != null
-          ? thread.listAvatarLetter(groupTab: thread.isGroupChat)
-          : null;
-      final badge = showAlert ? (total > 99 ? '99+' : '$total') : null;
-
-      return Positioned.fill(
-        child: Stack(
-          children: [
-            if (_isDragging) _buildCloseTarget(size),
-            Positioned(
-              left: _userMoved ? _x : null,
-              right: _userMoved ? null : FloatingOverlayLayout.rightMargin,
-              top: _userMoved
-                  ? _y
-                  : FloatingOverlayLayout.messageTop(size),
-              child: GestureDetector(
-                onPanStart: (_) {
-                  setState(() {
-                    _isDragging = true;
-                    if (!_userMoved) {
-                      _userMoved = true;
-                      _x = FloatingOverlayLayout.messageLeft(
-                        size,
-                        hasPreview: showAlert,
-                      );
-                    }
-                  });
-                },
-                onPanUpdate: (details) {
-                  setState(() {
-                    final w = _bubbleWidth(showAlert);
-                    _x = (_x + details.delta.dx).clamp(0, size.width - w);
-                    _y = (_y + details.delta.dy).clamp(
-                      0,
-                      size.height - _dragFootprint,
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          if (_isDragging) _buildCloseTarget(size),
+          Positioned(
+            left: _userMoved ? _x : null,
+            right: _userMoved ? null : FloatingOverlayLayout.rightMargin,
+            top: _userMoved
+                ? _y
+                : FloatingOverlayLayout.messageTop(size),
+            child: GestureDetector(
+              onPanStart: (_) {
+                setState(() {
+                  _isDragging = true;
+                  if (!_userMoved) {
+                    _userMoved = true;
+                    _x = FloatingOverlayLayout.messageLeft(
+                      size,
+                      hasPreview: showAlert,
                     );
-                  });
-                },
-                onPanEnd: (_) {
-                  final shouldHide = _y > size.height - 140;
-                  setState(() {
-                    _isDragging = false;
-                    if (shouldHide) {
-                      _markDismissed(Get.find<MessagingController>());
-                    }
-                  });
-                },
-                onPanCancel: () => setState(() => _isDragging = false),
-                onTap: () async => _openChat(thread, total),
-                child: ScaleTransition(
-                  scale: _popAnim,
-                  child: Material(
-                    color: Colors.transparent,
-                    elevation: showAlert ? 8 : 4,
-                    shadowColor: Colors.black26,
-                    borderRadius: BorderRadius.circular(28),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      textDirection: TextDirection.rtl,
-                      children: [
-                        _buildAvatar(letter: letter, badge: badge),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOut,
-                          alignment: Alignment.centerRight,
-                          child: showAlert
-                              ? Row(
-                                  children: [
-                                    const SizedBox(width: 8),
-                                    _buildPreviewCard(title, preview),
-                                  ],
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
+                  }
+                });
+              },
+              onPanUpdate: (details) {
+                setState(() {
+                  final w = _bubbleWidth(showAlert);
+                  _x = (_x + details.delta.dx).clamp(0, size.width - w);
+                  _y = (_y + details.delta.dy).clamp(
+                    0,
+                    size.height - _dragFootprint,
+                  );
+                });
+              },
+              onPanEnd: (_) {
+                final shouldHide = _y > size.height - 140;
+                setState(() {
+                  _isDragging = false;
+                  if (shouldHide) {
+                    _markDismissed(Get.find<MessagingController>());
+                  }
+                });
+              },
+              onPanCancel: () => setState(() => _isDragging = false),
+              onTap: () async => _openChat(thread, total),
+              child: ScaleTransition(
+                scale: _popAnim,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: showAlert ? 8 : 4,
+                  shadowColor: Colors.black26,
+                  borderRadius: BorderRadius.circular(28),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      _buildAvatar(letter: letter, badge: badge),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        alignment: Alignment.centerRight,
+                        child: showAlert
+                            ? Row(
+                                children: [
+                                  const SizedBox(width: 8),
+                                  _buildPreviewCard(title, preview),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
-      );
-    });
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPreviewCard(String title, String preview) {

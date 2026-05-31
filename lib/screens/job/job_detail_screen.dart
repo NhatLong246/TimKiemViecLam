@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../data/constants/full_time_policy.dart';
 import '../../controller/job_detail_controller.dart';
 import '../../controller/login_controller.dart';
+import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/services/messaging_service.dart';
 import '../messaging/chat_room_screen.dart';
@@ -175,6 +177,39 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
                 Divider(color: Colors.grey.shade200, thickness: 8),
 
+                if (job.isFullTimeReferral) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade100),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 20, color: Colors.blue.shade700),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              kFullTimeCandidateNotice,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.45,
+                                color: Colors.blue.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // 3. Thông tin thời gian và số lượng
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -206,6 +241,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         'Số lượng tuyển:',
                         slotsStr,
                       ),
+                      if (job.jobType == 'full_time' &&
+                          job.fullTimeDetails != null) ...[
+                        const SizedBox(height: 8),
+                        ..._buildFullTimeDetailRows(job.fullTimeDetails!),
+                      ],
                     ],
                   ),
                 ),
@@ -393,7 +433,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   )
                                 : Text(
                                     _controller.canApply.value
-                                        ? 'Ứng tuyển ngay'
+                                        ? (job.isFullTimeReferral
+                                            ? 'Gửi thông tin ứng tuyển'
+                                            : 'Ứng tuyển ngay')
                                         : 'Không khả dụng',
                                     style: const TextStyle(
                                       fontSize: 16,
@@ -482,6 +524,70 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ),
       );
     }
+  }
+
+  List<Widget> _buildFullTimeDetailRows(FullTimeJobDetails ft) {
+    final weekdays = ft.workingDays
+        .map(FullTimeJobDetails.weekdayLabel)
+        .join(', ');
+    final rows = <Widget>[
+      _buildDetailRow(Icons.date_range, 'Ngày làm/tuần:', weekdays),
+      const SizedBox(height: 8),
+      _buildDetailRow(
+        Icons.schedule,
+        'Ca làm:',
+        FullTimeJobDetails.shiftLabel(ft.workShift),
+      ),
+      const SizedBox(height: 8),
+      _buildDetailRow(
+        Icons.payments_outlined,
+        'Trả lương:',
+        'Ngày ${ft.payDayOfMonth} hàng tháng (NTD tự thỏa thuận)',
+      ),
+      const SizedBox(height: 8),
+      _buildDetailRow(
+        Icons.school_outlined,
+        'Học vấn:',
+        FullTimeJobDetails.educationLabel(ft.minEducation),
+      ),
+      const SizedBox(height: 8),
+      _buildDetailRow(
+        Icons.timeline,
+        'Kinh nghiệm:',
+        FullTimeJobDetails.experienceLabel(ft.minExperience),
+      ),
+    ];
+    if (ft.probationDays != null && ft.probationDays! > 0) {
+      rows.addAll([
+        const SizedBox(height: 8),
+        _buildDetailRow(
+          Icons.hourglass_bottom,
+          'Thử việc:',
+          '${ft.probationDays} ngày',
+        ),
+      ]);
+    }
+    if (ft.benefits?.isNotEmpty == true) {
+      rows.addAll([
+        const SizedBox(height: 8),
+        _buildDetailRow(Icons.card_giftcard, 'Quyền lợi:', ft.benefits!),
+      ]);
+    }
+    rows.addAll([
+      const SizedBox(height: 8),
+      _buildDetailRow(
+        Icons.description_outlined,
+        'Nộp CV:',
+        ft.requiresCv ? 'Bắt buộc' : 'Không bắt buộc',
+      ),
+      const SizedBox(height: 8),
+      _buildDetailRow(
+        Icons.record_voice_over_outlined,
+        'Phỏng vấn:',
+        ft.interviewRequired ? 'Có' : 'Không',
+      ),
+    ]);
+    return rows;
   }
 
   Widget _buildDetailRow(IconData icon, String title, String value) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../data/constants/full_time_policy.dart';
 import '../../common/styles/app_colors.dart';
 import '../../controller/candidates_controller.dart';
 import '../../data/models/application_model.dart';
@@ -194,9 +195,44 @@ class _CandidatesTab extends StatelessWidget {
             isFullTime ? ctrl.loadFullTime : ctrl.loadPartTime,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-          itemCount: jobs.length,
-          itemBuilder: (_, i) =>
-              _JobCard(jwA: jobs[i], ctrl: ctrl),
+          itemCount: jobs.length + (isFullTime ? 1 : 0),
+          itemBuilder: (_, i) {
+            if (isFullTime && i == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1565C0).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF1565C0).withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline,
+                          size: 18, color: Color(0xFF1565C0)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          kFullTimeEmployerNotice,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.45,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            final jobIndex = isFullTime ? i - 1 : i;
+            return _JobCard(jwA: jobs[jobIndex], ctrl: ctrl);
+          },
         ),
       );
     });
@@ -554,7 +590,11 @@ class _ApplicantTile extends StatelessWidget {
                       elevation: 0,
                     ),
                     child: Text(
-                      job.isFull ? 'Đã đủ slot' : 'Duyệt',
+                      job.isFull
+                          ? 'Đã đủ slot'
+                          : (job.isFullTimeReferral
+                              ? 'Ghi nhận & liên hệ'
+                              : 'Duyệt'),
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -595,9 +635,13 @@ class _ApplicantTile extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (_) => _ConfirmDialog(
-        title: 'Duyệt ứng viên',
-        content: 'Bạn chắc chắn muốn duyệt ứng viên này?',
-        confirmLabel: 'Duyệt',
+        title: job.isFullTimeReferral
+            ? 'Ghi nhận ứng viên Full-time'
+            : 'Duyệt ứng viên',
+        content: job.isFullTimeReferral
+            ? 'Bạn ghi nhận ứng viên quan tâm. Vui lòng liên hệ trực tiếp để phỏng vấn — ViecNow không quản lý việc Full-time.'
+            : 'Bạn chắc chắn muốn duyệt ứng viên này?',
+        confirmLabel: job.isFullTimeReferral ? 'Ghi nhận' : 'Duyệt',
         confirmColor: AppColors.employerPrimary,
       ),
     );

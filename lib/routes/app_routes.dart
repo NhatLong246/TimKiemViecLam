@@ -7,6 +7,7 @@ import 'package:viecnow/screens/auth/forget_password_screen.dart';
 import 'package:viecnow/screens/employer/employer_main_navigation_screen.dart';
 import 'package:viecnow/screens/post/post_management_screen.dart';
 import 'package:viecnow/screens/post/create_post_screen.dart';
+import 'package:viecnow/screens/post/create_fulltime_post_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_messages_screen.dart';
 import 'package:viecnow/screens/menu_employer/attendance_tool_screen.dart';
 import 'package:viecnow/screens/menu_employer/schedule_tool_screen.dart';
@@ -97,6 +98,7 @@ class AppRoutes {
   static const String employerHome = '/employer-home';
   static const String postManagement = '/post-management';
   static const String createPost = '/create-post';
+  static const String createFulltimePost = '/create-fulltime-post';
   static const String employerMessages = '/employer-messages';
   static const String attendanceTool = '/attendance-tool';
   static const String scheduleTool = '/schedule-tool';
@@ -154,7 +156,8 @@ class AppRoutes {
     myBankAccountview: (context) => MyBankAccountScreen(),
     employerHome: (context) => const EmployerMainNavigationScreen(),
     postManagement: (context) => const PostManagementScreen(),
-    createPost: (context) => const CreatePostScreen(),
+    createPost: (context) => const CreatePostScreen(initialJobType: 'part_time'),
+    createFulltimePost: (context) => const CreateFulltimePostScreen(),
     employerMessages: (context) => const EmployerMessagesScreen(),
     attendanceTool: (context) => const AttendanceToolScreen(),
     scheduleTool: (context) => const ScheduleToolScreen(),

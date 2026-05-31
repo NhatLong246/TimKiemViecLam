@@ -124,20 +124,25 @@ class CandidatesService {
     await batch.commit();
 
     final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
-    final jobTitle = (jobSnap.data()?['title'] ?? 'Công việc').toString();
+    final jobData = jobSnap.data() ?? {};
+    final jobTitle = (jobData['title'] ?? 'Công việc').toString();
+    final jobType = (jobData['jobType'] ?? 'part_time').toString();
     final candidateId = (appData['candidateId'] ?? '').toString();
     final employerId = (appData['employerId'] ?? '').toString();
 
     if (candidateId.isNotEmpty && employerId.isNotEmpty) {
-      await _groupChat.ensureJobGroup(
-        jobId: jobId,
-        jobTitle: jobTitle,
-        employerId: employerId,
-        candidateId: candidateId,
-      );
+      if (jobType != 'full_time') {
+        await _groupChat.ensureJobGroup(
+          jobId: jobId,
+          jobTitle: jobTitle,
+          employerId: employerId,
+          candidateId: candidateId,
+        );
+      }
       await NotificationService.notifyApplicationAccepted(
         candidateId: candidateId,
         jobTitle: jobTitle,
+        isFullTimeReferral: jobType == 'full_time',
       );
     }
   }

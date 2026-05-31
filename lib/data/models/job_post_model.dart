@@ -1,5 +1,8 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../constants/job_categories.dart' as job_cats;
+import 'full_time_job_details.dart';
+
 class JobPostModel {
   final String jobId;
   final String employerId;
@@ -21,6 +24,7 @@ class JobPostModel {
   final double totalBudget;
   final String? groupChatId;
   final List<String> imageUrls;
+  final FullTimeJobDetails? fullTimeDetails;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -45,12 +49,17 @@ class JobPostModel {
     required this.totalBudget,
     this.groupChatId,
     this.imageUrls = const [],
+    this.fullTimeDetails,
     this.createdAt,
     this.updatedAt,
   });
 
   int get remainingSlots => (slots - filledSlots).clamp(0, slots);
   bool get isFull => remainingSlots == 0;
+
+  /// Part-time: ViecNow quản lý điểm danh, giải ngân… Full-time: chỉ giới thiệu tin.
+  bool get isPartTimeManaged => jobType == 'part_time';
+  bool get isFullTimeReferral => jobType == 'full_time';
 
   String get locationDisplay {
     final district = location['district'] as String? ?? '';
@@ -115,6 +124,10 @@ class JobPostModel {
               .where((s) => s.isNotEmpty)
               .toList() ??
           const [],
+      fullTimeDetails: map['fullTimeDetails'] != null
+          ? FullTimeJobDetails.fromMap(
+              map['fullTimeDetails'] as Map<String, dynamic>)
+          : null,
       createdAt: map['createdAt'] != null ? _toDateTime(map['createdAt']) : null,
       updatedAt: map['updatedAt'] != null ? _toDateTime(map['updatedAt']) : null,
     );
@@ -142,6 +155,7 @@ class JobPostModel {
       'totalBudget': totalBudget,
       if (groupChatId != null) 'groupChatId': groupChatId,
       if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
+      if (fullTimeDetails != null) 'fullTimeDetails': fullTimeDetails!.toMap(),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -168,6 +182,7 @@ class JobPostModel {
     double? totalBudget,
     String? groupChatId,
     List<String>? imageUrls,
+    FullTimeJobDetails? fullTimeDetails,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -192,6 +207,7 @@ class JobPostModel {
       totalBudget: totalBudget ?? this.totalBudget,
       groupChatId: groupChatId ?? this.groupChatId,
       imageUrls: imageUrls ?? this.imageUrls,
+      fullTimeDetails: fullTimeDetails ?? this.fullTimeDetails,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -212,18 +228,6 @@ class JobPostModel {
   }
 
   /// Nhãn hiển thị cho category
-  static String categoryLabel(String category) {
-    const map = {
-      'boc_vac': 'Bốc vác',
-      'lau_don': 'Lau dọn',
-      'bung_be': 'Bưng bê',
-      'phuc_vu': 'Phục vụ',
-      'pha_che': 'Pha chế',
-      'tiep_thi': 'Tiếp thị',
-      'van_chuyen': 'Vận chuyển',
-      'bao_ve': 'Bảo vệ',
-      'other': 'Khác',
-    };
-    return map[category] ?? category;
-  }
+  static String categoryLabel(String category) =>
+      job_cats.categoryLabel(category);
 }

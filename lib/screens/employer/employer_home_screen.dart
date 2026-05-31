@@ -686,10 +686,11 @@ class EmployerHomeScreen extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
                       children: [
                         _buildTag(job.salaryDisplay, const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
-                        const SizedBox(width: 6),
                         _buildTag(typeLabel, const Color(0xFFF3E5F5), const Color(0xFF7B1FA2)),
                       ],
                     ),
@@ -806,7 +807,12 @@ class EmployerHomeScreen extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(text, style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../common/styles/app_colors.dart';
 import '../../controller/candidate_dashboard_controller.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/candidate_dashboard_models.dart';
+import '../menu_candidate/candidate_benefits_screen.dart';
 
 class CandidateStatsScreen extends StatefulWidget {
   const CandidateStatsScreen({super.key});
@@ -16,7 +18,6 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
   final AuthController _authController = Get.find<AuthController>();
   final CandidateDashboardController _dashCtrl =
       Get.put(CandidateDashboardController());
-  final Color _primary = const Color(0xFF2E7D32);
 
   @override
   void initState() {
@@ -26,25 +27,39 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Báo cáo của tôi',
           style: TextStyle(
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: IconThemeData(color: Theme.of(context).colorScheme.onSurface),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Thu nhập & rút tiền',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CandidateBenefitsScreen()),
+            ),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+          ),
+        ],
       ),
       body: Obx(() {
         if (_dashCtrl.isLoading.value && _dashCtrl.summary.value == null) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(color: AppColors.candidatePrimary),
+          );
         }
 
         final summary = _dashCtrl.summary.value;
@@ -52,24 +67,38 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Text(
-                _dashCtrl.errorMessage.value.isNotEmpty
-                    ? _dashCtrl.errorMessage.value
-                    : 'Không tải được báo cáo',
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _dashCtrl.errorMessage.value.isNotEmpty
+                        ? _dashCtrl.errorMessage.value
+                        : 'Không tải được báo cáo',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _dashCtrl.loadBenefits,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.candidatePrimary,
+                    ),
+                    child: const Text('Thử lại'),
+                  ),
+                ],
               ),
             ),
           );
         }
 
         return RefreshIndicator(
+          color: AppColors.candidatePrimary,
           onRefresh: _dashCtrl.loadBenefits,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildPeriodNote(),
+                _buildPeriodNote(isDark),
                 _buildMainStats(summary),
                 _buildSubStats(summary),
                 _buildHistorySection(_dashCtrl.payments),
@@ -81,29 +110,23 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
     );
   }
 
-  Widget _buildPeriodNote() {
+  Widget _buildPeriodNote(bool isDark) {
     final now = DateTime.now();
-    final label = 'Tháng ${now.month}, ${now.year}';
+    final monthLabel = 'Tháng ${now.month}, ${now.year}';
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          const Text(
-            'Dữ liệu:',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: Colors.black54,
-            ),
-          ),
+          Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              'Thu nhập tháng này: $monthLabel · Giờ làm tính từ điểm danh thực tế',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.grey.shade400 : Colors.black54,
+              ),
             ),
           ),
         ],
@@ -125,7 +148,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: _primary.withOpacity(0.3),
+              color: AppColors.candidatePrimary.withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -142,7 +165,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                     ? user.firstName
                     : 'Bạn';
                 return Text(
-                  'Tổng thu nhập đã nhận của $displayName',
+                  'Thu nhập tháng này của $displayName',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -153,17 +176,31 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              summary.formatVnd(summary.totalPaidVnd),
+              summary.formatVnd(summary.monthPaidVnd),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (summary.totalPaidVnd != summary.monthPaidVnd) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Tổng đã giải ngân: ${summary.formatVnd(summary.totalPaidVnd)}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
             if (summary.pendingVnd > 0) ...[
               const SizedBox(height: 12),
               Text(
-                'Chờ thanh toán: ${summary.formatVnd(summary.pendingVnd)}',
+                'Chờ giải ngân: ${summary.formatVnd(summary.pendingVnd)}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
+            if (summary.walletBalanceVnd > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Số dư ví: ${summary.formatVnd(summary.walletBalanceVnd)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ],
@@ -184,7 +221,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
         children: [
           Expanded(
             child: _buildStatCard(
-              title: 'Ca đã đóng',
+              title: 'Ca đã GN',
               value: '${summary.jobCount}',
               icon: Icons.work_outline,
               color: Colors.blue,
@@ -226,7 +263,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -237,7 +274,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 20),
@@ -245,10 +282,10 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
@@ -271,13 +308,18 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Lịch sử công việc đã nhận',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Đã thanh toán khi NTD xác nhận giải ngân. Trạng thái khiếu nại hiển thị nếu có tranh chấp đang xử lý.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35),
           ),
           const SizedBox(height: 16),
           if (payments.isEmpty)
@@ -290,7 +332,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                 border: Border.all(color: Colors.grey.shade200),
               ),
               child: Text(
-                'Chưa có công việc được NTD chấp nhận. Dữ liệu hiển thị từ đơn ứng tuyển và tin tuyển dụng trên Firebase.',
+                'Chưa có công việc được NTD chấp nhận. Sau khi được duyệt và giải ngân, dữ liệu sẽ hiện tại đây.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600, height: 1.4),
               ),
@@ -306,8 +348,13 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                 final date = p.paidAt != null
                     ? DateFormat('dd/MM/yyyy').format(p.paidAt!)
                     : '—';
-                final earningsPrefix =
-                    p.status == 'paid' ? '+ ' : '';
+                final earningsPrefix = p.status == 'paid' ? '+ ' : '';
+                final amountColor = p.status == 'paid'
+                    ? const Color(0xFF2E7D32)
+                    : p.status == 'disputed'
+                        ? Colors.red.shade700
+                        : Colors.orange.shade800;
+
                 return Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -320,12 +367,12 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: _primary.withOpacity(0.1),
+                          color: AppColors.candidatePrimary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           Icons.work_outline,
-                          color: _primary,
+                          color: AppColors.candidatePrimary,
                           size: 24,
                         ),
                       ),
@@ -336,10 +383,10 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                           children: [
                             Text(
                               p.jobTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
-                                color: Colors.black87,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -363,9 +410,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: p.status == 'paid'
-                                  ? const Color(0xFF2E7D32)
-                                  : Colors.orange.shade800,
+                              color: amountColor,
                             ),
                           ),
                           const SizedBox(height: 4),

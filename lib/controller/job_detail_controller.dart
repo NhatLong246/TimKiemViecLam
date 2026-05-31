@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import '../data/constants/full_time_policy.dart';
 import '../data/models/user_model.dart';
 import '../data/models/job_post_model.dart';
 import '../data/services/application_service.dart';
@@ -102,10 +103,13 @@ class JobDetailController extends GetxController {
       );
       Get.snackbar(
         'Thành công',
-        'Đã gửi đơn ứng tuyển thành công!',
+        job.isFullTimeReferral
+            ? kFullTimeApplySuccess
+            : 'Đã gửi đơn ứng tuyển thành công!',
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green.shade100,
         colorText: Colors.green.shade800,
+        duration: Duration(seconds: job.isFullTimeReferral ? 5 : 3),
       );
     } catch (e) {
       Get.snackbar(

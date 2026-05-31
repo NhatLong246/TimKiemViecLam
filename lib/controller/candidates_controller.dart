@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../data/constants/full_time_policy.dart';
 import '../data/models/application_model.dart';
-import '../data/models/job_post_model.dart';
 import '../data/services/candidates_service.dart';
 class CandidatesController extends GetxController {
   final _service = CandidatesService();
@@ -85,11 +85,24 @@ class CandidatesController extends GetxController {
       await _service.acceptApplication(appId, jobId);
       _updateEntry(appId, 'accepted');
       _incrementFilledSlots(jobId);
-      await _refreshJobGroupChatId(jobId);
-      _showSuccess('Đã duyệt ứng viên');
+      final isFullTime = _jobTypeOf(jobId) == 'full_time';
+      if (!isFullTime) {
+        await _refreshJobGroupChatId(jobId);
+      }
+      _showSuccess(
+        isFullTime ? kFullTimeAcceptSuccess : 'Đã duyệt ứng viên',
+      );
     } catch (e) {
       _showError('Không thể duyệt: $e');
     }
+  }
+
+  String? _jobTypeOf(String jobId) {
+    for (final list in [fullTimeJobs, partTimeJobs]) {
+      final idx = list.indexWhere((j) => j.job.jobId == jobId);
+      if (idx >= 0) return list[idx].job.jobType;
+    }
+    return null;
   }
 
   Future<void> _refreshJobGroupChatId(String jobId) async {
