@@ -1,4 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:viecnow/data/models/schedule_model.dart';
+import 'package:viecnow/data/services/schedule_service.dart';
 
 class CandidateScheduleScreen extends StatefulWidget {
   const CandidateScheduleScreen({super.key});
@@ -10,65 +13,24 @@ class CandidateScheduleScreen extends StatefulWidget {
 
 class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
   final Color _primary = const Color(0xFF2E7D32);
+  final _scheduleService = ScheduleService();
+
   late DateTime _selectedDate;
   late List<DateTime> _weekDates;
-  late Map<String, List<Map<String, dynamic>>> _mockShifts;
   int _weekOffset = 0;
+
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
     super.initState();
     final today = DateTime.now();
     _selectedDate = DateTime(today.year, today.month, today.day);
-
     _generateWeekDates();
-
-    // Dữ liệu giả lập
-    _mockShifts = {
-      _formatDateKey(_selectedDate): [
-        {
-          'time': '08:00 - 12:00',
-          'title': 'Nhân viên phục vụ nhà hàng',
-          'employer': 'Nhà hàng Biển Đông',
-          'location': '123 Nguyễn Văn Linh, Quận 7, TP.HCM',
-          'status': 'Sắp tới',
-          'color': Colors.blue,
-        },
-        {
-          'time': '14:00 - 18:00',
-          'title': 'Giao hàng nhanh',
-          'employer': 'Shopee Express',
-          'location': 'Kho Quận 4, TP.HCM',
-          'status': 'Đang diễn ra',
-          'color': Colors.orange,
-        },
-      ],
-      _formatDateKey(_selectedDate.add(const Duration(days: 1))): [
-        {
-          'time': '09:00 - 17:00',
-          'title': 'Bốc vác kho hàng',
-          'employer': 'Kho Giao Hàng Tiết Kiệm',
-          'location': 'KCN Tân Bình, Bình Dương',
-          'status': 'Chờ xác nhận',
-          'color': Colors.amber,
-        },
-      ],
-      _formatDateKey(_selectedDate.subtract(const Duration(days: 1))): [
-        {
-          'time': '18:00 - 22:00',
-          'title': 'Pha chế quán Cafe',
-          'employer': 'The Coffee House',
-          'location': 'Quận 1, TP.HCM',
-          'status': 'Đã hoàn thành',
-          'color': Colors.grey,
-        },
-      ],
-    };
   }
 
   void _generateWeekDates() {
     final today = DateTime.now();
-    // Tìm ngày Thứ 2 của tuần hiện tại
     final monday = today
         .subtract(Duration(days: today.weekday - 1))
         .add(Duration(days: _weekOffset * 7));
@@ -83,55 +45,113 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
   }
 
   String _getWeekdayName(int weekday) {
-    switch (weekday) {
-      case 1:
-        return 'T2';
-      case 2:
-        return 'T3';
-      case 3:
-        return 'T4';
-      case 4:
-        return 'T5';
-      case 5:
-        return 'T6';
-      case 6:
-        return 'T7';
-      case 7:
-        return 'CN';
-      default:
-        return '';
-    }
+    return switch (weekday) {
+      1 => 'T2',
+      2 => 'T3',
+      3 => 'T4',
+      4 => 'T5',
+      5 => 'T6',
+      6 => 'T7',
+      7 => 'CN',
+      _ => '',
+    };
+  }
+
+  Color _colorForKind(ScheduleDisplayKind kind) {
+    return switch (kind) {
+      ScheduleDisplayKind.upcoming => Colors.blue,
+      ScheduleDisplayKind.ongoing => Colors.orange,
+      ScheduleDisplayKind.pending => Colors.amber,
+      ScheduleDisplayKind.completed => Colors.grey,
+      ScheduleDisplayKind.cancelled => Colors.red.shade300,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_uid.isEmpty) {
+      return Scaffold(
+        appBar: _appBar(),
+        body: const Center(child: Text('Vui lòng đăng nhập để xem lịch làm')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 0,
-        title: const Text(
-          'Lịch làm việc',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black87),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          _buildDateSelector(),
-          Expanded(child: _buildShiftsList()),
-        ],
+      appBar: _appBar(),
+      body: StreamBuilder<List<ScheduleModel>>(
+        stream: _scheduleService.watchByCandidate(_uid),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return Column(
+              children: [
+                _buildDateSelector(const {}),
+                const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ],
+            );
+          }
+          if (snap.hasError) {
+            return Column(
+              children: [
+                _buildDateSelector(const {}),
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Không tải được lịch: ${snap.error}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          final all = snap.data ?? [];
+          final weekStart = _weekDates.first;
+          final weekEnd = _weekDates.last;
+          final weekSchedules = ScheduleService.filterByDateRange(
+            all,
+            weekStart,
+            weekEnd,
+          );
+          final daysWithShifts = {for (final s in weekSchedules) s.date: true};
+          final dayShifts = ScheduleService.forDay(all, _selectedDate);
+
+          return Column(
+            children: [
+              _buildDateSelector(daysWithShifts),
+              Expanded(child: _buildShiftsList(dayShifts)),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDateSelector() {
-    // Lấy tên đầy đủ của thứ
+  PreferredSizeWidget _appBar() {
+    return AppBar(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      elevation: 0,
+      title: const Text(
+        'Lịch làm việc',
+        style: TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+        ),
+      ),
+      iconTheme: const IconThemeData(color: Colors.black87),
+      centerTitle: true,
+    );
+  }
+
+  Widget _buildDateSelector(Map<String, bool> daysWithShifts) {
     String fullWeekdayName = 'Chủ nhật';
     if (_selectedDate.weekday != 7) {
       fullWeekdayName = 'Thứ ${_selectedDate.weekday + 1}';
@@ -139,7 +159,6 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
 
     return Column(
       children: [
-        // Hiển thị ngày tháng năm đầy đủ khi bấm vào
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(
@@ -175,13 +194,13 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                     final isToday = date.isAtSameMomentAs(
                       DateTime(now.year, now.month, now.day),
                     );
+                    final hasShift =
+                        daysWithShifts[_formatDateKey(date)] == true;
 
                     return Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          setState(() {
-                            _selectedDate = date;
-                          });
+                          setState(() => _selectedDate = date);
                         },
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -192,7 +211,6 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                               color: isSelected
                                   ? _primary
                                   : Colors.grey.shade200,
-                              width: 1,
                             ),
                           ),
                           child: Column(
@@ -219,13 +237,17 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (isToday)
+                              if (isToday || hasShift)
                                 Container(
                                   margin: const EdgeInsets.only(top: 2),
                                   width: 4,
                                   height: 4,
                                   decoration: BoxDecoration(
-                                    color: isSelected ? Colors.white : _primary,
+                                    color: hasShift && !isSelected
+                                        ? _primary
+                                        : (isSelected
+                                              ? Colors.white
+                                              : _primary),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -253,9 +275,7 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
     );
   }
 
-  Widget _buildShiftsList() {
-    final shifts = _mockShifts[_formatDateKey(_selectedDate)] ?? [];
-
+  Widget _buildShiftsList(List<ScheduleModel> shifts) {
     if (shifts.isEmpty) {
       return Center(
         child: Column(
@@ -271,6 +291,15 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
               'Không có ca làm việc nào',
               style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
             ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Lịch ca được employer gửi trong hội thoại việc làm sau khi duyệt ứng tuyển.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+              ),
+            ),
           ],
         ),
       );
@@ -279,10 +308,12 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: shifts.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final shift = shifts[index];
-        final Color statusColor = shift['color'];
+        final s = shifts[index];
+        final kind = ScheduleService.displayKind(s);
+        final statusColor = _colorForKind(kind);
+        final statusLabel = kind.label;
 
         return Container(
           decoration: BoxDecoration(
@@ -290,7 +321,7 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -300,7 +331,6 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Thanh màu bên trái hiển thị trạng thái
                 Container(
                   width: 6,
                   decoration: BoxDecoration(
@@ -321,7 +351,7 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              shift['time'],
+                              s.timeRange,
                               style: TextStyle(
                                 color: _primary,
                                 fontWeight: FontWeight.bold,
@@ -334,11 +364,11 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
+                                color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                shift['status'],
+                                statusLabel,
                                 style: TextStyle(
                                   color: statusColor,
                                   fontSize: 10,
@@ -350,7 +380,7 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          shift['title'],
+                          s.jobTitle ?? 'Công việc',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -368,7 +398,7 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                shift['employer'],
+                                s.employerName ?? 'Nhà tuyển dụng',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey.shade600,
@@ -379,28 +409,31 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                shift['location'],
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        if (s.jobLocation != null &&
+                            s.jobLocation!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: Colors.grey.shade600,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  s.jobLocation!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

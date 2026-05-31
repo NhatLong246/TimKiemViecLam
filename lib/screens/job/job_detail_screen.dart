@@ -8,6 +8,7 @@ import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/services/messaging_service.dart';
 import '../messaging/chat_room_screen.dart';
+import 'job_directions_map_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -135,24 +136,54 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            color: Colors.grey.shade600,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              location,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade700,
-                              ),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: location.isEmpty
+                              ? null
+                              : () => _openDirectionsMap(context),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  color: location.isEmpty
+                                      ? Colors.grey.shade600
+                                      : primaryColor,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    location.isEmpty
+                                        ? 'Chưa có địa điểm'
+                                        : location,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: location.isEmpty
+                                          ? Colors.grey.shade700
+                                          : primaryColor,
+                                      decoration: location.isEmpty
+                                          ? null
+                                          : TextDecoration.underline,
+                                      decorationColor: primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                if (location.isNotEmpty) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.map_outlined,
+                                    size: 18,
+                                    color: primaryColor,
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -190,8 +221,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.info_outline,
-                              size: 20, color: Colors.blue.shade700),
+                          Icon(
+                            Icons.info_outline,
+                            size: 20,
+                            color: Colors.blue.shade700,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -409,7 +443,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         child: SizedBox(
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _controller.isApplying.value ||
+                            onPressed:
+                                _controller.isApplying.value ||
                                     !_controller.canApply.value
                                 ? null
                                 : () => _controller.applyJob(job),
@@ -434,8 +469,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                 : Text(
                                     _controller.canApply.value
                                         ? (job.isFullTimeReferral
-                                            ? 'Gửi thông tin ứng tuyển'
-                                            : 'Ứng tuyển ngay')
+                                              ? 'Gửi thông tin ứng tuyển'
+                                              : 'Ứng tuyển ngay')
                                         : 'Không khả dụng',
                                     style: const TextStyle(
                                       fontSize: 16,
@@ -459,8 +494,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               right: 16,
               child: IgnorePointer(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(10),
@@ -483,6 +520,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
+  void _openDirectionsMap(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => JobDirectionsMapScreen(job: job)),
+    );
+  }
+
   Future<void> _openMessages(BuildContext context) async {
     final auth = Get.find<AuthController>();
     if (auth.currentUser == null) {
@@ -493,7 +537,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
     if (auth.currentUser?.role != 'candidate') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chỉ tài khoản Ứng viên mới nhắn tin từ màn này')),
+        const SnackBar(
+          content: Text('Chỉ tài khoản Ứng viên mới nhắn tin từ màn này'),
+        ),
       );
       return;
     }
@@ -508,10 +554,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ChatRoomScreen(
-            groupId: groupId,
-            isEmployer: false,
-          ),
+          builder: (_) => ChatRoomScreen(groupId: groupId, isEmployer: false),
         ),
       );
     } catch (e) {

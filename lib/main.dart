@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'app/app.dart';
@@ -7,6 +8,15 @@ import 'package:get/get.dart';
 import 'controller/login_controller.dart';
 import 'data/services/push_notification_service.dart';
 import 'firebase_options.dart';
+import 'utils/momo_return_bridge.dart';
+
+void _listenMomoReturnLinks() {
+  final appLinks = AppLinks();
+  appLinks.uriLinkStream.listen(MomoReturnBridge.dispatch);
+  appLinks.getInitialLink().then((uri) {
+    if (uri != null) MomoReturnBridge.dispatch(uri);
+  });
+}
 
 Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,12 +32,13 @@ Future<void> _bootstrap() async {
   }
 
   await initializeDateFormatting('vi', null);
-
   await PushNotificationService.instance.initialize();
 
   if (!Get.isRegistered<AuthController>()) {
     Get.put(AuthController(), permanent: true);
   }
+
+  _listenMomoReturnLinks();
 }
 
 void main() async {

@@ -84,7 +84,7 @@ class _EducationScreenState extends State<EducationScreen> {
     }
     setState(() => _saving = true);
     try {
-      final ctrl = Get.find<UpdateAccountController>();
+      final ctrl = Get.put(UpdateAccountController());
       final model = EducationModel(
         id: widget.education?.id ??
             DateTime.now().millisecondsSinceEpoch.toString(),

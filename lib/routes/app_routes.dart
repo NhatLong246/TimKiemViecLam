@@ -51,6 +51,7 @@ import 'package:viecnow/screens/stats/candidate_stats_screen.dart';
 import 'package:viecnow/screens/profile/profile_screen.dart';
 import 'package:viecnow/screens/reference/market_rate_screen.dart';
 import 'package:viecnow/screens/schedule/candidate_schedule_screen.dart';
+import 'package:viecnow/screens/profile/cv_screen.dart';
 import 'package:viecnow/screens/job/job_detail_screen.dart';
 import 'package:viecnow/screens/profile/change_password_screen.dart';
 import 'package:viecnow/screens/profile/change_phonenumber_screen.dart';
@@ -83,6 +84,7 @@ class AppRoutes {
   static const String publisher = '/publisher';
   static const String updateAccount = '/update-account';
   static const String myProfile = '/my-profile';
+  static const String cv = '/cv';
   static const String changeName = '/change-name';
   static const String changeUsername = '/change-username';
   static const String changePassword = '/change-password';
@@ -144,6 +146,7 @@ class AppRoutes {
     forgetPassword: (context) => ForgetPasswordScreen(),
     updateAccount: (context) => const UpdateAccountScreen(),
     myProfile: (context) => const MyProfileScreen(),
+    cv: (context) => const CvScreen(),
     changeName: (context) => const ChangeNameScreen(),
     changeUsername: (context) => const ChangeUsernameScreen(),
     changePassword: (context) => const ChangePasswordScreen(),

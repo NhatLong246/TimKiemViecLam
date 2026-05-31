@@ -42,13 +42,13 @@
 |---|---|---|---|---|
 | C1 | Feed công việc (Home) | `screens/home/home_screen.dart` | ✅ | Việc mới nhất, refresh, quick tools |
 | C2 | Tìm kiếm việc làm | `screens/search/search_screen.dart`, `search_results_screen.dart` | ✅ | Keyword, lương, khoảng cách |
-| C3 | Xem chi tiết công việc | `screens/job/job_detail_screen.dart` | ✅ | `job_detail_controller.dart` |
+| C3 | Xem chi tiết công việc | `screens/job/job_detail_screen.dart` | ✅ | `job_detail_controller.dart`; tap địa điểm → `job_directions_map_screen.dart` |
 | C4 | Ứng tuyển (part-time) | `controller/job_detail_controller.dart` | ✅ | `applyForJob`; check duplicate qua service |
 | C5 | Nộp CV (full-time) | `screens/job/apply_fulltime_screen.dart` | ❌ | Chưa có màn riêng upload CV |
 | C6 | Danh sách đã ứng tuyển | — | ❌ | Có `application_service.dart`, chưa có màn list |
-| C7 | Lịch làm việc | `screens/schedule/candidate_schedule_screen.dart` | ✅ | Quick tool "Lịch làm" |
+| C7 | Lịch làm việc | `screens/schedule/candidate_schedule_screen.dart` | ✅ | Quick tool "Lịch làm"; Firestore `schedules`, tuần + ca theo ngày |
 | C8 | Thống kê thu nhập | `screens/stats/candidate_stats_screen.dart` | ✅ | Quick tool "Thống kê" |
-| C9 | CV / hồ sơ chi tiết | `screens/profile/my_profile_screen.dart` + form screens | 🔄 | Kinh nghiệm, học vấn, kỹ năng, chứng chỉ… |
+| C9 | CV / hồ sơ chi tiết | `screens/profile/my_profile_screen.dart`, `screens/profile/cv_screen.dart` + form screens | 🔄 | Kinh nghiệm, học vấn, kỹ năng, chứng chỉ, upload PDF |
 | C10 | Tham khảo giá thị trường | `screens/reference/market_rate_screen.dart` | ✅ | Quick tool "Tham khảo" |
 | C11 | Đánh giá Employer | `screens/menu_candidate/candidate_reviews_screen.dart` | 🔄 | UI có; logic đánh giá đầy đủ chưa rõ |
 | C12 | Xem đánh giá cá nhân | `screens/menu_candidate/candidate_reviews_screen.dart` | 🔄 | |

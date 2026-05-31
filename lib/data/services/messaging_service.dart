@@ -678,6 +678,8 @@ class MessagingService {
     required String startTime,
     required String endTime,
     required String jobTitle,
+    String? jobLocation,
+    String? employerName,
   }) async {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
@@ -703,6 +705,11 @@ class MessagingService {
       'startTime': startTime,
       'endTime': endTime,
       'status': 'scheduled',
+      'jobTitle': jobTitle,
+      if (jobLocation != null && jobLocation.isNotEmpty)
+        'jobLocation': jobLocation,
+      if (employerName != null && employerName.isNotEmpty)
+        'employerName': employerName,
       'createdAt': FieldValue.serverTimestamp(),
     });
 

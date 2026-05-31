@@ -75,7 +75,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      final ctrl = Get.find<UpdateAccountController>();
+      final ctrl = Get.put(UpdateAccountController());
       final id = widget.certificate?.id ??
           DateTime.now().millisecondsSinceEpoch.toString();
 
