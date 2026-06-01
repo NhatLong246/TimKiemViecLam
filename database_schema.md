@@ -36,6 +36,8 @@
 | `cccdImageUrl` | `String?` | ❌ | URL ảnh CCCD |
 | `isVerified` | `bool` | ✅ | Email đã xác thực chưa |
 | `isActive` | `bool` | ✅ | Tài khoản còn hoạt động không |
+| `currentSessionId` | `String?` | ❌ | Lưu ID phiên đăng nhập hiện tại để check trùng |
+| `lastLoginAttempt` | `int?` | ❌ | Timestamp milliseconds lần cuối có thiết bị cố đăng nhập |
 | `createdAt` | `Timestamp` | ✅ | `FieldValue.serverTimestamp()` |
 | `updatedAt` | `Timestamp` | ✅ | `FieldValue.serverTimestamp()` |
 

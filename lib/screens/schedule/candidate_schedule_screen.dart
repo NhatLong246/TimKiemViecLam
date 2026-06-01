@@ -295,7 +295,7 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
-                'Lịch ca được employer gửi trong hội thoại việc làm sau khi duyệt ứng tuyển.',
+                'Lịch làm việc tự động hiển thị dựa trên các công việc bạn đã ứng tuyển hoặc được phân công.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
               ),

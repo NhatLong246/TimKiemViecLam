@@ -137,4 +137,16 @@ class PreferencesHelper {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(onboardingCompletedKey) ?? false;
   }
+
+  static const String currentSessionIdKey = 'current_session_id';
+
+  static Future<void> saveCurrentSessionId(String sessionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(currentSessionIdKey, sessionId);
+  }
+
+  static Future<String?> getCurrentSessionId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(currentSessionIdKey);
+  }
 }

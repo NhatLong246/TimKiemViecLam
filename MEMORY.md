@@ -58,6 +58,8 @@
 | 2026-05-12 | E16 — Employer Tham khảo giá | Tạo `data/models/market_rate_model.dart`, `data/services/market_rate_service.dart`, `controller/employer_reference_controller.dart`, `screens/reference/employer_market_rate_screen.dart`. Route: `employerReference = /employer-reference`. Quick tool "Tham khảo" trên Home đã navigate đến màn này. |
 | 2026-05-13 | E9 — Employer Thống kê | Tạo `data/models/employer_stats_model.dart`, `data/services/employer_stats_service.dart`, `controller/employer_stats_controller.dart`, `screens/stats/employer_stats_screen.dart`. Package fl_chart thêm vào pubspec. Route: `employerStats = /employer-stats`. Thêm tab "Thống kê" vào EmployerMainNavigationScreen (index 2). Gồm: 6 stat cards, 3 biểu đồ (Bar+Line chi tiêu & tuyển dụng, Area nạp tiền, Bar bài đăng), filter Ngày/Tuần/Tháng/Năm, date range picker. |
 | 2026-05-20 | Rà soát `feature_map.md` | Đánh dấu ✅ toàn bộ tính năng đã làm (auth, candidate home/search/apply, employer post/candidates/stats, chat CH1–CH19, attendance, notifications, chatbot). |
+| 2026-06-01 | Cập nhật Multiple Logins & Lịch làm việc candidate | Triển khai check `currentSessionId` và `lastLoginAttempt` để báo thiết bị đang đăng nhập khi có máy khác chen vào; Tự động fetch `applications` để hiển thị job vào Candidate Schedule (cho cả trạng thái đang chờ và đã duyệt). |
+| 2026-06-01 | Cập nhật hình ảnh Job và Trạng thái ứng tuyển | Hiển thị hình ảnh thật của job (lấy từ `imageUrls.first`) tại `HomeScreen` và `JobDetailScreen`. Thêm logic kiểm tra trạng thái ứng tuyển (hasApplied) trong `JobDetailController`. Nếu đã ứng tuyển, nút Ứng tuyển chuyển sang màu xám, hiển thị "Đã ứng tuyển" và không bấm được nữa. |
 
 ---
 

@@ -10,6 +10,7 @@ class UserModel {
 	final String phone;
 	final bool isVerified;
 	final bool isActive;
+	final String? currentSessionId;
 	final String? avatarUrl;
 	final String? avatarBase64; // ảnh đại diện dạng Base64 (thay thế Firebase Storage)
 	final String? gender;
@@ -45,6 +46,7 @@ class UserModel {
 		required this.phone,
 		this.isVerified = false,
 		this.isActive = true,
+		this.currentSessionId,
 		this.avatarUrl,
 		this.avatarBase64,
 		this.gender,
@@ -81,6 +83,7 @@ class UserModel {
 		String? phone,
 		bool? isVerified,
 		bool? isActive,
+		String? currentSessionId,
 		String? avatarUrl,
 		String? avatarBase64,
 		String? gender,
@@ -114,6 +117,7 @@ class UserModel {
 			phone: phone ?? this.phone,
 			isVerified: isVerified ?? this.isVerified,
 			isActive: isActive ?? this.isActive,
+			currentSessionId: currentSessionId ?? this.currentSessionId,
 			avatarUrl: avatarUrl ?? this.avatarUrl,
 			avatarBase64: avatarBase64 ?? this.avatarBase64,
 			gender: gender ?? this.gender,
@@ -150,6 +154,7 @@ class UserModel {
 			'phone': phone,
 			'isVerified': isVerified,
 			'isActive': isActive,
+			if (currentSessionId != null) 'currentSessionId': currentSessionId,
 			'avatarUrl': avatarUrl,
 		if (avatarBase64 != null) 'avatarBase64': avatarBase64,
 			'gender': gender,
@@ -184,6 +189,7 @@ class UserModel {
 			phone: (map['phone'] ?? '').toString(),
 			isVerified: (map['isVerified'] as bool?) ?? false,
 			isActive: (map['isActive'] as bool?) ?? true,
+			currentSessionId: map['currentSessionId']?.toString(),
 			avatarUrl: map['avatarUrl']?.toString(),
 		avatarBase64: map['avatarBase64']?.toString(),
 			gender: map['gender']?.toString(),

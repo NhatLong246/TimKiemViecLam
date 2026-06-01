@@ -18,6 +18,7 @@ class JobDetailController extends GetxController {
   final RxBool isLoadingEmployer = true.obs;
   final RxBool isApplying = false.obs;
   final RxBool canApply = true.obs;
+  final RxBool hasApplied = false.obs;
   final RxString currentRole = ''.obs;
 
   @override
@@ -69,6 +70,25 @@ class JobDetailController extends GetxController {
     }
   }
 
+  Future<void> checkApplicationStatus(String jobId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    
+    try {
+      final snap = await _db
+          .collection('applications')
+          .where('jobId', isEqualTo: jobId)
+          .where('candidateId', isEqualTo: uid)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        hasApplied.value = true;
+      }
+    } catch (e) {
+      print('Lỗi khi check status: $e');
+    }
+  }
+
   Future<void> applyJob(JobPostModel job) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -101,6 +121,7 @@ class JobDetailController extends GetxController {
         employerId: job.employerId,
         candidateId: user.uid,
       );
+      hasApplied.value = true;
       Get.snackbar(
         'Thành công',
         job.isFullTimeReferral

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +30,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (args is JobPostModel) {
       job = args;
       _controller.fetchEmployerInfo(job.employerId);
+      _controller.checkApplicationStatus(job.jobId);
     }
   }
 
@@ -97,10 +99,48 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 250,
-                  child: Image.asset(
-                    'assets/images/banners/default_image.png',
-                    fit: BoxFit.cover,
-                  ),
+                  child: Builder(builder: (context) {
+                    if (job.imageUrls.isEmpty) {
+                      return Image.asset(
+                        'assets/images/banners/default_image.png',
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    final img = job.imageUrls.first;
+                    if (img.startsWith('http')) {
+                      return Image.network(
+                        img,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Image.asset(
+                          'assets/images/banners/default_image.png',
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    } else {
+                      try {
+                        String b64 = img;
+                        if (b64.contains(',')) {
+                          b64 = b64.split(',').last;
+                        }
+                        final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+                        final padded = sanitized.padRight(sanitized.length + (4 - sanitized.length % 4) % 4, '=');
+                        return Image.memory(
+                          base64Decode(padded),
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Image.asset(
+                            'assets/images/banners/default_image.png',
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      } catch (e) {
+                        print('Lỗi base64 JobDetail: $e');
+                        return Image.asset(
+                          'assets/images/banners/default_image.png',
+                          fit: BoxFit.cover,
+                        );
+                      }
+                    }
+                  }),
                 ),
                 // 2. Header thông tin cơ bản
                 Padding(
@@ -445,11 +485,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           child: ElevatedButton(
                             onPressed:
                                 _controller.isApplying.value ||
-                                    !_controller.canApply.value
+                                    !_controller.canApply.value ||
+                                    _controller.hasApplied.value
                                 ? null
                                 : () => _controller.applyJob(job),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _controller.canApply.value
+                              backgroundColor: (_controller.canApply.value && !_controller.hasApplied.value)
                                   ? primaryColor
                                   : Colors.grey.shade500,
                               shape: RoundedRectangleBorder(
@@ -467,11 +508,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     ),
                                   )
                                 : Text(
-                                    _controller.canApply.value
-                                        ? (job.isFullTimeReferral
-                                              ? 'Gửi thông tin ứng tuyển'
-                                              : 'Ứng tuyển ngay')
-                                        : 'Không khả dụng',
+                                    _controller.hasApplied.value
+                                        ? 'Đã ứng tuyển'
+                                        : (_controller.canApply.value
+                                            ? (job.isFullTimeReferral
+                                                  ? 'Gửi thông tin ứng tuyển'
+                                                  : 'Ứng tuyển ngay')
+                                            : 'Không khả dụng'),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,

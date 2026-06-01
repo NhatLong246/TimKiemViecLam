@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../notification/notification_screen.dart';
 import '../../widgets/weather_widget.dart';
@@ -442,12 +443,61 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
-                  child: Image.asset(
-                    'assets/images/banners/default_image.png',
-                    height: 100,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
+                  child: Builder(builder: (context) {
+                    if (job.imageUrls.isEmpty) {
+                      return Image.asset(
+                        'assets/images/banners/default_image.png',
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    final img = job.imageUrls.first;
+                    if (img.startsWith('http')) {
+                      return Image.network(
+                        img,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Image.asset(
+                          'assets/images/banners/default_image.png',
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    } else {
+                      try {
+                        String b64 = img;
+                        if (b64.contains(',')) {
+                          b64 = b64.split(',').last;
+                        }
+                        final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+                        // Thêm padding nếu thiếu
+                        final padded = sanitized.padRight(sanitized.length + (4 - sanitized.length % 4) % 4, '=');
+                        return Image.memory(
+                          base64Decode(padded),
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Image.asset(
+                            'assets/images/banners/default_image.png',
+                            height: 100,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      } catch (e) {
+                        print('Lỗi base64 HomeScreen: $e');
+                        return Image.asset(
+                          'assets/images/banners/default_image.png',
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        );
+                      }
+                    }
+                  }),
                 ),
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
@@ -549,27 +599,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     SizedBox(
                       width: double.infinity,
                       height: 32,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Get.toNamed(AppRoutes.jobDetail, arguments: job);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      child: Obx(() {
+                        final hasApplied = _homeController.appliedJobIds.contains(job.jobId);
+                        return ElevatedButton(
+                          onPressed: hasApplied ? null : () {
+                            Get.toNamed(AppRoutes.jobDetail, arguments: job);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: hasApplied ? Colors.grey.shade400 : _primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: EdgeInsets.zero,
                           ),
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: const Text(
-                          'Ứng tuyển',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          child: Text(
+                            hasApplied ? 'Đã ứng tuyển' : 'Ứng tuyển',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      }),
                     ),
                   ],
                 ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:viecnow/data/models/job_post_model.dart';
 import 'package:viecnow/data/models/schedule_model.dart';
@@ -13,10 +14,57 @@ class ScheduleService {
     if (candidateId.isEmpty) {
       return Stream.value(const []);
     }
-    return _col
+
+    final controller = StreamController<List<ScheduleModel>>.broadcast();
+    List<ScheduleModel> explicitSchedules = [];
+    List<ScheduleModel> appliedSchedules = [];
+
+    void emit() {
+      final map = <String, ScheduleModel>{};
+      for (final s in appliedSchedules) {
+        map['${s.jobId}_${s.date}'] = s;
+      }
+      for (final s in explicitSchedules) {
+        map['${s.jobId}_${s.date}'] = s;
+      }
+      
+      final list = map.values.toList();
+      list.sort((a, b) {
+        final d = a.date.compareTo(b.date);
+        if (d != 0) return d;
+        return a.startTime.compareTo(b.startTime);
+      });
+      if (!controller.isClosed) {
+        controller.add(list);
+      }
+    }
+
+    final sub1 = _col
         .where('candidateId', isEqualTo: candidateId)
         .snapshots()
-        .asyncMap((snap) => _enrichSchedules(snap.docs));
+        .asyncMap((snap) => _enrichSchedules(snap.docs))
+        .listen((data) {
+      explicitSchedules = data;
+      emit();
+    });
+
+    final sub2 = _db
+        .collection('applications')
+        .where('candidateId', isEqualTo: candidateId)
+        .where('status', whereIn: ['pending', 'accepted'])
+        .snapshots()
+        .asyncMap((snap) => _enrichApplicationsToSchedules(candidateId, snap.docs))
+        .listen((data) {
+      appliedSchedules = data;
+      emit();
+    });
+
+    controller.onCancel = () {
+      sub1.cancel();
+      sub2.cancel();
+    };
+
+    return controller.stream;
   }
 
   Future<List<ScheduleModel>> fetchByCandidate(String candidateId) async {
@@ -67,6 +115,83 @@ class ScheduleService {
       if (d != 0) return d;
       return a.startTime.compareTo(b.startTime);
     });
+    return list;
+  }
+
+  Future<List<ScheduleModel>> _enrichApplicationsToSchedules(
+    String candidateId,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    if (docs.isEmpty) return [];
+
+    final jobIds = docs.map((d) => d.data()['jobId'] as String? ?? '').where((id) => id.isNotEmpty).toSet();
+    final jobs = await _loadJobs(jobIds);
+
+    final employerIds = jobs.values.map((j) => j.employerId).toSet();
+    final employers = await _loadEmployerNames(employerIds);
+
+    final list = <ScheduleModel>[];
+
+    for (final doc in docs) {
+      final appId = doc.id;
+      final data = doc.data();
+      final jobId = data['jobId'] as String? ?? '';
+      final appStatus = data['status'] as String? ?? 'pending';
+      
+      final job = jobs[jobId];
+      if (job == null) continue;
+
+      final empName = employers[job.employerId] ?? 'Nhà tuyển dụng';
+      
+      final startDate = job.startDate;
+      final endDate = job.endDate ?? startDate;
+      
+      final limitDays = 60;
+      var current = DateTime(startDate.year, startDate.month, startDate.day);
+      final end = DateTime(endDate.year, endDate.month, endDate.day);
+      
+      int count = 0;
+      while ((current.isBefore(end) || current.isAtSameMomentAs(end)) && count < limitDays) {
+        final dateKey = _dateKey(current);
+        
+        final startTime = job.startTime ?? '08:00';
+        final workHours = job.workHoursPerDay ?? 8.0;
+        final h = (workHours).floor();
+        final m = ((workHours - h) * 60).round();
+        
+        String endTime = '17:00';
+        final p = startTime.split(':');
+        if (p.length == 2) {
+          final sh = int.tryParse(p[0]) ?? 8;
+          final sm = int.tryParse(p[1]) ?? 0;
+          final totalM = sh * 60 + sm + h * 60 + m;
+          final eh = (totalM ~/ 60) % 24;
+          final em = totalM % 60;
+          endTime = '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
+        }
+
+        list.add(ScheduleModel(
+          scheduleId: 'app_${appId}_$dateKey',
+          jobId: jobId,
+          candidateId: candidateId,
+          employerId: job.employerId,
+          date: dateKey,
+          startTime: startTime,
+          endTime: endTime,
+          status: appStatus == 'pending' ? 'pending' : 'scheduled',
+          jobTitle: job.title,
+          jobLocation: job.locationDisplay,
+          employerName: empName,
+          createdAt: data['createdAt'] != null 
+              ? (data['createdAt'] as Timestamp).toDate() 
+              : DateTime.now(),
+        ));
+        
+        current = current.add(const Duration(days: 1));
+        count++;
+      }
+    }
+
     return list;
   }
 
@@ -125,6 +250,7 @@ class ScheduleService {
 
   /// Tính trạng thái hiển thị từ `status` + ngày/giờ hiện tại.
   static ScheduleDisplayKind displayKind(ScheduleModel s) {
+    if (s.status == 'pending') return ScheduleDisplayKind.pending;
     if (s.status == 'cancelled') return ScheduleDisplayKind.cancelled;
     if (s.status == 'completed') return ScheduleDisplayKind.completed;
 
