@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'file_upload_service.dart';
 import '../models/user_model.dart';
 import 'sqlite_cache_service.dart';
 
@@ -65,11 +66,9 @@ class EmployerProfileService {
     await updateFields(data);
   }
 
-  /// Upload ảnh lên Firebase Storage, trả về download URL
+  /// Upload ảnh lên server phụ, trả về download URL
   Future<String> uploadImage(File file, String storagePath) async {
-    final ref = FirebaseStorage.instance.ref().child(storagePath);
-    await ref.putFile(file);
-    return await ref.getDownloadURL();
+    return await FileUploadService.uploadAnonymous(file);
   }
 
   /// Cập nhật thông tin doanh nghiệp

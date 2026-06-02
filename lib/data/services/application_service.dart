@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/application_model.dart';
+import '../models/job_post_model.dart';
 import 'notification_service.dart';
+import 'schedule_service.dart';
 
 class ApplicationService {
   final _db = FirebaseFirestore.instance;
@@ -26,6 +28,18 @@ class ApplicationService {
     }
     await _assertCandidateRole(candidateId);
 
+    // Lấy thông tin công việc và kiểm tra trùng lịch
+    final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
+    if (!jobDoc.exists) {
+      throw Exception('Công việc không tồn tại.');
+    }
+    final jobData = jobDoc.data() ?? {};
+    jobData['jobId'] = jobDoc.id;
+    final jobModel = JobPostModel.fromMap(jobData);
+
+    final scheduleService = ScheduleService();
+    await scheduleService.checkOverlap(candidateId, jobModel);
+
     // Check duplicate: candidateId + jobId
     final duplicateCheck = await _db
         .collection('applications')
@@ -50,13 +64,9 @@ class ApplicationService {
 
     await docRef.set(app.toMap());
 
-    var jobTitle = 'Công việc';
+    var jobTitle = jobModel.title;
     var candidateName = 'Ứng viên';
     try {
-      final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
-      if (jobDoc.exists) {
-        jobTitle = (jobDoc.data()?['title'] ?? jobTitle).toString();
-      }
       final userDoc = await _db.collection('users').doc(candidateId).get();
       if (userDoc.exists) {
         final d = userDoc.data() ?? {};

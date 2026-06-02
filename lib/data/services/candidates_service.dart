@@ -49,7 +49,11 @@ class CandidatesService {
           .collection('applications')
           .where('jobId', whereIn: batch)
           .get();
-      allApps.addAll(snap.docs.map((d) => ApplicationModel.fromMap(d.data())));
+      allApps.addAll(snap.docs.map((d) {
+        final data = d.data();
+        data['appId'] = d.id;
+        return ApplicationModel.fromMap(data);
+      }));
     }
 
     if (allApps.isEmpty) {

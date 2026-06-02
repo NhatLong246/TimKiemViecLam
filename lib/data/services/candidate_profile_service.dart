@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'file_upload_service.dart';
 import '../models/candidate_profile_models.dart';
 
 class CandidateProfileService {
@@ -107,11 +108,7 @@ class CandidateProfileService {
   }
 
   Future<String> uploadCertificateImage(File file, String certificateId) async {
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('users/$_uid/certificates/$certificateId.jpg');
-    await ref.putFile(file);
-    return ref.getDownloadURL();
+    return await FileUploadService.uploadAnonymous(file);
   }
 
   Future<void> addCertificate(CertificateModel item) async {

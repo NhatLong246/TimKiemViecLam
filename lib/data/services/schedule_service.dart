@@ -74,6 +74,29 @@ class ScheduleService {
     return _enrichSchedules(snap.docs);
   }
 
+  Future<List<ScheduleModel>> fetchAllSchedules(String candidateId) async {
+    if (candidateId.isEmpty) return [];
+    
+    final explicitDocs = await _col.where('candidateId', isEqualTo: candidateId).get();
+    final explicitList = await _enrichSchedules(explicitDocs.docs);
+    
+    final appDocs = await _db
+        .collection('applications')
+        .where('candidateId', isEqualTo: candidateId)
+        .where('status', whereIn: ['pending', 'accepted'])
+        .get();
+    final appList = await _enrichApplicationsToSchedules(candidateId, appDocs.docs);
+    
+    final map = <String, ScheduleModel>{};
+    for (final s in appList) {
+      map['${s.jobId}_${s.date}'] = s;
+    }
+    for (final s in explicitList) {
+      map['${s.jobId}_${s.date}'] = s;
+    }
+    return map.values.toList();
+  }
+
   Future<List<ScheduleModel>> _enrichSchedules(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) async {
@@ -283,5 +306,60 @@ class ScheduleService {
     final m = int.tryParse(p[1]);
     if (h == null || m == null) return null;
     return h * 60 + m;
+  }
+
+  /// Kiểm tra lịch làm việc của candidate có bị trùng với job này không.
+  /// Throws Exception nếu bị trùng.
+  Future<void> checkOverlap(String candidateId, JobPostModel newJob) async {
+    final existingSchedules = await fetchAllSchedules(candidateId);
+    
+    // Tạo danh sách ngày dự kiến cho newJob
+    final startDate = newJob.startDate;
+    final endDate = newJob.endDate ?? startDate;
+    
+    final startTime = newJob.startTime ?? '08:00';
+    final workHours = newJob.workHoursPerDay ?? 8.0;
+    final h = workHours.floor();
+    final m = ((workHours - h) * 60).round();
+    
+    String endTime = '17:00';
+    final p = startTime.split(':');
+    if (p.length == 2) {
+      final sh = int.tryParse(p[0]) ?? 8;
+      final sm = int.tryParse(p[1]) ?? 0;
+      final totalM = sh * 60 + sm + h * 60 + m;
+      final eh = (totalM ~/ 60) % 24;
+      final em = totalM % 60;
+      endTime = '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
+    }
+
+    final newStartMin = _parseMinutes(startTime) ?? 0;
+    final newEndMin = _parseMinutes(endTime) ?? 0;
+
+    var current = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    
+    int limitDays = 60;
+    int count = 0;
+    
+    while ((current.isBefore(end) || current.isAtSameMomentAs(end)) && count < limitDays) {
+      final dateKey = _dateKey(current);
+      
+      // Check in existing schedules
+      for (final s in existingSchedules) {
+        if (s.jobId == newJob.jobId) continue; // Bỏ qua trùng với chính job này
+        if (s.date == dateKey && s.status != 'cancelled' && s.status != 'completed') {
+          final sStartMin = _parseMinutes(s.startTime) ?? 0;
+          final sEndMin = _parseMinutes(s.endTime) ?? 0;
+          
+          // Trùng khi (NewStart < OldEnd) && (NewEnd > OldStart)
+          if (newStartMin < sEndMin && newEndMin > sStartMin) {
+            throw Exception('Lịch trùng vào ngày ${s.date} (Ca: ${s.startTime}-${s.endTime}). Vui lòng kiểm tra lại!');
+          }
+        }
+      }
+      current = current.add(const Duration(days: 1));
+      count++;
+    }
   }
 }

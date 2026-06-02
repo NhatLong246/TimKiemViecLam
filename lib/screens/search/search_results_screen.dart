@@ -179,178 +179,228 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   void _showFilterBottomSheet() {
-    final minCtrl = TextEditingController(
-      text: _controller.minSalary.value?.toStringAsFixed(0) ?? '',
-    );
-    final maxCtrl = TextEditingController(
-      text: _controller.maxSalary.value?.toStringAsFixed(0) ?? '',
-    );
+    final List<String> provinces = [
+      'Tất cả', 'Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
+      'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh',
+      'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau',
+      'Cao Bằng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai', 'Đồng Tháp',
+      'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Tĩnh', 'Hải Dương', 'Hậu Giang',
+      'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
+      'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 'Nghệ An',
+      'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 'Quảng Nam',
+      'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sóc Trăng', 'Sơn La', 'Tây Ninh',
+      'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang',
+      'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
+    ];
+
+    double? tempMinSalary = _controller.minSalary.value;
+    double? tempMaxSalary = _controller.maxSalary.value;
     String selectedLoc = _controller.selectedLocation.value;
     String selectedJobType = _controller.selectedJobType.value;
 
+    // Convert old values from previous state
+    if (selectedJobType == 'part_time') selectedJobType = 'Part-time';
+    if (selectedJobType == 'full_time') selectedJobType = 'Full-time';
+
+    final minCtrl = TextEditingController(text: tempMinSalary?.toInt().toString() ?? '');
+    final maxCtrl = TextEditingController(text: tempMaxSalary?.toInt().toString() ?? '');
+
     Get.bottomSheet(
+      isScrollControlled: true,
       StatefulBuilder(
         builder: (context, setState) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          Widget buildChoiceChip(String label, String currentVal, Function(String) onSelect) {
+            final isSelected = currentVal == label;
+            return ChoiceChip(
+              label: Text(
+                isSelected && label == 'Tất cả' ? '✓ Tất cả' : label,
+                style: TextStyle(
+                  color: isSelected ? Colors.black87 : Colors.black54,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              selected: isSelected,
+              selectedColor: const Color(0xFFC8E6C9),
+              backgroundColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF81C784) : Colors.grey.shade300,
+                ),
+              ),
+              onSelected: (_) => onSelect(label),
+            );
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Bộ lọc tìm kiếm',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Get.back(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Khoảng mức lương (VNĐ)',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: minCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'TỐI THIỂU',
-                            filled: true,
-                            fillColor: Colors.grey.shade100,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Text('-'),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: maxCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'TỐI ĐA',
-                            filled: true,
-                            fillColor: Colors.grey.shade100,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Khu vực',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children:
-                        [
-                          'Tất cả',
-                          'Hà Nội',
-                          'TP.HCM',
-                          'Đà Nẵng',
-                          'Bình Dương',
-                        ].map((loc) {
-                          return ChoiceChip(
-                            label: Text(loc),
-                            selected: selectedLoc == loc,
-                            selectedColor: _primary.withOpacity(0.2),
-                            onSelected: (val) {
-                              setState(() => selectedLoc = loc);
-                            },
-                          );
-                        }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Loại công việc',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children:
-                        [
-                          {'label': 'Tất cả', 'value': 'Tất cả'},
-                          {'label': 'Part-time', 'value': 'part_time'},
-                          {'label': 'Full-time', 'value': 'full_time'},
-                        ].map((type) {
-                          return ChoiceChip(
-                            label: Text(type['label']!),
-                            selected: selectedJobType == type['value'],
-                            selectedColor: _primary.withOpacity(0.2),
-                            onSelected: (val) {
-                              setState(() => selectedJobType = type['value']!);
-                            },
-                          );
-                        }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
-                        final min = double.tryParse(minCtrl.text);
-                        final max = double.tryParse(maxCtrl.text);
-                        _controller.applyAdvancedFilters(
-                          min,
-                          max,
-                          selectedLoc,
-                          selectedJobType,
-                        );
-                        Get.back();
-                      },
-                      child: const Text(
-                        'Áp dụng',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Bộ lọc tìm kiếm',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        GestureDetector(
+                          onTap: () => Get.back(),
+                          child: const Icon(Icons.expand_more, size: 28),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Khoảng mức lương (VNĐ)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: minCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: 'TỐI THIỂU',
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                            ),
+                            onChanged: (val) => tempMinSalary = double.tryParse(val),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text('-', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: maxCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: 'TỐI ĐA',
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                            ),
+                            onChanged: (val) => tempMaxSalary = double.tryParse(val),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text('Khu vực', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: provinces.contains(selectedLoc) ? selectedLoc : 'Tất cả',
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isExpanded: true,
+                      items: provinces.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value, style: const TextStyle(fontSize: 14)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedLoc = val);
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text('Loại công việc', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        buildChoiceChip('Tất cả', selectedJobType, (val) => setState(() => selectedJobType = val)),
+                        buildChoiceChip('Part-time', selectedJobType, (val) => setState(() => selectedJobType = val)),
+                        buildChoiceChip('Full-time', selectedJobType, (val) => setState(() => selectedJobType = val)),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          _controller.applyAdvancedFilters(
+                            tempMinSalary,
+                            tempMaxSalary,
+                            selectedLoc,
+                            selectedJobType,
+                          );
+                          Get.back();
+                        },
+                        child: const Text(
+                          'Áp dụng',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );

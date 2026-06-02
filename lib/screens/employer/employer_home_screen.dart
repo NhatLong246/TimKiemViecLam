@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controller/employer_home_controller.dart';
@@ -152,7 +153,7 @@ class EmployerHomeScreen extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Avatar with initial
+                    // Avatar with initial or real image
                     Container(
                       width: 46,
                       height: 46,
@@ -161,15 +162,23 @@ class EmployerHomeScreen extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white.withOpacity(0.55), width: 2),
                       ),
-                      child: Center(
-                        child: Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                      child: ClipOval(
+                        child: user?.companyLogoUrl?.isNotEmpty == true
+                            ? Image.network(user!.companyLogoUrl!, fit: BoxFit.cover)
+                            : user?.avatarBase64?.isNotEmpty == true
+                                ? Image.memory(base64Decode(user!.avatarBase64!), fit: BoxFit.cover)
+                                : user?.avatarUrl?.isNotEmpty == true
+                                    ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
+                                    : Center(
+                                        child: Text(
+                                          initial,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 19,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
                       ),
                     ),
                     const SizedBox(width: 12),

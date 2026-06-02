@@ -9,7 +9,7 @@ import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/services/messaging_service.dart';
 import '../messaging/chat_room_screen.dart';
-import 'job_directions_map_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -563,11 +563,35 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  void _openDirectionsMap(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => JobDirectionsMapScreen(job: job)),
-    );
+  Future<void> _openDirectionsMap(BuildContext context) async {
+    final query = job.mapsDestinationQuery;
+    final lat = job.locationLat;
+    final lng = job.locationLng;
+    
+    Uri uri;
+    if (lat != null && lng != null && job.hasMapCoordinates) {
+      uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    } else {
+      uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}');
+    }
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không thể mở ứng dụng bản đồ.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lỗi khi mở bản đồ.')),
+        );
+      }
+    }
   }
 
   Future<void> _openMessages(BuildContext context) async {

@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../controller/login_controller.dart';
 import '../data/models/app_notification_model.dart';
 import '../data/models/group_chat_model.dart';
+import '../data/models/job_post_model.dart';
 import '../routes/app_routes.dart';
 import '../screens/attendance/candidate_attendance_screen.dart';
 import '../screens/attendance/candidate_work_assignment_screen.dart';
@@ -24,7 +25,15 @@ class NotificationNavigation {
     if (item.isEmployerInterest) {
       final jobId = item.interestJobId;
       if (jobId != null && jobId.isNotEmpty) {
-        Get.toNamed(AppRoutes.jobDetail, arguments: {'jobId': jobId});
+        final snap = await FirebaseFirestore.instance.collection('jobPosts').doc(jobId).get();
+        if (snap.exists) {
+          final data = snap.data() as Map<String, dynamic>;
+          data['jobId'] = snap.id;
+          final job = JobPostModel.fromMap(data);
+          Get.toNamed(AppRoutes.jobDetail, arguments: job);
+        } else {
+          Get.snackbar('Lỗi', 'Công việc này không còn tồn tại.');
+        }
       }
       return;
     }

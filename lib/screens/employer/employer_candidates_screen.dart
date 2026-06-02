@@ -7,6 +7,8 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/candidates_controller.dart';
 import '../../data/models/application_model.dart';
 import '../../data/models/job_post_model.dart';
+import '../../data/models/user_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerCandidatesScreen
@@ -431,11 +433,18 @@ class _ApplicantTile extends StatelessWidget {
     final isPending = app.status == 'pending';
     final isAccepted = app.status == 'accepted';
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return InkWell(
+      onTap: () {
+        Get.bottomSheet(
+          _CandidateProfileSheet(candidateSnap: candidate, app: app),
+          isScrollControlled: true,
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // ── Avatar + tên + rating ────────────────────────────────────────
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,6 +635,7 @@ class _ApplicantTile extends StatelessWidget {
             ),
           ],
         ],
+      ),
       ),
     );
   }
@@ -825,6 +835,181 @@ class _AppStatusChip extends StatelessWidget {
         style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w600, color: fg),
       ),
+    );
+  }
+}
+
+class _CandidateProfileSheet extends StatefulWidget {
+  final CandidateSnapshot candidateSnap;
+  final ApplicationModel app;
+
+  const _CandidateProfileSheet({required this.candidateSnap, required this.app});
+
+  @override
+  State<_CandidateProfileSheet> createState() => _CandidateProfileSheetState();
+}
+
+class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
+  UserModel? _fullUser;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFullUser();
+  }
+
+  Future<void> _fetchFullUser() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.candidateSnap.uid)
+          .get();
+      if (doc.exists) {
+        if (mounted) {
+          setState(() {
+            final data = doc.data()!;
+            data['uid'] = doc.id;
+            _fullUser = UserModel.fromMap(data);
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _CandidateAvatar(candidate: widget.candidateSnap),
+            const SizedBox(height: 16),
+            Text(
+              widget.candidateSnap.fullName.isNotEmpty
+                  ? widget.candidateSnap.fullName
+                  : 'Ứng viên',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _StarRating(rating: widget.candidateSnap.averageRating),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.candidateSnap.averageRating.toStringAsFixed(1)} sao • ${widget.candidateSnap.totalJobsDone} việc',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: CircularProgressIndicator(),
+              )
+            else if (_fullUser != null) ...[
+              _buildInfoRow(
+                Icons.email_outlined,
+                'Email',
+                _fullUser!.email.isNotEmpty ? _fullUser!.email : 'Chưa cập nhật',
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                Icons.phone_outlined,
+                'Số điện thoại',
+                _fullUser!.phone.isNotEmpty ? _fullUser!.phone : 'Chưa cập nhật',
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                Icons.person_outline,
+                'Giới tính',
+                _fullUser!.gender ?? 'Chưa cập nhật',
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                Icons.cake_outlined,
+                'Ngày sinh',
+                _fullUser!.dateOfBirth != null
+                    ? DateFormat('dd/MM/yyyy').format(_fullUser!.dateOfBirth!)
+                    : 'Chưa cập nhật',
+              ),
+            ] else
+              Text(
+                'Không thể lấy thông tin chi tiết.',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.employerPrimary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  'Đóng',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: AppColors.employerPrimary, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ],
     );
   }
 }

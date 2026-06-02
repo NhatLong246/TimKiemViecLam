@@ -127,10 +127,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             : null,
                         child: user?.avatarUrl == null ||
                                 user!.avatarUrl!.isEmpty
-                            ? const Icon(
-                                Icons.person,
-                                color: Color(0xFFE0E0E0),
-                                size: 54,
+                            ? Text(
+                                fullName.isNotEmpty
+                                    ? fullName[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Color(0xFF2E7D32),
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               )
                             : null,
                       ),

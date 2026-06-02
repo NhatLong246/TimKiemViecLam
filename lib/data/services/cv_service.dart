@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'file_upload_service.dart';
 
 /// CV cá nhân — lưu trên `users/{uid}` (skills, kinh nghiệm, cvUrl, …).
 class CvService {
@@ -44,9 +45,7 @@ class CvService {
     }
 
     final storagePath = 'users/${ref.id}/cv$ext';
-    final storageRef = FirebaseStorage.instance.ref().child(storagePath);
-    await storageRef.putFile(file);
-    final url = await storageRef.getDownloadURL();
+    final url = await FileUploadService.uploadAnonymous(file);
 
     await ref.update({
       'cvUrl': url,
@@ -65,9 +64,7 @@ class CvService {
     final data = snap.data();
     final url = data?['cvUrl'] as String?;
     if (url != null && url.isNotEmpty) {
-      try {
-        await FirebaseStorage.instance.refFromURL(url).delete();
-      } catch (_) {}
+      // Cannot delete anonymous uploads easily, just remove reference
     }
 
     await ref.update({

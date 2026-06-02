@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'file_upload_service.dart';
 import '../models/job_criteria_model.dart';
 import '../models/user_model.dart';
 import '../models/work_experience_model.dart';
@@ -187,9 +188,7 @@ class UpdateAccountService {
 
   Future<String> uploadAvatar(File file) async {
     final uid = _auth.currentUser!.uid;
-    final ref = FirebaseStorage.instance.ref().child('users/$uid/avatar.jpg');
-    await ref.putFile(file);
-    final url = await ref.getDownloadURL();
+    final url = await FileUploadService.uploadAnonymous(file);
     await _firestore.collection('users').doc(uid).update({
       'avatarUrl': url,
       'updatedAt': FieldValue.serverTimestamp(),

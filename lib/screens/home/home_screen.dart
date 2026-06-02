@@ -93,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) => _buildJobCard(jobs[index]),
@@ -136,14 +136,38 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    'assets/images/banners/mapandtt.png',
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                  ),
+                GetBuilder<AuthController>(
+                  init: _authController,
+                  builder: (controller) {
+                    final user = controller.currentUser;
+                    return Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.55), width: 2),
+                      ),
+                      child: ClipOval(
+                        child: user?.avatarBase64?.isNotEmpty == true
+                            ? Image.memory(base64Decode(user!.avatarBase64!), fit: BoxFit.cover)
+                            : user?.avatarUrl?.isNotEmpty == true
+                                ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
+                                : Center(
+                                    child: Text(
+                                      (user != null && user.firstName.trim().isNotEmpty)
+                                          ? user.firstName[0].toUpperCase()
+                                          : 'N',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -255,18 +279,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(11),
-                    child: Image.asset(
-                      'assets/images/icons/icons8-hamburger-menu-50.png',
-                      color: Colors.white,
+                GestureDetector(
+                  onTap: () => _showFilterBottomSheet(context),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(11),
+                      child: Image.asset(
+                        'assets/images/icons/icons8-hamburger-menu-50.png',
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -386,19 +413,247 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showFilterBottomSheet(BuildContext context) {
+    final List<String> provinces = [
+      'Tất cả', 'Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
+      'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh',
+      'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau',
+      'Cao Bằng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai', 'Đồng Tháp',
+      'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Tĩnh', 'Hải Dương', 'Hậu Giang',
+      'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
+      'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 'Nghệ An',
+      'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 'Quảng Nam',
+      'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sóc Trăng', 'Sơn La', 'Tây Ninh',
+      'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang',
+      'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
+    ];
+
+    double? tempMinSalary = _homeController.filterMinSalary.value;
+    double? tempMaxSalary = _homeController.filterMaxSalary.value;
+    String tempLocation = _homeController.filterLocation.value;
+    String tempJobType = _homeController.filterJobType.value;
+
+    final minCtrl = TextEditingController(text: tempMinSalary?.toInt().toString() ?? '');
+    final maxCtrl = TextEditingController(text: tempMaxSalary?.toInt().toString() ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFF5F5F5),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Widget buildChoiceChip(String label, String currentVal, Function(String) onSelect) {
+              final isSelected = currentVal == label;
+              return ChoiceChip(
+                label: Text(
+                  isSelected && label == 'Tất cả' ? '✓ Tất cả' : label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black87 : Colors.black54,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: const Color(0xFFC8E6C9),
+                backgroundColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSelected ? const Color(0xFF81C784) : Colors.grey.shade300,
+                  ),
+                ),
+                onSelected: (_) => onSelect(label),
+              );
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Bộ lọc tìm kiếm',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(ctx),
+                          child: const Icon(Icons.expand_more, size: 28),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    const Text('Khoảng mức lương (VNĐ)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: minCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: 'TỐI THIỂU',
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                            ),
+                            onChanged: (val) => tempMinSalary = double.tryParse(val),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text('-', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: maxCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: 'TỐI ĐA',
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.green.shade200),
+                              ),
+                            ),
+                            onChanged: (val) => tempMaxSalary = double.tryParse(val),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text('Khu vực', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: provinces.contains(tempLocation) ? tempLocation : 'Tất cả',
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isExpanded: true,
+                      items: provinces.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value, style: const TextStyle(fontSize: 14)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => tempLocation = val);
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text('Loại công việc', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        buildChoiceChip('Tất cả', tempJobType, (val) => setState(() => tempJobType = val)),
+                        buildChoiceChip('Part-time', tempJobType, (val) => setState(() => tempJobType = val)),
+                        buildChoiceChip('Full-time', tempJobType, (val) => setState(() => tempJobType = val)),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _homeController.applyAdvancedFilter(
+                            minSalary: tempMinSalary,
+                            maxSalary: tempMaxSalary,
+                            location: tempLocation,
+                            jobType: tempJobType,
+                          );
+                          Navigator.pop(ctx);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Áp dụng', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildSectionHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       child: Row(
         children: [
-          const Text(
-            'Việc làm mới nhất',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
+          Obx(() {
+            final filter = _homeController.filterJobType.value;
+            String label = 'Việc làm mới nhất';
+            if (filter == 'Part-time') label += ' (Part-time)';
+            if (filter == 'Full-time') label += ' (Full-time)';
+            return Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A1A),
+              ),
+            );
+          }),
           const Spacer(),
           GestureDetector(
             onTap: () {},

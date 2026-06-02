@@ -5,17 +5,47 @@ class SearchService {
   final JobPostService _jobPostService = JobPostService();
 
   // Helper để loại bỏ dấu tiếng Việt
-  String _removeDiacritics(String str) {
-    const withDia =
-        'áàảãạăắằẳẵặâấầẩẫậêếềểễệéèẻẽẹíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÊẾỀỂỄỆÉÈẺẼẸÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ';
-    const withoutDia =
-        'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyydAAAAAAAAAAAAAAAAAEEEEEEEEEEEIIIIIOOOOOOOOOOOOOOOOOUUUUUUUUUUUYYYYYD';
+  String _removeVietnameseTones(String str) {
+    str = str.replaceAll(RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'), 'a');
+    str = str.replaceAll(RegExp(r'[èéẹẻẽêềếệểễ]'), 'e');
+    str = str.replaceAll(RegExp(r'[ìíịỉĩ]'), 'i');
+    str = str.replaceAll(RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'), 'o');
+    str = str.replaceAll(RegExp(r'[ùúụủũưừứựửữ]'), 'u');
+    str = str.replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y');
+    str = str.replaceAll(RegExp(r'[đ]'), 'd');
+    str = str.replaceAll(RegExp(r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]'), 'A');
+    str = str.replaceAll(RegExp(r'[ÈÉẸẺẼÊỀẾỆỂỄ]'), 'E');
+    str = str.replaceAll(RegExp(r'[ÌÍỊỈĨ]'), 'I');
+    str = str.replaceAll(RegExp(r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]'), 'O');
+    str = str.replaceAll(RegExp(r'[ÙÚỤỦŨƯỪỨỰỬỮ]'), 'U');
+    str = str.replaceAll(RegExp(r'[ỲÝỴỶỸ]'), 'Y');
+    str = str.replaceAll(RegExp(r'[Đ]'), 'D');
+    return str;
+  }
 
-    String result = str;
-    for (int i = 0; i < withDia.length; i++) {
-      result = result.replaceAll(withDia[i], withoutDia[i]);
+  bool _matchLocation(String jobLocation, String filterLocation) {
+    if (filterLocation == 'Tất cả') return true;
+    
+    final jl = _removeVietnameseTones(jobLocation.toLowerCase());
+    
+    if (filterLocation == 'TP.HCM') {
+      return jl.contains('hcm') || jl.contains('ho chi minh');
     }
-    return result;
+    
+    if (filterLocation == 'Hà Nội') {
+      return jl.contains('ha noi') || RegExp(r'\bhn\b').hasMatch(jl);
+    }
+    
+    if (filterLocation == 'Đà Nẵng') {
+      return jl.contains('da nang') || RegExp(r'\bdn\b').hasMatch(jl);
+    }
+    
+    if (filterLocation == 'Bình Dương') {
+      return jl.contains('binh duong') || RegExp(r'\bbd\b').hasMatch(jl);
+    }
+
+    final fl = _removeVietnameseTones(filterLocation.toLowerCase());
+    return jl.contains(fl);
   }
 
   // ── Tìm kiếm và Lọc việc làm ───────────────────────────────────────────────
@@ -31,15 +61,15 @@ class SearchService {
     // Nếu ứng dụng lớn, cần dùng Algolia hoặc ElasticSearch.
     final allJobs = await _jobPostService.getLatestActiveJobs();
 
-    final normalizedKeyword = _removeDiacritics(keyword).toLowerCase().trim();
+    final normalizedKeyword = _removeVietnameseTones(keyword).toLowerCase().trim();
 
     final filtered = allJobs.where((job) {
       // 1. Keyword search (title, description, category)
       bool matchesKeyword = true;
       if (normalizedKeyword.isNotEmpty) {
-        final t = _removeDiacritics(job.title).toLowerCase();
-        final d = _removeDiacritics(job.description).toLowerCase();
-        final c = _removeDiacritics(
+        final t = _removeVietnameseTones(job.title).toLowerCase();
+        final d = _removeVietnameseTones(job.description).toLowerCase();
+        final c = _removeVietnameseTones(
           JobPostModel.categoryLabel(job.category),
         ).toLowerCase();
         matchesKeyword =
@@ -60,21 +90,14 @@ class SearchService {
       // 3. Location filter
       bool matchesLocation = true;
       if (location != null && location.isNotEmpty && location != 'Tất cả') {
-        final locCity = _removeDiacritics(
-          job.location['city']?.toString() ?? '',
-        ).toLowerCase();
-        final locAddress = _removeDiacritics(
-          job.location['address']?.toString() ?? '',
-        ).toLowerCase();
-        final queryLoc = _removeDiacritics(location).toLowerCase();
-        matchesLocation =
-            locCity.contains(queryLoc) || locAddress.contains(queryLoc);
+        matchesLocation = _matchLocation(job.locationDisplay, location);
       }
 
       // 4. Job type filter
       bool matchesJobType = true;
       if (jobType != null && jobType != 'Tất cả') {
-        matchesJobType = job.jobType == jobType;
+        final jType = job.jobType == 'part_time' ? 'Part-time' : 'Full-time';
+        matchesJobType = jType == jobType;
       }
 
       return matchesKeyword &&

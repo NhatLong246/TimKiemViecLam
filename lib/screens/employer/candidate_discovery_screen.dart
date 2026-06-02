@@ -262,9 +262,9 @@ class _CandidateCard extends StatelessWidget {
                             user.avatarUrl!,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                                Icon(Icons.person, color: Colors.grey.shade400),
+                                _avatarFallback(user.fullName),
                           )
-                        : Icon(Icons.person, color: Colors.grey.shade400),
+                        : _avatarFallback(user.fullName),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -370,7 +370,7 @@ class _CandidateCard extends StatelessWidget {
                 ),
                 onPressed: () {
                   Get.bottomSheet(
-                    _SendInterestSheet(candidate: user),
+                    SendInterestSheet(candidate: user),
                     isScrollControlled: true,
                   );
                 },
@@ -381,25 +381,42 @@ class _CandidateCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _avatarFallback(String name) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return Container(
+      color: const Color(0xFF1565C0),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-/// Bottom Sheet để NTD chọn job và gửi quan tâm
-class _SendInterestSheet extends StatefulWidget {
+class SendInterestSheet extends StatefulWidget {
   final UserModel candidate;
-  const _SendInterestSheet({required this.candidate});
+  final String? jobTypeFilter;
+  const SendInterestSheet({super.key, required this.candidate, this.jobTypeFilter = 'full_time'});
 
   @override
-  State<_SendInterestSheet> createState() => _SendInterestSheetState();
+  State<SendInterestSheet> createState() => _SendInterestSheetState();
 }
 
-class _SendInterestSheetState extends State<_SendInterestSheet> {
+class _SendInterestSheetState extends State<SendInterestSheet> {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
   final _service = CandidateDiscoveryService();
 
   List<JobPostModel>? _jobs;
   bool _isLoading = true;
-  bool _isSending = false;
+  String? _sendingJobId;
 
   @override
   void initState() {
@@ -412,18 +429,32 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
     if (uid == null) return;
 
     try {
-      final snap = await _db
+      var query = _db
           .collection('jobPosts')
           .where('employerId', isEqualTo: uid)
-          .where('jobType', isEqualTo: 'full_time')
-          .where('status', whereIn: ['active', 'approved'])
+          .where('status', whereIn: ['active', 'approved']);
+          
+      if (widget.jobTypeFilter != null) {
+        query = query.where('jobType', isEqualTo: widget.jobTypeFilter);
+      }
+      
+      final snap = await query.get();
+
+      final appsSnap = await _db
+          .collection('applications')
+          .where('candidateId', isEqualTo: widget.candidate.id)
+          .where('employerId', isEqualTo: uid)
           .get();
+      final doneJobIds = appsSnap.docs
+          .map((d) => (d.data() as Map<String, dynamic>)['jobId'] as String?)
+          .where((id) => id != null)
+          .toSet();
 
       final list = snap.docs.map((d) {
         final data = d.data();
         data['jobId'] = d.id;
         return JobPostModel.fromMap(data);
-      }).toList();
+      }).where((job) => !doneJobIds.contains(job.jobId)).toList();
 
       if (mounted) {
         setState(() {
@@ -440,7 +471,7 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    setState(() => _isSending = true);
+    setState(() => _sendingJobId = job.jobId);
 
     try {
       // Lấy tên NTD
@@ -477,6 +508,10 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
     } catch (e) {
       Get.back();
       Get.snackbar('Lỗi', 'Có lỗi xảy ra, vui lòng thử lại sau.');
+    } finally {
+      if (mounted) {
+        setState(() => _sendingJobId = null);
+      }
     }
   }
 
@@ -502,9 +537,11 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Chọn công việc Full-time',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            Text(
+              widget.jobTypeFilter == 'full_time' 
+                  ? 'Chọn công việc Full-time' 
+                  : 'Chọn công việc',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
@@ -528,7 +565,9 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
                                   size: 48, color: Colors.grey.shade400),
                               const SizedBox(height: 12),
                               Text(
-                                'Bạn chưa có công việc Full-time nào đang tuyển.',
+                                widget.jobTypeFilter == 'full_time'
+                                    ? 'Bạn chưa có công việc Full-time nào đang tuyển.'
+                                    : 'Bạn chưa có công việc nào đang tuyển.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                     color: Colors.grey.shade600,
@@ -567,7 +606,7 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13),
                               ),
-                              trailing: _isSending
+                              trailing: _sendingJobId == job.jobId
                                   ? const SizedBox(
                                       width: 20,
                                       height: 20,
@@ -575,7 +614,7 @@ class _SendInterestSheetState extends State<_SendInterestSheet> {
                                           strokeWidth: 2),
                                     )
                                   : TextButton(
-                                      onPressed: () => _sendInterest(job),
+                                      onPressed: _sendingJobId != null ? null : () => _sendInterest(job),
                                       child: const Text('Gửi'),
                                     ),
                             );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/job_post_model.dart';
+import '../../data/models/user_model.dart';
 import '../../routes/app_routes.dart';
 import 'candidate_discovery_screen.dart';
 
@@ -645,6 +646,8 @@ class _WorkersTab extends StatelessWidget {
               final data = d.data() as Map<String, dynamic>;
               final first = data['firstName'] as String? ?? '';
               final last = data['lastName'] as String? ?? '';
+              data['uid'] = d.id;
+              final userModel = UserModel.fromMap(data);
               return _WorkerEntry(
                 uid: d.id,
                 name: '$first $last'.trim(),
@@ -652,6 +655,7 @@ class _WorkersTab extends StatelessWidget {
                 phone: data['phoneNumber'] as String? ?? '',
                 rating: (data['averageRating'] as num?)?.toDouble() ?? 0.0,
                 jobsDone: (data['totalJobsDone'] as int?) ?? 0,
+                userModel: userModel,
               );
             }).toList();
 
@@ -870,84 +874,115 @@ class _WorkerCard extends StatelessWidget {
           onTap: () {}, // TODO: mở profile ứng viên
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00695C), Color(0xFF1565C0)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                        color: const Color(0xFF7B1FA2).withOpacity(0.2),
-                        width: 2),
-                  ),
-                  child: worker.avatarUrl != null
-                      ? ClipOval(
-                          child: Image.network(worker.avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _avatarFallback(worker.name)))
-                      : _avatarFallback(worker.name),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HighlightText(
-                          text: worker.name.isEmpty
-                              ? 'Người dùng'
-                              : worker.name,
-                          query: query,
-                          style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1A1A2E))),
-                      const SizedBox(height: 3),
-                      if (worker.phone.isNotEmpty)
-                        Row(
-                          children: [
-                            Icon(Icons.phone_outlined,
-                                size: 13, color: Colors.grey.shade500),
-                            const SizedBox(width: 4),
-                            Text(worker.phone,
-                                style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: Colors.grey.shade500)),
-                          ],
+                Row(
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF00695C), Color(0xFF1565C0)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      const SizedBox(height: 4),
-                      Row(
+                        border: Border.all(
+                            color: const Color(0xFF7B1FA2).withOpacity(0.2),
+                            width: 2),
+                      ),
+                      child: worker.avatarUrl != null
+                          ? ClipOval(
+                              child: Image.network(worker.avatarUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _avatarFallback(worker.name)))
+                          : _avatarFallback(worker.name),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Rating stars
-                          ...List.generate(
-                              5,
-                              (i) => Icon(
-                                    i < worker.rating.round()
-                                        ? Icons.star_rounded
-                                        : Icons.star_outline_rounded,
-                                    size: 14,
-                                    color: const Color(0xFFFFC107),
-                                  )),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${worker.rating.toStringAsFixed(1)} • ${worker.jobsDone} việc',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade500),
+                          _HighlightText(
+                              text: worker.name.isEmpty
+                                  ? 'Người dùng'
+                                  : worker.name,
+                              query: query,
+                              style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1A1A2E))),
+                          const SizedBox(height: 3),
+                          if (worker.phone.isNotEmpty)
+                            Row(
+                              children: [
+                                Icon(Icons.phone_outlined,
+                                    size: 13, color: Colors.grey.shade500),
+                                const SizedBox(width: 4),
+                                Text(worker.phone,
+                                    style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              // Rating stars
+                              ...List.generate(
+                                  5,
+                                  (i) => Icon(
+                                        i < worker.rating.round()
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
+                                        size: 14,
+                                        color: const Color(0xFFFFC107),
+                                      )),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${worker.rating.toStringAsFixed(1)} • ${worker.jobsDone} việc',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey.shade500),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
+                    Icon(Icons.chevron_right_rounded,
+                        color: Colors.grey.shade300, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.send_rounded, size: 16),
+                    label: const Text('Thuê lại',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1565C0),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      Get.bottomSheet(
+                        SendInterestSheet(
+                          candidate: worker.userModel,
+                          jobTypeFilter: null, // Cho phép chọn tất cả các loại công việc
+                        ),
+                        isScrollControlled: true,
+                      );
+                    },
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded,
-                    color: Colors.grey.shade300, size: 20),
               ],
             ),
           ),
@@ -1168,6 +1203,7 @@ class _WorkerEntry {
   final String phone;
   final double rating;
   final int jobsDone;
+  final UserModel userModel;
 
   const _WorkerEntry({
     required this.uid,
@@ -1176,5 +1212,6 @@ class _WorkerEntry {
     required this.phone,
     required this.rating,
     required this.jobsDone,
+    required this.userModel,
   });
 }
