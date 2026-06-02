@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/constants/full_time_policy.dart';
 import '../../controller/job_detail_controller.dart';
 import '../../controller/login_controller.dart';
+import '../../data/models/application_model.dart';
 import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
+import '../../data/services/candidates_service.dart';
 import '../../data/services/messaging_service.dart';
 import '../messaging/chat_room_screen.dart';
 import 'job_directions_map_screen.dart';
@@ -18,23 +21,80 @@ class JobDetailScreen extends StatefulWidget {
 }
 
 class _JobDetailScreenState extends State<JobDetailScreen> {
-  final JobDetailController _controller = Get.put(JobDetailController());
+  late final JobDetailController _controller;
   final MessagingService _messagingService = MessagingService();
+  final CandidatesService _candidatesService = CandidatesService();
   late JobPostModel job;
+  bool _hasJob = false;
+  bool _historyMode = false;
+  bool _dialogShowing = false;
+  bool _isLoadingHiredUsers = false;
+  String? _hiredUsersError;
+  List<ApplicationEntry> _hiredEntries = [];
 
   @override
   void initState() {
     super.initState();
+    // Xóa controller cũ (nếu có) và tạo controller mới hoàn toàn
+    if (Get.isRegistered<JobDetailController>()) {
+      Get.delete<JobDetailController>(force: true);
+    }
+    _controller = Get.put(JobDetailController());
+
     final dynamic args = Get.arguments;
-    if (args is JobPostModel) {
-      job = args;
+    final parsedJob = _jobFromArguments(args);
+    if (parsedJob != null) {
+      job = parsedJob;
+      _hasJob = true;
+      _historyMode = args is Map && args['fromPostHistory'] == true;
       _controller.fetchEmployerInfo(job.employerId);
+      if (_historyMode) {
+        _loadHiredUsers();
+      } else {
+        _controller.checkApplicationStatus(job.jobId);
+      }
+    }
+  }
+
+  JobPostModel? _jobFromArguments(dynamic args) {
+    if (args is JobPostModel) return args;
+    if (args is Map && args['job'] is JobPostModel) {
+      return args['job'] as JobPostModel;
+    }
+    return null;
+  }
+
+  Future<void> _loadHiredUsers() async {
+    setState(() {
+      _isLoadingHiredUsers = true;
+      _hiredUsersError = null;
+    });
+
+    try {
+      final entries = await _candidatesService.fetchAcceptedByJob(job);
+      if (!mounted) return;
+      setState(() {
+        _hiredEntries = entries;
+        _isLoadingHiredUsers = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _hiredUsersError = e.toString().replaceFirst('Exception: ', '');
+        _isLoadingHiredUsers = false;
+      });
     }
   }
 
   @override
+  void dispose() {
+    Get.delete<JobDetailController>(force: true);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (Get.arguments is! JobPostModel) {
+    if (!_hasJob) {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(child: Text('Lỗi: Không tìm thấy thông tin công việc.')),
@@ -87,9 +147,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.only(
-              bottom: 100,
-            ), // padding cho button Ứng tuyển
+            padding: EdgeInsets.only(bottom: _historyMode ? 24 : 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -390,104 +448,175 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     ],
                   ),
                 ),
+                if (_historyMode) ...[
+                  Divider(color: Colors.grey.shade200, thickness: 8),
+                  _buildHiredUsersSection(),
+                ],
               ],
             ),
           ),
           // 7. Nút ứng tuyển cố định phía dưới
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    offset: const Offset(0, -4),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Obx(
-                  () => Row(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: _controller.canApply.value
-                                ? primaryColor
-                                : Colors.grey.shade500,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.chat_bubble_outline,
-                            color: _controller.canApply.value
-                                ? primaryColor
-                                : Colors.grey.shade500,
-                          ),
-                          onPressed: _controller.canApply.value
-                              ? () => _openMessages(context)
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: SizedBox(
+          if (!_historyMode)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      offset: const Offset(0, -4),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Obx(() {
+                    final status = _controller.applicationStatus.value;
+                    final isPending = status == 'pending';
+                    final isAccepted = status == 'accepted';
+                    final isWithdrawn = [
+                      'withdrawn',
+                      'cancelled',
+                      'rejected',
+                    ].contains(status);
+                    final now = DateTime.now();
+                    final today = DateTime(now.year, now.month, now.day);
+                    final startDay = DateTime(
+                      job.startDate.year,
+                      job.startDate.month,
+                      job.startDate.day,
+                    );
+                    final jobStarted =
+                        (isPending || isAccepted) && !today.isBefore(startDay);
+
+                    Color btnColor;
+                    if (!_controller.canApply.value ||
+                        isWithdrawn ||
+                        jobStarted) {
+                      btnColor = Colors.grey.shade500;
+                    } else if (isAccepted) {
+                      btnColor = Colors.red;
+                    } else if (isPending) {
+                      btnColor = Colors.amber.shade700;
+                    } else {
+                      btnColor = const Color(0xFF2E7D32); // Green
+                    }
+
+                    String btnText;
+                    if (jobStarted) {
+                      btnText = 'Công việc đã bắt đầu';
+                    } else if (isAccepted) {
+                      btnText = 'Hủy tham gia';
+                    } else if (isPending) {
+                      btnText = 'Hủy ứng tuyển';
+                    } else if (isWithdrawn) {
+                      btnText = 'Không thể ứng tuyển';
+                    } else {
+                      btnText = 'Ứng tuyển ngay';
+                    }
+
+                    return Row(
+                      children: [
+                        Container(
+                          width: 50,
                           height: 50,
-                          child: ElevatedButton(
-                            onPressed:
-                                _controller.isApplying.value ||
-                                    !_controller.canApply.value
-                                ? null
-                                : () => _controller.applyJob(job),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _controller.canApply.value
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: _controller.canApply.value
                                   ? primaryColor
                                   : Colors.grey.shade500,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
                             ),
-                            child: _controller.isApplying.value
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    _controller.canApply.value
-                                        ? (job.isFullTimeReferral
-                                              ? 'Gửi thông tin ứng tuyển'
-                                              : 'Ứng tuyển ngay')
-                                        : 'Không khả dụng',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.chat_bubble_outline,
+                              color: _controller.canApply.value
+                                  ? primaryColor
+                                  : Colors.grey.shade500,
+                            ),
+                            onPressed: _controller.canApply.value
+                                ? () => _openMessages(context)
+                                : null,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed:
+                                  (!_controller.canApply.value ||
+                                      isWithdrawn ||
+                                      jobStarted)
+                                  ? null
+                                  : () {
+                                      if (isAccepted || isPending) {
+                                        if (_dialogShowing) return;
+                                        _dialogShowing = true;
+                                        Get.defaultDialog(
+                                          title: 'Xác nhận hủy ứng tuyển',
+                                          middleText: isAccepted
+                                              ? 'Bạn đã được nhận vào công việc này. Bạn có chắc chắn muốn hủy không?'
+                                              : 'Bạn có chắc chắn muốn hủy đơn ứng tuyển đang chờ duyệt không?',
+                                          textConfirm: 'Có',
+                                          textCancel: 'Không',
+                                          confirmTextColor: Colors.white,
+                                          onConfirm: () {
+                                            _dialogShowing = false;
+                                            Get.back();
+                                            _controller.cancelApplication(job);
+                                          },
+                                          onCancel: () {
+                                            _dialogShowing = false;
+                                          },
+                                        );
+                                        return;
+                                      }
+                                      _controller.applyJob(job);
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: btnColor,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _controller.isApplying.value
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : Text(
+                                      btnText,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
                 ),
               ),
             ),
-          ),
-          if (!_controller.canApply.value)
+          if (!_historyMode && !_controller.canApply.value)
             Positioned(
               bottom: 78,
               left: 16,
@@ -520,6 +649,326 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
+  Widget _buildHiredUsersSection() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.groups_outlined,
+                size: 20,
+                color: Color(0xFF1565C0),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'User đã thuê',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1565C0).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${_hiredEntries.length}',
+                  style: const TextStyle(
+                    color: Color(0xFF1565C0),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_isLoadingHiredUsers)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF1565C0)),
+              ),
+            )
+          else if (_hiredUsersError != null)
+            _buildHiredUsersNotice(
+              Icons.error_outline,
+              'Không tải được danh sách user: $_hiredUsersError',
+            )
+          else if (_hiredEntries.isEmpty)
+            _buildHiredUsersNotice(
+              Icons.people_outline,
+              'Chưa có user đã thuê trong bài đăng này.',
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  for (var i = 0; i < _hiredEntries.length; i++) ...[
+                    _buildHiredUserTile(_hiredEntries[i]),
+                    if (i != _hiredEntries.length - 1)
+                      Divider(height: 1, color: Colors.grey.shade100),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHiredUsersNotice(IconData icon, String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.grey.shade500, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHiredUserTile(ApplicationEntry entry) {
+    final app = entry.application;
+    final candidate = entry.candidate;
+    final appliedLabel = app.appliedAt != null
+        ? 'Nộp ${DateFormat('dd/MM/yyyy').format(app.appliedAt!)}'
+        : 'Vừa nộp';
+
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildCandidateAvatar(candidate),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      candidate.fullName.isNotEmpty
+                          ? candidate.fullName
+                          : 'Ứng viên',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF1A1A2E),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildStarRating(candidate.averageRating),
+                            const SizedBox(width: 5),
+                            Text(
+                              candidate.averageRating > 0
+                                  ? candidate.averageRating.toStringAsFixed(1)
+                                  : 'Chưa có',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.work_outline,
+                              size: 13,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${candidate.totalJobsDone} việc',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 13,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              appliedLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildAcceptedBadge(),
+            ],
+          ),
+          if (app.coverLetter?.isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Text(
+                app.coverLetter!,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+            ),
+          ],
+          if (app.cvUrl?.isNotEmpty == true) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => _openExternalUrl(app.cvUrl!),
+              icon: Icon(
+                Icons.picture_as_pdf,
+                size: 15,
+                color: Colors.red.shade500,
+              ),
+              label: const Text('Xem CV'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1565C0),
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCandidateAvatar(CandidateSnapshot candidate) {
+    return CircleAvatar(
+      radius: 23,
+      backgroundColor: const Color(0xFF1565C0).withValues(alpha: 0.12),
+      backgroundImage: candidate.avatarUrl?.isNotEmpty == true
+          ? NetworkImage(candidate.avatarUrl!)
+          : null,
+      child: candidate.avatarUrl?.isNotEmpty != true
+          ? Text(
+              candidate.fullName.isNotEmpty
+                  ? candidate.fullName[0].toUpperCase()
+                  : '?',
+              style: const TextStyle(
+                color: Color(0xFF1565C0),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildStarRating(double rating) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final icon = i < rating.floor()
+            ? Icons.star_rounded
+            : (i < rating && rating - i >= 0.5
+                  ? Icons.star_half_rounded
+                  : Icons.star_outline_rounded);
+        return Icon(
+          icon,
+          size: 13,
+          color: icon == Icons.star_outline_rounded
+              ? Colors.grey.shade300
+              : Colors.amber.shade500,
+        );
+      }),
+    );
+  }
+
+  Widget _buildAcceptedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'Đã duyệt',
+        style: TextStyle(
+          color: Colors.green.shade800,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   void _openDirectionsMap(BuildContext context) {
     Navigator.push(
       context,
@@ -550,7 +999,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         employerId: job.employerId,
         candidateId: auth.currentUser!.id,
       );
-      if (!mounted) return;
+      if (!context.mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -558,7 +1007,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

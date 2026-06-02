@@ -107,9 +107,10 @@ class GroupChatService {
       }
     }
 
-    final allMembers = <String>{employerId, ...memberIds}
-        .where((id) => id.isNotEmpty)
-        .toList();
+    final allMembers = <String>{
+      employerId,
+      ...memberIds,
+    }.where((id) => id.isNotEmpty).toList();
 
     final ref = _groups.doc();
     await ref.set({
@@ -151,10 +152,7 @@ class GroupChatService {
 
   // ─── Gửi tin nhắn ────────────────────────────────────────────────────────
   Future<void> sendMessage(String groupId, ChatMessageModel message) async {
-    await _groups
-        .doc(groupId)
-        .collection('messages')
-        .add(message.toMap());
+    await _groups.doc(groupId).collection('messages').add(message.toMap());
 
     final senderId = message.senderId;
     if (senderId.isNotEmpty && senderId != 'system') {
@@ -184,39 +182,42 @@ class GroupChatService {
         .collection('messages')
         .orderBy('createdAt', descending: false)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => ChatMessageModel.fromMap(d.data(), d.id))
-            .toList());
+        .map(
+          (snap) => snap.docs
+              .map((d) => ChatMessageModel.fromMap(d.data(), d.id))
+              .toList(),
+        );
   }
 
   // ─── Stream danh sách groups của Employer ────────────────────────────────
   // Không dùng orderBy cùng with where để tránh yêu cầu composite index
   // Thay vào đó sort trong memory
   Stream<List<GroupChatModel>> streamEmployerGroups(String employerId) {
-    return _groups
-        .where('employerId', isEqualTo: employerId)
-        .snapshots()
-        .map((snap) {
-          final list = snap.docs
-              .map((d) => GroupChatModel.fromMap(
-                  d.data() as Map<String, dynamic>, d.id))
+    return _groups.where('employerId', isEqualTo: employerId).snapshots().map((
+      snap,
+    ) {
+      final list =
+          snap.docs
+              .map(
+                (d) => GroupChatModel.fromMap(
+                  d.data() as Map<String, dynamic>,
+                  d.id,
+                ),
+              )
               .toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
+      return list;
+    });
   }
 
   // ─── Lấy 1 group theo ID ─────────────────────────────────────────────────
   Future<List<GroupChatModel>> listEmployerGroups(String employerId) async {
     if (employerId.isEmpty) return [];
-    final snap = await _groups
-        .where('employerId', isEqualTo: employerId)
-        .get();
+    final snap = await _groups.where('employerId', isEqualTo: employerId).get();
     return snap.docs
-        .map((d) => GroupChatModel.fromMap(
-              d.data() as Map<String, dynamic>,
-              d.id,
-            ))
+        .map(
+          (d) => GroupChatModel.fromMap(d.data() as Map<String, dynamic>, d.id),
+        )
         .toList();
   }
 
@@ -228,10 +229,9 @@ class GroupChatService {
         .where('chatType', isEqualTo: 'group')
         .get();
     return snap.docs
-        .map((d) => GroupChatModel.fromMap(
-              d.data() as Map<String, dynamic>,
-              d.id,
-            ))
+        .map(
+          (d) => GroupChatModel.fromMap(d.data() as Map<String, dynamic>, d.id),
+        )
         .toList();
   }
 
@@ -243,12 +243,13 @@ class GroupChatService {
 
   // ─── Cập nhật trạng thái cuộc gọi ───────────────────────────────────────
   Future<void> updateCallStatus(
-      String groupId, String msgId, String status) async {
-    await _groups
-        .doc(groupId)
-        .collection('messages')
-        .doc(msgId)
-        .update({'metadata.status': status});
+    String groupId,
+    String msgId,
+    String status,
+  ) async {
+    await _groups.doc(groupId).collection('messages').doc(msgId).update({
+      'metadata.status': status,
+    });
   }
 
   // ─── Cập nhật vote cho poll ───────────────────────────────────────────────
@@ -269,7 +270,8 @@ class GroupChatService {
       final allowMultiple = meta['allowMultiple'] == true;
       final rawVotes = meta['votes'] as Map? ?? {};
       final votes = rawVotes.map(
-          (k, v) => MapEntry(k as String, List<String>.from(v ?? [])));
+        (k, v) => MapEntry(k as String, List<String>.from(v ?? [])),
+      );
 
       final key = '$optionIndex';
       votes.putIfAbsent(key, () => []);
@@ -302,8 +304,7 @@ class GroupChatService {
   Stream<GroupChatModel?> streamGroup(String groupId) {
     return _groups.doc(groupId).snapshots().map((doc) {
       if (!doc.exists) return null;
-      return GroupChatModel.fromMap(
-          doc.data() as Map<String, dynamic>, doc.id);
+      return GroupChatModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
     });
   }
 
@@ -354,9 +355,7 @@ class GroupChatService {
     String groupId, {
     String? changedByName,
   }) async {
-    await _groups.doc(groupId).update({
-      'chatWallpaper': FieldValue.delete(),
-    });
+    await _groups.doc(groupId).update({'chatWallpaper': FieldValue.delete()});
     final actor = _wallpaperActorName(changedByName);
     await _postSystemChatNotice(
       groupId,
@@ -427,7 +426,8 @@ class GroupChatService {
     await notifications.sendToUser(
       userId: targetUserId,
       title: 'Điểm danh $label',
-      body: 'Xin chào $name, vui lòng chụp ảnh điểm danh $label (trong 15 phút). '
+      body:
+          'Xin chào $name, vui lòng chụp ảnh điểm danh $label (trong 15 phút). '
           'Nhấn thông báo để mở màn điểm danh.',
       category: NotificationCategory.job,
       data: {
@@ -448,8 +448,9 @@ class GroupChatService {
   /// Tin hệ thống trong khung chat + cập nhật dòng xem trước hội thoại.
   Future<void> _postSystemChatNotice(String groupId, String content) async {
     await _sendSystemMessage(groupId, content);
-    final preview =
-        content.length > 80 ? '${content.substring(0, 80)}…' : content;
+    final preview = content.length > 80
+        ? '${content.substring(0, 80)}…'
+        : content;
     await MessagingService().recordOutgoingMessage(
       groupId: groupId,
       senderId: 'system',
@@ -553,19 +554,22 @@ class GroupChatService {
   // ─── Lấy thông tin thành viên từ Firestore ────────────────────────────────
   Future<List<UserModel>> getGroupMembers(List<String> memberIds) async {
     if (memberIds.isEmpty) return [];
-    final futures =
-        memberIds.map((id) => _db.collection('users').doc(id).get()).toList();
+    final futures = memberIds
+        .map((id) => _db.collection('users').doc(id).get())
+        .toList();
     final snaps = await Future.wait(futures);
     return snaps
         .where((s) => s.exists)
-        .map((s) =>
-            UserModel.fromMap(s.data() as Map<String, dynamic>))
+        .map((s) => UserModel.fromMap(s.data() as Map<String, dynamic>))
         .toList();
   }
 
   // ─── Sửa nội dung tin nhắn ───────────────────────────────────────────────
   Future<void> editMessage(
-      String groupId, String msgId, String newContent) async {
+    String groupId,
+    String msgId,
+    String newContent,
+  ) async {
     await _groups.doc(groupId).collection('messages').doc(msgId).update({
       'content': newContent,
       'edited': true,
@@ -600,7 +604,9 @@ class GroupChatService {
 
   // ─── Tìm kiếm tin nhắn theo từ khóa ──────────────────────────────────────
   Future<List<ChatMessageModel>> searchMessages(
-      String groupId, String query) async {
+    String groupId,
+    String query,
+  ) async {
     if (query.trim().isEmpty) return [];
     final snap = await _groups
         .doc(groupId)
@@ -609,21 +615,23 @@ class GroupChatService {
         .get();
 
     final lower = query.toLowerCase().trim();
-    return snap.docs
-        .map((d) => ChatMessageModel.fromMap(d.data(), d.id))
-        .where((m) {
-          if (m.content.toLowerCase().contains(lower)) return true;
-          if (m.type == 'schedule' && m.content.toLowerCase().contains(lower)) {
-            return true;
-          }
-          return false;
-        })
-        .toList();
+    return snap.docs.map((d) => ChatMessageModel.fromMap(d.data(), d.id)).where(
+      (m) {
+        if (m.content.toLowerCase().contains(lower)) return true;
+        if (m.type == 'schedule' && m.content.toLowerCase().contains(lower)) {
+          return true;
+        }
+        return false;
+      },
+    ).toList();
   }
 
   // ─── Bật / tắt thông báo nhóm cho 1 user ────────────────────────────────
   Future<void> toggleMute(
-      String groupId, String userId, bool currentlyMuted) async {
+    String groupId,
+    String userId,
+    bool currentlyMuted,
+  ) async {
     await _groups.doc(groupId).update({
       'mutedBy': currentlyMuted
           ? FieldValue.arrayRemove([userId])
@@ -641,7 +649,42 @@ class GroupChatService {
       'memberIds': FieldValue.arrayRemove([userId]),
       'mutedBy': FieldValue.arrayRemove([userId]),
     });
+    await _removeMemberFromWorkSchedules(groupId, userId);
     await _sendSystemMessage(groupId, 'Một thành viên đã rời khỏi nhóm');
+  }
+
+  Future<void> _removeMemberFromWorkSchedules(
+    String groupId,
+    String userId,
+  ) async {
+    final snap = await _db
+        .collection('workSchedules')
+        .where('groupId', isEqualTo: groupId)
+        .get();
+    if (snap.docs.isEmpty) return;
+
+    WriteBatch batch = _db.batch();
+    var opCount = 0;
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final rawTasks = data['tasks'] as List? ?? const [];
+      final keptTasks = rawTasks.where((task) {
+        if (task is! Map) return true;
+        return (task['userId'] ?? '').toString() != userId;
+      }).toList();
+      if (keptTasks.length == rawTasks.length) continue;
+      batch.update(doc.reference, {
+        'tasks': keptTasks,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      opCount++;
+      if (opCount >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) await batch.commit();
   }
 
   // ─── Giải tán nhóm: xóa tất cả messages rồi xóa group ───────────────────
@@ -668,8 +711,31 @@ class GroupChatService {
 
     if (opCount > 0) await batch.commit();
 
+    await _deleteWorkSchedulesForGroup(groupId);
+
     // Xóa document nhóm
     await _groups.doc(groupId).delete();
+  }
+
+  Future<void> _deleteWorkSchedulesForGroup(String groupId) async {
+    final snap = await _db
+        .collection('workSchedules')
+        .where('groupId', isEqualTo: groupId)
+        .get();
+    if (snap.docs.isEmpty) return;
+
+    WriteBatch batch = _db.batch();
+    var opCount = 0;
+    for (final doc in snap.docs) {
+      batch.delete(doc.reference);
+      opCount++;
+      if (opCount >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) await batch.commit();
   }
 
   // ─── Private: gửi tin nhắn hệ thống ─────────────────────────────────────

@@ -32,30 +32,108 @@ class EmployerHomeController extends GetxController {
       return;
     }
     isLoading.value = true;
-    _sub = _postService.getJobPostsByEmployer(uid).listen(
-      (allPosts) {
-        // Chỉ hiển thị bài đăng không phải bản nháp trên trang chủ
-        posts.value =
-            allPosts.where((p) => p.status != 'draft').toList();
-        isLoading.value = false;
-      },
-      onError: (_) => isLoading.value = false,
-    );
+    _sub = _postService.getJobPostsByEmployer(uid).listen((allPosts) {
+      // Chỉ lưu các bài đăng có status đã biết (loại draft + bất kỳ status lạ nào)
+      const knownStatuses = {
+        'pending',
+        'approved',
+        'active',
+        'closed',
+        'rejected',
+        'cancelled',
+        'deleted',
+      };
+      posts.value = allPosts
+          .where((p) => knownStatuses.contains(p.status))
+          .toList();
+      isLoading.value = false;
+    }, onError: (_) => isLoading.value = false);
   }
 
   // ── Thống kê ────────────────────────────────────────────────────────
-  int get activePostsCount => posts
-      .where((p) => p.status == 'approved' || p.status == 'active')
-      .length;
+  int get activePostsCount =>
+      posts.where((p) => p.status == 'approved' || p.status == 'active').length;
 
-  int get totalHired =>
-      posts.fold(0, (sum, p) => sum + p.filledSlots);
+  int get totalHired => posts.fold(0, (sum, p) => sum + p.filledSlots);
 
-  // ── Phân trang ──────────────────────────────────────────────────────
+  // ── Bài đăng "đang hoạt động / tương lai" (hiển thị trang chủ) ─────
+  /// Chỉ bao gồm CÁC STATUS CỤ THỂ: pending, approved, active
+  /// và closed nếu endDate còn trong tương lai.
+  /// Mọi status khác (draft, empty, unknown) đều bị ẩn.
+  List<JobPostModel> get activePosts {
+    final now = DateTime.now();
+    return posts.where((p) {
+      switch (p.status) {
+        case 'pending':
+        case 'approved':
+        case 'active':
+          return true;
+        case 'closed':
+          // Chỉ hiển thị nếu endDate còn trong tương lai
+          if (p.endDate == null) {
+            return false; // closed không có endDate → lịch sử
+          }
+          return p.endDate!.isAfter(now);
+        default:
+          return false; // rejected, draft, hoặc bất kỳ status lạ nào → ẩn
+      }
+    }).toList();
+  }
+
+  // ── Lịch sử: bài đã làm xong ───────────────
+  List<JobPostModel> get completedWorkPosts {
+    final now = DateTime.now();
+    return posts.where((p) {
+      final statusOk =
+          p.status == 'approved' ||
+          p.status == 'active' ||
+          p.status == 'closed';
+      final workEnded =
+          p.status == 'closed' ||
+          (p.endDate != null && !_endDateTime(p).isAfter(now));
+      return statusOk && p.filledSlots > 0 && workEnded;
+    }).toList();
+  }
+
+  // ── Lịch sử: bài đã hủy do không đủ người hoặc doanh nghiệp chủ động xóa ──
+  List<JobPostModel> get removedPosts => posts.where((p) {
+    final cancelledUnderfilled =
+        p.status == 'cancelled' && p.filledSlots < p.slots;
+    return cancelledUnderfilled || p.status == 'deleted';
+  }).toList();
+
+  List<JobPostModel> get completedPosts => [
+    ...completedWorkPosts,
+    ...removedPosts,
+  ];
+
+  DateTime _endDateTime(JobPostModel post) {
+    final date = post.endDate ?? post.startDate;
+    final time = post.startTime?.trim();
+    if (time == null || time.isEmpty) {
+      return DateTime(date.year, date.month, date.day, 23, 59, 59);
+    }
+
+    final parts = time.split(':');
+    if (parts.length != 2) {
+      return DateTime(date.year, date.month, date.day, 23, 59, 59);
+    }
+
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    final workHours = post.workHoursPerDay ?? 0;
+    final start = DateTime(date.year, date.month, date.day, hour, minute);
+    if (workHours <= 0) {
+      return DateTime(date.year, date.month, date.day, 23, 59, 59);
+    }
+    return start.add(Duration(minutes: (workHours * 60).round()));
+  }
+
+  // ── Phân trang (dùng activePosts thay vì toàn bộ posts) ─────────────
   List<JobPostModel> get displayedPosts =>
-      posts.take(displayCount.value).toList();
+      activePosts.take(displayCount.value).toList();
 
-  bool get hasMore => posts.length > displayCount.value;
+  bool get hasMore => activePosts.length > displayCount.value;
 
   void loadMore() => displayCount.value += 3;
 }

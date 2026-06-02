@@ -30,8 +30,8 @@ class _EmployerNotificationsScreenState
 
   Color _unreadColor(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? _primary.withValues(alpha: 0.18)
-          : _unreadBg;
+      ? _primary.withValues(alpha: 0.18)
+      : _unreadBg;
 
   _SortOrder _sortOrder = _SortOrder.newestFirst;
   _FilterType _filter = _FilterType.all;
@@ -84,7 +84,10 @@ class _EmployerNotificationsScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF888888))),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -141,10 +144,16 @@ class _EmployerNotificationsScreenState
         }
         break;
       case 'application':
-        Get.toNamed(AppRoutes.employerCandidates);
+      case 'application_withdrawn':
+        final jobId = (n.data['jobId'] ?? '').toString();
+        Get.toNamed(
+          AppRoutes.employerCandidates,
+          arguments: jobId.isNotEmpty ? {'jobId': jobId} : null,
+        );
         break;
       case 'post_approved':
       case 'post_rejected':
+      case 'application_deadline_underfilled':
         Get.toNamed(AppRoutes.postManagement);
         break;
       case 'message':
@@ -160,10 +169,7 @@ class _EmployerNotificationsScreenState
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatRoomScreen(
-                  groupId: gid,
-                  isEmployer: true,
-                ),
+                builder: (_) => ChatRoomScreen(groupId: gid, isEmployer: true),
               ),
             );
             break;
@@ -174,10 +180,8 @@ class _EmployerNotificationsScreenState
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ChatRoomScreen(
-                groupId: groupId,
-                isEmployer: true,
-              ),
+              builder: (_) =>
+                  ChatRoomScreen(groupId: groupId, isEmployer: true),
             ),
           );
         } else {
@@ -280,10 +284,9 @@ class _EmployerNotificationsScreenState
         children: [
           Text(
             'Thông báo',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           if (unreadCount > 0) ...[
             const SizedBox(width: 8),
@@ -476,7 +479,9 @@ class _EmployerNotificationsScreenState
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: item.isRead ? Theme.of(context).cardColor : _unreadColor(context),
+            color: item.isRead
+                ? Theme.of(context).cardColor
+                : _unreadColor(context),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: item.isRead
@@ -577,7 +582,9 @@ class _EmployerNotificationsScreenState
                           _formatTime(item.createdAt),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -641,6 +648,13 @@ class _EmployerNotificationsScreenState
           const Color(0xFFE3F2FD),
           'Ứng viên',
         );
+      case 'application_withdrawn':
+        return _TypeMeta(
+          Icons.person_remove_alt_1_outlined,
+          const Color(0xFFC62828),
+          const Color(0xFFFFEBEE),
+          'Hủy ứng tuyển',
+        );
       case 'post_approved':
         return _TypeMeta(
           Icons.check_circle_outline,
@@ -668,6 +682,13 @@ class _EmployerNotificationsScreenState
           const Color(0xFF2E7D32),
           const Color(0xFFE8F5E9),
           'Điểm danh',
+        );
+      case 'application_deadline_underfilled':
+        return _TypeMeta(
+          Icons.warning_amber_rounded,
+          const Color(0xFFE65100),
+          const Color(0xFFFFF3E0),
+          'Thiếu người',
         );
       case 'review':
         return _TypeMeta(

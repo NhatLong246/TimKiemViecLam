@@ -25,6 +25,7 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
   late final TabController _tabs;
   late final CandidatesController _ctrl;
   String? _forcedJobType;
+  bool _acceptedOnly = false;
 
   String? get _filterJobId => _ctrl.filterJobId;
   bool get _isSingleTypeView =>
@@ -40,10 +41,11 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
     final args = Get.arguments;
     final routeJobId = args is Map ? args['jobId']?.toString() : null;
     final routeJobType = args is Map ? args['jobType']?.toString() : null;
+    _acceptedOnly = args is Map && args['acceptedOnly'] == true;
     _forcedJobType =
         (routeJobType == 'full_time' || routeJobType == 'part_time')
-            ? routeJobType
-            : null;
+        ? routeJobType
+        : null;
     _tabs = TabController(length: _isSingleTypeView ? 1 : 2, vsync: this);
     _ctrl.setFilterJobId(routeJobId);
   }
@@ -59,16 +61,28 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [_buildAppBar()],
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [_buildAppBar()],
         body: TabBarView(
           controller: _tabs,
           children: _isSingleTypeView
               ? [
-                  _CandidatesTab(ctrl: _ctrl, isFullTime: _singleIsFullTime),
+                  _CandidatesTab(
+                    ctrl: _ctrl,
+                    isFullTime: _singleIsFullTime,
+                    acceptedOnly: _acceptedOnly,
+                  ),
                 ]
               : [
-                  _CandidatesTab(ctrl: _ctrl, isFullTime: true),
-                  _CandidatesTab(ctrl: _ctrl, isFullTime: false),
+                  _CandidatesTab(
+                    ctrl: _ctrl,
+                    isFullTime: true,
+                    acceptedOnly: _acceptedOnly,
+                  ),
+                  _CandidatesTab(
+                    ctrl: _ctrl,
+                    isFullTime: false,
+                    acceptedOnly: _acceptedOnly,
+                  ),
                 ],
         ),
       ),
@@ -84,11 +98,17 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
         decoration: const BoxDecoration(gradient: AppColors.employerGradient),
       ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+        icon: const Icon(
+          Icons.arrow_back_ios_new,
+          color: Colors.white,
+          size: 20,
+        ),
         onPressed: Get.back,
       ),
       title: Text(
-        _filterJobId != null ? 'Ứng viên bài đăng' : 'Ứng viên',
+        _acceptedOnly
+            ? 'User đã thuê'
+            : (_filterJobId != null ? 'Ứng viên bài đăng' : 'Ứng viên'),
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
@@ -126,7 +146,9 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  _singleIsFullTime ? 'Full-time' : 'Part-time',
+                  _acceptedOnly
+                      ? 'Chỉ hiển thị user đã thuê'
+                      : (_singleIsFullTime ? 'Full-time' : 'Part-time'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -141,10 +163,14 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
               indicatorWeight: 3,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white60,
-              labelStyle:
-                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              unselectedLabelStyle:
-                  const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.normal,
+                fontSize: 14,
+              ),
               tabs: [
                 _TabLabel(
                   label: 'Full-time',
@@ -164,17 +190,35 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
 class _CandidatesTab extends StatelessWidget {
   final CandidatesController ctrl;
   final bool isFullTime;
+  final bool acceptedOnly;
 
-  const _CandidatesTab({required this.ctrl, required this.isFullTime});
+  const _CandidatesTab({
+    required this.ctrl,
+    required this.isFullTime,
+    this.acceptedOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final loading =
-          isFullTime ? ctrl.isLoadingFullTime.value : ctrl.isLoadingPartTime.value;
-      final jobs = isFullTime
+      final loading = isFullTime
+          ? ctrl.isLoadingFullTime.value
+          : ctrl.isLoadingPartTime.value;
+      final rawJobs = isFullTime
           ? ctrl.filteredFullTimeJobs()
           : ctrl.filteredPartTimeJobs();
+      final jobs = acceptedOnly
+          ? rawJobs
+                .map(
+                  (job) => job.copyWithEntries(
+                    job.entries
+                        .where((e) => e.application.status == 'accepted')
+                        .toList(),
+                  ),
+                )
+                .where((job) => job.entries.isNotEmpty)
+                .toList()
+          : rawJobs;
 
       if (loading && jobs.isEmpty) {
         return const Center(
@@ -186,18 +230,18 @@ class _CandidatesTab extends StatelessWidget {
         return _EmptyState(
           isFullTime: isFullTime,
           isFilteredByJob: ctrl.filterJobId != null,
+          acceptedOnly: acceptedOnly,
         );
       }
 
       return RefreshIndicator(
         color: AppColors.employerPrimary,
-        onRefresh:
-            isFullTime ? ctrl.loadFullTime : ctrl.loadPartTime,
+        onRefresh: isFullTime ? ctrl.loadFullTime : ctrl.loadPartTime,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-          itemCount: jobs.length + (isFullTime ? 1 : 0),
+          itemCount: jobs.length + (isFullTime && !acceptedOnly ? 1 : 0),
           itemBuilder: (_, i) {
-            if (isFullTime && i == 0) {
+            if (isFullTime && !acceptedOnly && i == 0) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Container(
@@ -212,8 +256,11 @@ class _CandidatesTab extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline,
-                          size: 18, color: Color(0xFF1565C0)),
+                      const Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: Color(0xFF1565C0),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -230,8 +277,12 @@ class _CandidatesTab extends StatelessWidget {
                 ),
               );
             }
-            final jobIndex = isFullTime ? i - 1 : i;
-            return _JobCard(jwA: jobs[jobIndex], ctrl: ctrl);
+            final jobIndex = isFullTime && !acceptedOnly ? i - 1 : i;
+            return _JobCard(
+              jwA: jobs[jobIndex],
+              ctrl: ctrl,
+              readOnly: acceptedOnly,
+            );
           },
         ),
       );
@@ -243,8 +294,13 @@ class _CandidatesTab extends StatelessWidget {
 class _JobCard extends StatefulWidget {
   final JobWithApplications jwA;
   final CandidatesController ctrl;
+  final bool readOnly;
 
-  const _JobCard({required this.jwA, required this.ctrl});
+  const _JobCard({
+    required this.jwA,
+    required this.ctrl,
+    this.readOnly = false,
+  });
 
   @override
   State<_JobCard> createState() => _JobCardState();
@@ -257,7 +313,8 @@ class _JobCardState extends State<_JobCard> {
   void initState() {
     super.initState();
     final filterId = widget.ctrl.filterJobId;
-    _expanded = widget.jwA.pendingCount > 0 ||
+    _expanded =
+        widget.jwA.pendingCount > 0 ||
         (filterId != null && filterId == widget.jwA.job.jobId);
   }
 
@@ -274,7 +331,7 @@ class _JobCardState extends State<_JobCard> {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -300,14 +357,10 @@ class _JobCardState extends State<_JobCard> {
                       _JobStatusChip(status: job.status),
                       const Spacer(),
                       // Slot progress
-                      _SlotBadge(
-                        filled: job.filledSlots,
-                        total: job.slots,
-                      ),
+                      _SlotBadge(filled: job.filledSlots, total: job.slots),
                       const SizedBox(width: 8),
                       // Pending badge
-                      if (pending > 0)
-                        _PendingBadge(count: pending),
+                      if (pending > 0) _PendingBadge(count: pending),
                       const SizedBox(width: 8),
                       AnimatedRotation(
                         turns: _expanded ? 0.5 : 0,
@@ -334,20 +387,28 @@ class _JobCardState extends State<_JobCard> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.location_on_outlined,
-                          size: 13, color: Colors.grey.shade500),
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 13,
+                        color: Colors.grey.shade500,
+                      ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           job.locationDisplay,
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.attach_money_rounded,
-                          size: 13, color: Colors.grey.shade500),
+                      Icon(
+                        Icons.attach_money_rounded,
+                        size: 13,
+                        color: Colors.grey.shade500,
+                      ),
                       Text(
                         job.salaryDisplay,
                         style: TextStyle(
@@ -361,25 +422,35 @@ class _JobCardState extends State<_JobCard> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.people_outline,
-                          size: 13, color: Colors.grey.shade500),
+                      Icon(
+                        Icons.people_outline,
+                        size: 13,
+                        color: Colors.grey.shade500,
+                      ),
                       const SizedBox(width: 3),
                       Text(
-                        '${entries.length} ứng viên',
+                        widget.readOnly
+                            ? '${entries.length} user đã thuê'
+                            : '${entries.length} ứng viên',
                         style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                      if (job.startDate != null) ...[
-                        const SizedBox(width: 12),
-                        Icon(Icons.calendar_today_outlined,
-                            size: 13, color: Colors.grey.shade500),
-                        const SizedBox(width: 3),
-                        Text(
-                          DateFormat('dd/MM/yyyy').format(job.startDate!),
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 13,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        DateFormat('dd/MM/yyyy').format(job.startDate),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -397,12 +468,13 @@ class _JobCardState extends State<_JobCard> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: entries.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (context, index) =>
                     Divider(height: 1, color: Colors.grey.shade100),
                 itemBuilder: (_, i) => _ApplicantTile(
                   entry: entries[i],
                   job: widget.jwA.job,
                   ctrl: widget.ctrl,
+                  readOnly: widget.readOnly,
                 ),
               ),
           ],
@@ -417,11 +489,13 @@ class _ApplicantTile extends StatelessWidget {
   final ApplicationEntry entry;
   final JobPostModel job;
   final CandidatesController ctrl;
+  final bool readOnly;
 
   const _ApplicantTile({
     required this.entry,
     required this.job,
     required this.ctrl,
+    this.readOnly = false,
   });
 
   @override
@@ -463,35 +537,46 @@ class _ApplicantTile extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           candidate.averageRating > 0
-                              ? candidate.averageRating
-                                  .toStringAsFixed(1)
+                              ? candidate.averageRating.toStringAsFixed(1)
                               : 'Chưa có',
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(Icons.work_outline,
-                            size: 12, color: Colors.grey.shade500),
+                        Icon(
+                          Icons.work_outline,
+                          size: 12,
+                          color: Colors.grey.shade500,
+                        ),
                         const SizedBox(width: 2),
                         Text(
                           '${candidate.totalJobsDone} việc',
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        Icon(Icons.access_time,
-                            size: 12, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.access_time,
+                          size: 12,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           app.appliedAt != null
                               ? 'Nộp ${DateFormat('dd/MM/yyyy').format(app.appliedAt!)}'
                               : 'Vừa nộp',
                           style: TextStyle(
-                              fontSize: 11, color: Colors.grey.shade500),
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ],
                     ),
@@ -515,8 +600,7 @@ class _ApplicantTile extends StatelessWidget {
               ),
               child: Text(
                 app.coverLetter!,
-                style:
-                    TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -530,15 +614,17 @@ class _ApplicantTile extends StatelessWidget {
               onTap: () async {
                 final uri = Uri.tryParse(app.cvUrl!);
                 if (uri != null && await canLaunchUrl(uri)) {
-                  await launchUrl(uri,
-                      mode: LaunchMode.externalApplication);
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.picture_as_pdf,
-                      size: 14, color: Colors.red.shade400),
+                  Icon(
+                    Icons.picture_as_pdf,
+                    size: 14,
+                    color: Colors.red.shade400,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Xem CV',
@@ -554,23 +640,25 @@ class _ApplicantTile extends StatelessWidget {
           ],
 
           // ── Action buttons (chỉ pending) ─────────────────────────────────
-          if (isPending) ...[
+          if (!readOnly && isPending) ...[
             const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () =>
-                        _confirmReject(context, app.appId),
+                    onPressed: () => _confirmReject(context, app.appId),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade600,
                       side: BorderSide(color: Colors.red.shade300),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                    child: const Text('Từ chối',
-                        style: TextStyle(fontSize: 13)),
+                    child: const Text(
+                      'Từ chối',
+                      style: TextStyle(fontSize: 13),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -578,23 +666,23 @@ class _ApplicantTile extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: job.isFull
                         ? null
-                        : () => _confirmAccept(
-                            context, app.appId, job.jobId),
+                        : () => _confirmAccept(context, app.appId, job.jobId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.employerPrimary,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: Colors.grey.shade300,
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       elevation: 0,
                     ),
                     child: Text(
                       job.isFull
                           ? 'Đã đủ slot'
                           : (job.isFullTimeReferral
-                              ? 'Ghi nhận & liên hệ'
-                              : 'Duyệt'),
+                                ? 'Ghi nhận & liên hệ'
+                                : 'Duyệt'),
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
@@ -604,23 +692,26 @@ class _ApplicantTile extends StatelessWidget {
           ],
 
           // ── Huỷ duyệt button (nếu accepted) ─────────────────────────────
-          if (isAccepted) ...[
+          if (!readOnly && isAccepted) ...[
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () =>
-                    _confirmRevoke(context, app.appId, job.jobId),
-                icon: Icon(Icons.undo_rounded,
-                    size: 14, color: Colors.orange.shade700),
+                onPressed: () => _confirmRevoke(context, app.appId, job.jobId),
+                icon: Icon(
+                  Icons.undo_rounded,
+                  size: 14,
+                  color: Colors.orange.shade700,
+                ),
                 label: Text(
                   'Huỷ duyệt',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.orange.shade700),
+                  style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
                 ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
               ),
             ),
@@ -631,7 +722,10 @@ class _ApplicantTile extends StatelessWidget {
   }
 
   Future<void> _confirmAccept(
-      BuildContext ctx, String appId, String jobId) async {
+    BuildContext ctx,
+    String appId,
+    String jobId,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (_) => _ConfirmDialog(
@@ -662,7 +756,10 @@ class _ApplicantTile extends StatelessWidget {
   }
 
   Future<void> _confirmRevoke(
-      BuildContext ctx, String appId, String jobId) async {
+    BuildContext ctx,
+    String appId,
+    String jobId,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (_) => _ConfirmDialog(
@@ -694,8 +791,7 @@ class _TabLabel extends StatelessWidget {
           if (badge > 0) ...[
             const SizedBox(width: 6),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: Colors.orange.shade400,
                 borderRadius: BorderRadius.circular(10),
@@ -703,9 +799,10 @@ class _TabLabel extends StatelessWidget {
               child: Text(
                 badge > 99 ? '99+' : '$badge',
                 style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -733,13 +830,16 @@ class _JobStatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         label,
         style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600, color: color),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -758,8 +858,8 @@ class _SlotBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: isFull
-            ? Colors.red.withOpacity(0.1)
-            : AppColors.employerPrimary.withOpacity(0.1),
+            ? Colors.red.withValues(alpha: 0.1)
+            : AppColors.employerPrimary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -822,8 +922,7 @@ class _AppStatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }
@@ -838,7 +937,7 @@ class _CandidateAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: 24,
-      backgroundColor: AppColors.employerPrimary.withOpacity(0.12),
+      backgroundColor: AppColors.employerPrimary.withValues(alpha: 0.12),
       backgroundImage: candidate.avatarUrl?.isNotEmpty == true
           ? NetworkImage(candidate.avatarUrl!)
           : null,
@@ -848,9 +947,10 @@ class _CandidateAvatar extends StatelessWidget {
                   ? candidate.fullName[0].toUpperCase()
                   : '?',
               style: const TextStyle(
-                  color: AppColors.employerPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18),
+                color: AppColors.employerPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
             )
           : null,
     );
@@ -868,14 +968,23 @@ class _StarRating extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
         if (i < rating.floor()) {
-          return Icon(Icons.star_rounded,
-              size: 13, color: Colors.amber.shade500);
+          return Icon(
+            Icons.star_rounded,
+            size: 13,
+            color: Colors.amber.shade500,
+          );
         } else if (i < rating && rating - i >= 0.5) {
-          return Icon(Icons.star_half_rounded,
-              size: 13, color: Colors.amber.shade500);
+          return Icon(
+            Icons.star_half_rounded,
+            size: 13,
+            color: Colors.amber.shade500,
+          );
         }
-        return Icon(Icons.star_outline_rounded,
-            size: 13, color: Colors.grey.shade300);
+        return Icon(
+          Icons.star_outline_rounded,
+          size: 13,
+          color: Colors.grey.shade300,
+        );
       }),
     );
   }
@@ -893,9 +1002,7 @@ class _NoApplicants extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Chưa có ứng viên nào',
-              style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
             ),
           ],
         ),
@@ -907,10 +1014,12 @@ class _NoApplicants extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final bool isFullTime;
   final bool isFilteredByJob;
+  final bool acceptedOnly;
 
   const _EmptyState({
     required this.isFullTime,
     this.isFilteredByJob = false,
+    this.acceptedOnly = false,
   });
 
   @override
@@ -925,22 +1034,24 @@ class _EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.employerPrimary.withOpacity(0.08),
+                color: AppColors.employerPrimary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.people_alt_outlined,
                 size: 40,
-                color: AppColors.employerPrimary.withOpacity(0.5),
+                color: AppColors.employerPrimary.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              isFilteredByJob
+              acceptedOnly
+                  ? 'Chưa có user đã thuê'
+                  : isFilteredByJob
                   ? 'Chưa có ứng viên ứng tuyển'
                   : (isFullTime
-                      ? 'Chưa có bài đăng Full-time'
-                      : 'Chưa có bài đăng Part-time'),
+                        ? 'Chưa có bài đăng Full-time'
+                        : 'Chưa có bài đăng Part-time'),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -949,7 +1060,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              isFilteredByJob
+              acceptedOnly
+                  ? 'Bài đăng này chưa có ứng viên nào ở trạng thái đã duyệt.'
+                  : isFilteredByJob
                   ? 'Bài đăng này chưa có đơn ứng tuyển nào.'
                   : 'Tạo bài đăng tuyển dụng để bắt đầu\nnhận đơn ứng tuyển từ ứng viên.',
               textAlign: TextAlign.center,
@@ -983,15 +1096,18 @@ class _ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      content: Text(content,
-          style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+      content: Text(
+        content,
+        style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: Text('Huỷ',
-              style: TextStyle(color: Colors.grey.shade600)),
+          child: Text('Huỷ', style: TextStyle(color: Colors.grey.shade600)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, true),
@@ -999,7 +1115,8 @@ class _ConfirmDialog extends StatelessWidget {
             backgroundColor: confirmColor,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
             elevation: 0,
           ),
           child: Text(confirmLabel),

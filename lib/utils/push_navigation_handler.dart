@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controller/login_controller.dart';
@@ -111,6 +110,10 @@ class PushNavigationHandler {
     }
 
     if (role == 'employer') {
+      if (type == 'application_deadline_underfilled') {
+        await Get.toNamed(AppRoutes.postManagement);
+        return;
+      }
       if (type == 'application' &&
           data['jobId']?.toString().isNotEmpty == true) {
         await Get.toNamed(

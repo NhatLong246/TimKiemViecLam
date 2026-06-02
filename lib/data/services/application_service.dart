@@ -21,10 +21,42 @@ class ApplicationService {
     String? coverLetter,
     String? cvUrl,
   }) async {
-    if (candidateId == employerId) {
+    await _assertCandidateRole(candidateId);
+
+    final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
+    if (!jobDoc.exists) {
+      throw Exception('Công việc không tồn tại.');
+    }
+    final jobData = jobDoc.data() ?? {};
+    final jobEmployerId = (jobData['employerId'] ?? employerId).toString();
+    if (candidateId == jobEmployerId) {
       throw Exception('Không thể tự ứng tuyển vào bài đăng của chính mình.');
     }
-    await _assertCandidateRole(candidateId);
+
+    final status = (jobData['status'] ?? '').toString();
+    if (status != 'approved' && status != 'active') {
+      throw Exception('Công việc hiện không nhận ứng tuyển.');
+    }
+
+    final now = DateTime.now();
+    final startDate = (jobData['startDate'] as Timestamp?)?.toDate();
+    if (startDate == null) {
+      throw Exception('Công việc thiếu ngày bắt đầu.');
+    }
+    if (!now.isBefore(startDate)) {
+      throw Exception('Công việc đã bắt đầu, không thể ứng tuyển.');
+    }
+
+    final deadline = (jobData['applicationDeadline'] as Timestamp?)?.toDate();
+    if (deadline != null && !now.isBefore(deadline)) {
+      throw Exception('Đã hết hạn ứng tuyển công việc này.');
+    }
+
+    final slots = (jobData['slots'] as num?)?.toInt() ?? 0;
+    final filledSlots = (jobData['filledSlots'] as num?)?.toInt() ?? 0;
+    if (slots <= 0 || filledSlots >= slots) {
+      throw Exception('Công việc đã đủ số lượng ứng viên.');
+    }
 
     // Check duplicate: candidateId + jobId
     final duplicateCheck = await _db
@@ -42,7 +74,7 @@ class ApplicationService {
       appId: docRef.id,
       jobId: jobId,
       candidateId: candidateId,
-      employerId: employerId,
+      employerId: jobEmployerId,
       status: 'pending',
       coverLetter: coverLetter,
       cvUrl: cvUrl,
@@ -53,21 +85,18 @@ class ApplicationService {
     var jobTitle = 'Công việc';
     var candidateName = 'Ứng viên';
     try {
-      final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
-      if (jobDoc.exists) {
-        jobTitle = (jobDoc.data()?['title'] ?? jobTitle).toString();
-      }
+      jobTitle = (jobData['title'] ?? jobTitle).toString();
       final userDoc = await _db.collection('users').doc(candidateId).get();
       if (userDoc.exists) {
         final d = userDoc.data() ?? {};
-        final combined =
-            '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+        final combined = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'
+            .trim();
         if (combined.isNotEmpty) candidateName = combined;
       }
     } catch (_) {}
 
     await NotificationService.notifyNewApplication(
-      employerId: employerId,
+      employerId: jobEmployerId,
       jobTitle: jobTitle,
       candidateName: candidateName,
       jobId: jobId,

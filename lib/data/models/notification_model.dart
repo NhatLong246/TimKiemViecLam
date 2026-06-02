@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// type: 'application' | 'post_approved' | 'post_rejected' | 'message' | 'attendance_result' | 'system'
+/// type: 'application' | 'application_withdrawn' | 'post_approved' |
+/// 'post_rejected' | 'message' | 'attendance_result' | 'system'
 class NotificationModel {
   final String notifId;
-  final String recipientId;    // employerId
+  final String recipientId; // employerId
   final String type;
   final String title;
   final String body;
@@ -36,12 +37,12 @@ class NotificationModel {
   }
 
   Map<String, dynamic> toMap() => {
-        'recipientId': recipientId,
-        'type': type,
-        'title': title,
-        'body': body,
-        'data': data,
-        'isRead': isRead,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+    'recipientId': recipientId,
+    'type': type,
+    'title': title,
+    'body': body,
+    'data': data,
+    'isRead': isRead,
+    'createdAt': FieldValue.serverTimestamp(),
+  };
 }

@@ -31,6 +31,7 @@ class JobDisbursementReminderService {
   Future<void> runForEmployer(String employerId) async {
     if (employerId.isEmpty) return;
     try {
+      await _processUnderfilledApplicationDeadlines(employerId);
       final groups = await _groups.listEmployerJobGroups(employerId);
       final byJob = <String, GroupChatModel>{};
       for (final g in groups) {
@@ -46,6 +47,36 @@ class JobDisbursementReminderService {
       }
       await _processJobsWithoutGroup(employerId, byJob.keys.toSet());
     } catch (_) {}
+  }
+
+  Future<void> _processUnderfilledApplicationDeadlines(
+    String employerId,
+  ) async {
+    final snap = await _db
+        .collection('jobPosts')
+        .where('employerId', isEqualTo: employerId)
+        .get();
+
+    for (final doc in snap.docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['jobId'] = doc.id;
+      final job = JobPostModel.fromMap(data);
+      if (!_shouldNotifyUnderfilledApplicationDeadline(job)) continue;
+      if (!await _claimOnce(
+        job.jobId,
+        'applicationDeadlineUnderfilledNotifiedAt',
+      )) {
+        continue;
+      }
+
+      await NotificationService.notifyApplicationDeadlineUnderfilled(
+        employerId: employerId,
+        jobTitle: job.title,
+        jobId: job.jobId,
+        filledSlots: job.filledSlots,
+        slots: job.slots,
+      );
+    }
   }
 
   /// Bài đã hết hạn nhưng chưa có nhóm (chưa tuyển UV).
@@ -291,6 +322,18 @@ class JobDisbursementReminderService {
 
   bool _isActiveJob(JobPostModel job) {
     return job.status == 'approved' || job.status == 'active';
+  }
+
+  bool _shouldNotifyUnderfilledApplicationDeadline(JobPostModel job) {
+    final deadline = job.applicationDeadline;
+    if (deadline == null) return false;
+    if (!_isActiveJob(job)) return false;
+    if (job.underfilledAccepted) return false;
+    if (job.slots <= 0 || job.filledSlots >= job.slots) return false;
+
+    final now = DateTime.now();
+    if (!now.isAfter(deadline)) return false;
+    return job.startDate.isAfter(now);
   }
 
   String _formatRange(JobPostModel job) {

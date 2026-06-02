@@ -95,6 +95,8 @@
 | `requirements` | `String?` | ❌ | Yêu cầu ứng viên |
 | `status` | `String` | ✅ | `"pending"` \| `"approved"` \| `"active"` \| `"closed"` \| `"rejected"` |
 | `totalBudget` | `double` | ✅ | `salary × slots` (khóa tiền Employer) |
+| `applicationDeadline` | `Timestamp?` | ❌ | Hạn nhận ứng tuyển trước ngày bắt đầu |
+| `underfilledAccepted` | `bool` | ✅ | NTD đã đồng ý cho job chạy dù hết hạn ứng tuyển nhưng chưa đủ người |
 | `groupChatId` | `String?` | ❌ | ID nhóm chat (tạo sau khi approved) |
 | `createdAt` | `Timestamp` | ✅ | Server timestamp |
 | `updatedAt` | `Timestamp` | ✅ | Server timestamp |

@@ -194,13 +194,19 @@ class JobPostService {
 
   // ── Xóa bài đăng ─────────────────────────────────────────────────────────
   Future<void> deleteJobPost(String jobId) async {
-    final blocked = await JobWorkflowService().hasBlockingDisbursementNotice(jobId);
+    final blocked = await JobWorkflowService().hasBlockingDisbursementNotice(
+      jobId,
+    );
     if (blocked) {
       throw Exception(
         'Không thể xóa: còn thông báo giải ngân chưa được Admin và NTD xác nhận.',
       );
     }
-    await _db.collection(_collection).doc(jobId).delete();
+    await _db.collection(_collection).doc(jobId).update({
+      'status': 'deleted',
+      'deletedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   // ── Lấy 1 bài đăng ───────────────────────────────────────────────────────

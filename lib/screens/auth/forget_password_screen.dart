@@ -1,24 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../common/widgets/primary_button.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/validators.dart';
 
-class ForgetPasswordScreen extends StatelessWidget {
-  ForgetPasswordScreen({super.key});
+class ForgetPasswordScreen extends StatefulWidget {
+  const ForgetPasswordScreen({super.key});
 
+  @override
+  State<ForgetPasswordScreen> createState() => _ForgetPasswordScreenState();
+}
+
+class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> {
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final TextEditingController emailController = TextEditingController();
+  bool _isLoading = false;
 
-  void _submit(BuildContext context) {
+  Future<void> _submit() async {
     final bool isValid = formKey.currentState!.validate();
-    if (!isValid) {
-      return;
+    if (!isValid) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: emailController.text.trim(),
+      );
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.resetEmailSent,
+          arguments: emailController.text.trim(),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'Không tìm thấy tài khoản với email này.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'Email không hợp lệ.';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã có lỗi xảy ra. Vui lòng thử lại sau.'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-    Navigator.pushNamed(
-      context,
-      AppRoutes.resetEmailSent,
-      arguments: emailController.text,
-    );
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
   }
 
   @override
@@ -45,7 +101,8 @@ class ForgetPasswordScreen extends StatelessWidget {
               const SizedBox(height: 24),
               PrimaryButton(
                 title: 'Gửi yêu cầu',
-                onPressed: () => _submit(context),
+                isLoading: _isLoading,
+                onPressed: _isLoading ? () {} : _submit,
               ),
             ],
           ),
