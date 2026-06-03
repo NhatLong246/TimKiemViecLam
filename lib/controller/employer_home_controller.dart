@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import '../data/models/job_post_model.dart';
 import '../data/services/job_post_service.dart';
+import 'candidates_controller.dart';
 
 class EmployerHomeController extends GetxController {
   final _postService = JobPostService();
@@ -12,6 +13,7 @@ class EmployerHomeController extends GetxController {
   final RxInt displayCount = 3.obs;
 
   StreamSubscription<List<JobPostModel>>? _sub;
+  Completer<void>? _pendingFirstEvent;
 
   @override
   void onInit() {
@@ -21,33 +23,71 @@ class EmployerHomeController extends GetxController {
 
   @override
   void onClose() {
+    _finishPendingFirstEvent();
     _sub?.cancel();
     super.onClose();
   }
 
-  void _listenToPosts() {
+  Future<void> _listenToPosts() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       isLoading.value = false;
       return;
     }
+    _finishPendingFirstEvent();
+    await _sub?.cancel();
     isLoading.value = true;
-    _sub = _postService.getJobPostsByEmployer(uid).listen((allPosts) {
-      // Chỉ lưu các bài đăng có status đã biết (loại draft + bất kỳ status lạ nào)
-      const knownStatuses = {
-        'pending',
-        'approved',
-        'active',
-        'closed',
-        'rejected',
-        'cancelled',
-        'deleted',
-      };
-      posts.value = allPosts
-          .where((p) => knownStatuses.contains(p.status))
-          .toList();
-      isLoading.value = false;
-    }, onError: (_) => isLoading.value = false);
+    final firstEvent = Completer<void>();
+    _pendingFirstEvent = firstEvent;
+    _sub = _postService
+        .getJobPostsByEmployer(uid)
+        .listen(
+          (allPosts) {
+            // Chỉ lưu các bài đăng có status đã biết (loại draft + bất kỳ status lạ nào)
+            const knownStatuses = {
+              'pending',
+              'approved',
+              'active',
+              'closed',
+              'rejected',
+              'cancelled',
+              'deleted',
+            };
+            posts.value = allPosts
+                .where((p) => knownStatuses.contains(p.status))
+                .toList();
+            isLoading.value = false;
+            _completeFirstEvent(firstEvent);
+          },
+          onError: (_) {
+            isLoading.value = false;
+            _completeFirstEvent(firstEvent);
+          },
+        );
+    return firstEvent.future;
+  }
+
+  void _completeFirstEvent(Completer<void> firstEvent) {
+    if (!firstEvent.isCompleted) firstEvent.complete();
+    if (identical(_pendingFirstEvent, firstEvent)) {
+      _pendingFirstEvent = null;
+    }
+  }
+
+  void _finishPendingFirstEvent() {
+    final pending = _pendingFirstEvent;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete();
+    }
+    _pendingFirstEvent = null;
+  }
+
+  Future<void> refreshHome() async {
+    displayCount.value = 3;
+    await _listenToPosts();
+    if (Get.isRegistered<CandidatesController>()) {
+      await Get.find<CandidatesController>().loadAll();
+    }
   }
 
   // ── Thống kê ────────────────────────────────────────────────────────

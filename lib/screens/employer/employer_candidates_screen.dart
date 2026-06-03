@@ -37,7 +37,8 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
   @override
   void initState() {
     super.initState();
-    _ctrl = Get.isRegistered<CandidatesController>()
+    final reusedController = Get.isRegistered<CandidatesController>();
+    _ctrl = reusedController
         ? Get.find<CandidatesController>()
         : Get.put(CandidatesController());
     final args = Get.arguments;
@@ -50,6 +51,11 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen>
         : null;
     _tabs = TabController(length: _isSingleTypeView ? 1 : 2, vsync: this);
     _ctrl.setFilterJobId(routeJobId);
+    if (reusedController) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _ctrl.loadAll();
+      });
+    }
   }
 
   @override
@@ -221,25 +227,54 @@ class _CandidatesTab extends StatelessWidget {
                 .where((job) => job.entries.isNotEmpty)
                 .toList()
           : rawJobs;
+      final onRefresh = isFullTime ? ctrl.loadFullTime : ctrl.loadPartTime;
 
       if (loading && jobs.isEmpty) {
-        return const Center(
-          child: CircularProgressIndicator(color: AppColors.employerPrimary),
+        return RefreshIndicator(
+          color: AppColors.employerPrimary,
+          onRefresh: onRefresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: const [
+              SizedBox(
+                height: 280,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.employerPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       }
 
       if (jobs.isEmpty) {
-        return _EmptyState(
-          isFullTime: isFullTime,
-          isFilteredByJob: ctrl.filterJobId != null,
-          acceptedOnly: acceptedOnly,
+        return RefreshIndicator(
+          color: AppColors.employerPrimary,
+          onRefresh: onRefresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.65,
+                child: _EmptyState(
+                  isFullTime: isFullTime,
+                  isFilteredByJob: ctrl.filterJobId != null,
+                  acceptedOnly: acceptedOnly,
+                ),
+              ),
+            ],
+          ),
         );
       }
 
       return RefreshIndicator(
         color: AppColors.employerPrimary,
-        onRefresh: isFullTime ? ctrl.loadFullTime : ctrl.loadPartTime,
+        onRefresh: onRefresh,
         child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
           itemCount: jobs.length + (isFullTime && !acceptedOnly ? 1 : 0),
           itemBuilder: (_, i) {
@@ -519,214 +554,218 @@ class _ApplicantTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          // ── Avatar + tên + rating ────────────────────────────────────────
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _CandidateAvatar(candidate: candidate),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      candidate.fullName.isNotEmpty
-                          ? candidate.fullName
-                          : 'Ứng viên',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: Color(0xFF1A1A2E),
+            // ── Avatar + tên + rating ────────────────────────────────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CandidateAvatar(candidate: candidate),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        candidate.fullName.isNotEmpty
+                            ? candidate.fullName
+                            : 'Ứng viên',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF1A1A2E),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        _StarRating(rating: candidate.averageRating),
-                        const SizedBox(width: 6),
-                        Text(
-                          candidate.averageRating > 0
-                              ? candidate.averageRating.toStringAsFixed(1)
-                              : 'Chưa có',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          _StarRating(rating: candidate.averageRating),
+                          const SizedBox(width: 6),
+                          Text(
+                            candidate.averageRating > 0
+                                ? candidate.averageRating.toStringAsFixed(1)
+                                : 'Chưa có',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.work_outline,
-                          size: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${candidate.totalJobsDone} việc',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 12,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          app.appliedAt != null
-                              ? 'Nộp ${DateFormat('dd/MM/yyyy').format(app.appliedAt!)}'
-                              : 'Vừa nộp',
-                          style: TextStyle(
-                            fontSize: 11,
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.work_outline,
+                            size: 12,
                             color: Colors.grey.shade500,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 2),
+                          Text(
+                            '${candidate.totalJobsDone} việc',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 12,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            app.appliedAt != null
+                                ? 'Nộp ${DateFormat('dd/MM/yyyy').format(app.appliedAt!)}'
+                                : 'Vừa nộp',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Status chip
+                _AppStatusChip(status: app.status),
+              ],
+            ),
+
+            // ── Cover letter (nếu có, rút gọn 2 dòng) ───────────────────────
+            if (app.coverLetter?.isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  app.coverLetter!,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+
+            // ── CV link (chỉ full-time) ──────────────────────────────────────
+            if (app.cvUrl?.isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () async {
+                  final uri = Uri.tryParse(app.cvUrl!);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.picture_as_pdf,
+                      size: 14,
+                      color: Colors.red.shade400,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Xem CV',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.employerSecondary,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ],
                 ),
               ),
-              // Status chip
-              _AppStatusChip(status: app.status),
             ],
-          ),
 
-          // ── Cover letter (nếu có, rút gọn 2 dòng) ───────────────────────
-          if (app.coverLetter?.isNotEmpty == true) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Text(
-                app.coverLetter!,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-
-          // ── CV link (chỉ full-time) ──────────────────────────────────────
-          if (app.cvUrl?.isNotEmpty == true) ...[
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () async {
-                final uri = Uri.tryParse(app.cvUrl!);
-                if (uri != null && await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            // ── Action buttons (chỉ pending) ─────────────────────────────────
+            if (!readOnly && isPending) ...[
+              const SizedBox(height: 10),
+              Row(
                 children: [
-                  Icon(
-                    Icons.picture_as_pdf,
-                    size: 14,
-                    color: Colors.red.shade400,
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _confirmReject(context, app.appId),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade600,
+                        side: BorderSide(color: Colors.red.shade300),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Từ chối',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Xem CV',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.employerSecondary,
-                      decoration: TextDecoration.underline,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: job.isFull
+                          ? null
+                          : () => _confirmAccept(context, app.appId, job.jobId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.employerPrimary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        job.isFull
+                            ? 'Đã đủ slot'
+                            : (job.isFullTimeReferral
+                                  ? 'Ghi nhận & liên hệ'
+                                  : 'Duyệt'),
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
 
-          // ── Action buttons (chỉ pending) ─────────────────────────────────
-          if (!readOnly && isPending) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _confirmReject(context, app.appId),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red.shade600,
-                      side: BorderSide(color: Colors.red.shade300),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Từ chối',
-                      style: TextStyle(fontSize: 13),
+            // ── Huỷ duyệt button (nếu accepted) ─────────────────────────────
+            if (!readOnly && isAccepted) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      _confirmRevoke(context, app.appId, job.jobId),
+                  icon: Icon(
+                    Icons.undo_rounded,
+                    size: 14,
+                    color: Colors.orange.shade700,
+                  ),
+                  label: Text(
+                    'Huỷ duyệt',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange.shade700,
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: job.isFull
-                        ? null
-                        : () => _confirmAccept(context, app.appId, job.jobId),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.employerPrimary,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                    child: Text(
-                      job.isFull
-                          ? 'Đã đủ slot'
-                          : (job.isFullTimeReferral
-                                ? 'Ghi nhận & liên hệ'
-                                : 'Duyệt'),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-
-          // ── Huỷ duyệt button (nếu accepted) ─────────────────────────────
-          if (!readOnly && isAccepted) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _confirmRevoke(context, app.appId, job.jobId),
-                icon: Icon(
-                  Icons.undo_rounded,
-                  size: 14,
-                  color: Colors.orange.shade700,
-                ),
-                label: Text(
-                  'Huỷ duyệt',
-                  style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
-                ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
                   ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -921,7 +960,7 @@ class _AppStatusChip extends StatelessWidget {
       'pending' => ('Chờ duyệt', Colors.orange.shade50, Colors.orange.shade800),
       'accepted' => ('Đã duyệt', Colors.green.shade50, Colors.green.shade800),
       'rejected' => ('Từ chối', Colors.red.shade50, Colors.red.shade800),
-      'withdrawn' => ('Đã rút', Colors.grey.shade100, Colors.grey.shade700),
+      'withdrawn' => ('Đã hủy', Colors.grey.shade100, Colors.grey.shade700),
       _ => (status, Colors.grey.shade100, Colors.grey.shade700),
     };
     return Container(
@@ -942,7 +981,10 @@ class _CandidateProfileSheet extends StatefulWidget {
   final CandidateSnapshot candidateSnap;
   final ApplicationModel app;
 
-  const _CandidateProfileSheet({required this.candidateSnap, required this.app});
+  const _CandidateProfileSheet({
+    required this.candidateSnap,
+    required this.app,
+  });
 
   @override
   State<_CandidateProfileSheet> createState() => _CandidateProfileSheetState();
@@ -1032,13 +1074,17 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
               _buildInfoRow(
                 Icons.email_outlined,
                 'Email',
-                _fullUser!.email.isNotEmpty ? _fullUser!.email : 'Chưa cập nhật',
+                _fullUser!.email.isNotEmpty
+                    ? _fullUser!.email
+                    : 'Chưa cập nhật',
               ),
               const SizedBox(height: 16),
               _buildInfoRow(
                 Icons.phone_outlined,
                 'Số điện thoại',
-                _fullUser!.phone.isNotEmpty ? _fullUser!.phone : 'Chưa cập nhật',
+                _fullUser!.phone.isNotEmpty
+                    ? _fullUser!.phone
+                    : 'Chưa cập nhật',
               ),
               const SizedBox(height: 16),
               _buildInfoRow(
@@ -1067,15 +1113,17 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.employerPrimary,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text(
                   'Đóng',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1100,12 +1148,15 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+            ),
             const SizedBox(height: 2),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w500)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       ],

@@ -20,10 +20,26 @@ class EmployerHomeScreen extends StatelessWidget {
   const EmployerHomeScreen({super.key});
 
   static const _quickTools = [
-    {'asset': 'assets/images/icons/icons8-open-book-100 (1).png', 'label': 'Tham khảo', 'route': AppRoutes.employerReference},
-    {'asset': 'assets/images/icons/icons8-column-chart-100.png', 'label': 'Thống kê', 'route': AppRoutes.employerStats},
-    {'asset': 'assets/images/icons/icons8-cv-100.png', 'label': 'Ứng viên', 'route': AppRoutes.employerCandidates},
-    {'asset': 'assets/images/icons/icons8-create-post-64.png', 'label': 'Bài đăng', 'route': AppRoutes.postManagement},
+    {
+      'asset': 'assets/images/icons/icons8-open-book-100 (1).png',
+      'label': 'Tham khảo',
+      'route': AppRoutes.employerReference,
+    },
+    {
+      'asset': 'assets/images/icons/icons8-column-chart-100.png',
+      'label': 'Thống kê',
+      'route': AppRoutes.employerStats,
+    },
+    {
+      'asset': 'assets/images/icons/icons8-cv-100.png',
+      'label': 'Ứng viên',
+      'route': AppRoutes.employerCandidates,
+    },
+    {
+      'asset': 'assets/images/icons/icons8-create-post-64.png',
+      'label': 'Bài đăng',
+      'route': AppRoutes.postManagement,
+    },
   ];
 
   @override
@@ -38,44 +54,57 @@ class EmployerHomeScreen extends StatelessWidget {
         final user = authCtrl.currentUser;
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: Obx(() => CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader(context, user)),
-              SliverToBoxAdapter(child: _buildQuickTools(context)),
-              SliverToBoxAdapter(child: _buildQuickStats(homeCtrl, user)),
-              SliverToBoxAdapter(child: _buildSectionTitle(context, homeCtrl)),
-              if (homeCtrl.isLoading.value)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(Color(0xFF7B1FA2)),
+          body: RefreshIndicator(
+            color: const Color(0xFF7B1FA2),
+            onRefresh: homeCtrl.refreshHome,
+            child: Obx(
+              () => CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(child: _buildHeader(context, user)),
+                  SliverToBoxAdapter(child: _buildQuickTools(context)),
+                  SliverToBoxAdapter(child: _buildQuickStats(homeCtrl, user)),
+                  SliverToBoxAdapter(
+                    child: _buildSectionTitle(context, homeCtrl),
+                  ),
+                  if (homeCtrl.isLoading.value)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(
+                              Color(0xFF7B1FA2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (homeCtrl.displayedPosts.isEmpty)
+                    SliverToBoxAdapter(child: _buildEmptyState())
+                  else ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (ctx, index) => _buildJobCard(
+                            ctx,
+                            homeCtrl.displayedPosts[index],
+                          ),
+                          childCount: homeCtrl.displayedPosts.length,
+                        ),
                       ),
                     ),
-                  ),
-                )
-              else if (homeCtrl.displayedPosts.isEmpty)
-                SliverToBoxAdapter(child: _buildEmptyState())
-              else ...[
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx, index) =>
-                          _buildJobCard(ctx, homeCtrl.displayedPosts[index]),
-                      childCount: homeCtrl.displayedPosts.length,
+                    SliverToBoxAdapter(
+                      child: homeCtrl.hasMore
+                          ? _buildLoadMoreButton(homeCtrl)
+                          : const SizedBox(height: 100),
                     ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: homeCtrl.hasMore
-                      ? _buildLoadMoreButton(homeCtrl)
-                      : const SizedBox(height: 100),
-                ),
-              ],
-            ],
-          )),
+                  ],
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -161,25 +190,34 @@ class EmployerHomeScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.22),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.55), width: 2),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.55),
+                          width: 2,
+                        ),
                       ),
                       child: ClipOval(
                         child: user?.companyLogoUrl?.isNotEmpty == true
-                            ? Image.network(user!.companyLogoUrl!, fit: BoxFit.cover)
+                            ? Image.network(
+                                user!.companyLogoUrl!,
+                                fit: BoxFit.cover,
+                              )
                             : user?.avatarBase64?.isNotEmpty == true
-                                ? Image.memory(base64Decode(user!.avatarBase64!), fit: BoxFit.cover)
-                                : user?.avatarUrl?.isNotEmpty == true
-                                    ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
-                                    : Center(
-                                        child: Text(
-                                          initial,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 19,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ),
+                            ? Image.memory(
+                                base64Decode(user!.avatarBase64!),
+                                fit: BoxFit.cover,
+                              )
+                            : user?.avatarUrl?.isNotEmpty == true
+                            ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
+                            : Center(
+                                child: Text(
+                                  initial,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -200,8 +238,11 @@ class EmployerHomeScreen extends StatelessWidget {
                           const SizedBox(height: 3),
                           Row(
                             children: [
-                              const Icon(Icons.location_on_rounded,
-                                  color: Colors.white60, size: 12),
+                              const Icon(
+                                Icons.location_on_rounded,
+                                color: Colors.white60,
+                                size: 12,
+                              ),
                               const SizedBox(width: 3),
                               Expanded(
                                 child: Text(
@@ -245,9 +286,9 @@ class EmployerHomeScreen extends StatelessWidget {
                                 color: Colors.white.withOpacity(0.15),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                    color:
-                                        Colors.white.withOpacity(0.25),
-                                    width: 1.2),
+                                  color: Colors.white.withOpacity(0.25),
+                                  width: 1.2,
+                                ),
                               ),
                               child: Icon(
                                 count > 0
@@ -263,24 +304,28 @@ class EmployerHomeScreen extends StatelessWidget {
                                 right: -3,
                                 child: Container(
                                   constraints: const BoxConstraints(
-                                      minWidth: 17, minHeight: 17),
+                                    minWidth: 17,
+                                    minHeight: 17,
+                                  ),
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 4),
+                                    horizontal: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFF5252),
-                                    borderRadius:
-                                        BorderRadius.circular(9),
+                                    borderRadius: BorderRadius.circular(9),
                                     border: Border.all(
-                                        color: Colors.white,
-                                        width: 1.5),
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
                                   ),
                                   child: Center(
                                     child: Text(
                                       count > 99 ? '99+' : '$count',
                                       style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold),
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -294,17 +339,26 @@ class EmployerHomeScreen extends StatelessWidget {
                 const SizedBox(height: 18),
                 // ── Subtitle ──
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.13),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.lightbulb_outline_rounded,
-                          color: Colors.white70, size: 13),
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        color: Colors.white70,
+                        size: 13,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'Hôm nay bạn muốn tuyển ai?',
@@ -320,8 +374,7 @@ class EmployerHomeScreen extends StatelessWidget {
                     // Search input (tap → mở EmployerSearchScreen)
                     Expanded(
                       child: GestureDetector(
-                        onTap: () =>
-                            Get.toNamed(AppRoutes.employerSearch),
+                        onTap: () => Get.toNamed(AppRoutes.employerSearch),
                         child: Container(
                           height: 50,
                           decoration: BoxDecoration(
@@ -338,15 +391,19 @@ class EmployerHomeScreen extends StatelessWidget {
                           child: Row(
                             children: [
                               const SizedBox(width: 14),
-                              Icon(Icons.search_rounded,
-                                  color: Colors.grey.shade400, size: 22),
+                              Icon(
+                                Icons.search_rounded,
+                                color: Colors.grey.shade400,
+                                size: 22,
+                              ),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
                                   'Tìm bài đăng, người làm...',
                                   style: TextStyle(
-                                      color: Color(0xFFBDBDBD),
-                                      fontSize: 14),
+                                    color: Color(0xFFBDBDBD),
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ),
                             ],
@@ -373,15 +430,17 @@ class EmployerHomeScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  const Color(0xFF7B1FA2).withOpacity(0.35),
+                              color: const Color(0xFF7B1FA2).withOpacity(0.35),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.tune_rounded,
-                            color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.tune_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ],
@@ -403,7 +462,11 @@ class EmployerHomeScreen extends StatelessWidget {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -413,7 +476,11 @@ class EmployerHomeScreen extends StatelessWidget {
             padding: EdgeInsets.only(left: 10, bottom: 14),
             child: Text(
               'Công cụ nhanh',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF212121),
+              ),
             ),
           ),
           Row(
@@ -435,44 +502,48 @@ class EmployerHomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: _gradientBegin,
-                end: _gradientEnd,
-                colors: _gradientColors,
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7B1FA2).withOpacity(0.25),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: _gradientBegin,
+                  end: _gradientEnd,
+                  colors: _gradientColors,
                 ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(11),
-              child: Image.asset(
-                tool['asset'] as String,
-                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7B1FA2).withOpacity(0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(11),
+                child: Image.asset(
+                  tool['asset'] as String,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 32,
-            child: Text(
-              tool['label'] as String,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF424242)),
-              maxLines: 2,
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 32,
+              child: Text(
+                tool['label'] as String,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF424242),
+                ),
+                maxLines: 2,
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -491,9 +562,16 @@ class EmployerHomeScreen extends StatelessWidget {
           colors: [Color(0xFFF3E5F5), Color(0xFFE3F2FD)],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFCE93D8).withOpacity(0.4), width: 1),
+        border: Border.all(
+          color: const Color(0xFFCE93D8).withOpacity(0.4),
+          width: 1,
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -509,12 +587,19 @@ class EmployerHomeScreen extends StatelessWidget {
                 ).createShader(bounds),
                 child: const Text(
                   'Thống kê nhanh',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: _gradientBegin,
@@ -523,18 +608,40 @@ class EmployerHomeScreen extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text('Tháng này', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                child: const Text(
+                  'Tháng này',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              _buildStatItem(Icons.work_outline_rounded, 'Đang tuyển', '${homeCtrl.activePostsCount} vị trí', const Color(0xFF7B1FA2)),
+              _buildStatItem(
+                Icons.work_outline_rounded,
+                'Đang tuyển',
+                '${homeCtrl.activePostsCount} vị trí',
+                const Color(0xFF7B1FA2),
+              ),
               _buildStatDivider(),
-              _buildStatItem(Icons.people_outline_rounded, 'Đã thuê', '${homeCtrl.totalHired} người', const Color(0xFF1565C0)),
+              _buildStatItem(
+                Icons.people_outline_rounded,
+                'Đã thuê',
+                '${homeCtrl.totalHired} người',
+                const Color(0xFF1565C0),
+              ),
               _buildStatDivider(),
-              _buildStatItem(Icons.account_balance_wallet_outlined, 'Ngân sách\nđã chi', _formatVnd(totalSpent), const Color(0xFF6A1B9A)),
+              _buildStatItem(
+                Icons.account_balance_wallet_outlined,
+                'Ngân sách\nđã chi',
+                _formatVnd(totalSpent),
+                const Color(0xFF6A1B9A),
+              ),
             ],
           ),
         ],
@@ -549,7 +656,12 @@ class EmployerHomeScreen extends StatelessWidget {
     return '${amount.toInt()}₫';
   }
 
-  Widget _buildStatItem(IconData icon, String label, String value, Color color) {
+  Widget _buildStatItem(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Expanded(
       child: Column(
         children: [
@@ -563,7 +675,14 @@ class EmployerHomeScreen extends StatelessWidget {
             child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(height: 8),
-          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 2),
           Text(
             label,
@@ -577,11 +696,18 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   Widget _buildStatDivider() {
-    return Container(width: 1, height: 60, color: Colors.purple.withOpacity(0.12));
+    return Container(
+      width: 1,
+      height: 60,
+      color: Colors.purple.withOpacity(0.12),
+    );
   }
 
   // ── SECTION TITLE ──────────────────────────────────────────────────────────
-  Widget _buildSectionTitle(BuildContext context, EmployerHomeController homeCtrl) {
+  Widget _buildSectionTitle(
+    BuildContext context,
+    EmployerHomeController homeCtrl,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
       child: Row(
@@ -590,9 +716,10 @@ class EmployerHomeScreen extends StatelessWidget {
             child: Text(
               'Bài đăng tuyển dụng của bạn',
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF212121)),
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF212121),
+              ),
             ),
           ),
           GestureDetector(
@@ -622,8 +749,11 @@ class EmployerHomeScreen extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.history_rounded,
-                      color: Colors.white, size: 15),
+                  const Icon(
+                    Icons.history_rounded,
+                    color: Colors.white,
+                    size: 15,
+                  ),
                   const SizedBox(width: 5),
                   const Text(
                     'Lịch sử',
@@ -651,12 +781,18 @@ class EmployerHomeScreen extends StatelessWidget {
           children: [
             Icon(Icons.inbox_rounded, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 12),
-            const Text('Chưa có bài đăng nào', style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14)),
+            const Text(
+              'Chưa có bài đăng nào',
+              style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+            ),
             const SizedBox(height: 16),
             GestureDetector(
               onTap: () => Get.toNamed(AppRoutes.createPost),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: _gradientBegin,
@@ -667,7 +803,11 @@ class EmployerHomeScreen extends StatelessWidget {
                 ),
                 child: const Text(
                   'Tạo bài đăng mới',
-                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -688,12 +828,18 @@ class EmployerHomeScreen extends StatelessWidget {
           onPressed: homeCtrl.loadMore,
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Color(0xFF7B1FA2), width: 1.5),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           icon: const Icon(Icons.expand_more_rounded, color: Color(0xFF7B1FA2)),
           label: const Text(
             'Xem thêm bài đăng',
-            style: TextStyle(color: Color(0xFF7B1FA2), fontWeight: FontWeight.w700, fontSize: 14),
+            style: TextStyle(
+              color: Color(0xFF7B1FA2),
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
           ),
         ),
       ),
@@ -712,7 +858,11 @@ class EmployerHomeScreen extends StatelessWidget {
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -733,7 +883,11 @@ class EmployerHomeScreen extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.business_center_rounded, color: Colors.white, size: 24),
+                child: const Icon(
+                  Icons.business_center_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -742,7 +896,11 @@ class EmployerHomeScreen extends StatelessWidget {
                   children: [
                     Text(
                       job.title,
-                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF212121),
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -751,8 +909,16 @@ class EmployerHomeScreen extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        _buildTag(job.salaryDisplay, const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
-                        _buildTag(typeLabel, const Color(0xFFF3E5F5), const Color(0xFF7B1FA2)),
+                        _buildTag(
+                          job.salaryDisplay,
+                          const Color(0xFFE8F5E9),
+                          const Color(0xFF2E7D32),
+                        ),
+                        _buildTag(
+                          typeLabel,
+                          const Color(0xFFF3E5F5),
+                          const Color(0xFF7B1FA2),
+                        ),
                       ],
                     ),
                   ],
@@ -767,7 +933,11 @@ class EmployerHomeScreen extends StatelessWidget {
                 ),
                 child: Text(
                   statusLabel,
-                  style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -778,17 +948,30 @@ class EmployerHomeScreen extends StatelessWidget {
           // ── Info row ──
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF9E9E9E)),
+              const Icon(
+                Icons.location_on_outlined,
+                size: 14,
+                color: Color(0xFF9E9E9E),
+              ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  job.locationDisplay.isNotEmpty ? job.locationDisplay : 'Chưa cập nhật',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF757575)),
+                  job.locationDisplay.isNotEmpty
+                      ? job.locationDisplay
+                      : 'Chưa cập nhật',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF757575),
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.people_outline_rounded, size: 14, color: Color(0xFF9E9E9E)),
+              const Icon(
+                Icons.people_outline_rounded,
+                size: 14,
+                color: Color(0xFF9E9E9E),
+              ),
               const SizedBox(width: 4),
               Text(
                 '${job.filledSlots}/${job.slots} vị trí',
@@ -815,12 +998,18 @@ class EmployerHomeScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   padding: EdgeInsets.zero,
                 ),
                 child: const Text(
                   'Quản lý',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ),
