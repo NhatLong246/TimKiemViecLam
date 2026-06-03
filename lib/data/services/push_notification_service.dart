@@ -23,6 +23,7 @@ class PushNotificationService {
 
   static const defaultChannelId = kPushDefaultChannelId;
   static const defaultChannelName = kPushDefaultChannelName;
+  static const callChannelId = 'call_channel_v2'; // Đổi ID để đảm bảo cập nhật importance
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local =
@@ -66,12 +67,13 @@ class PushNotificationService {
       );
       
       const callChannel = AndroidNotificationChannel(
-        'call_channel',
-        'Cuộc gọi',
-        description: 'Thông báo cuộc gọi đến',
+        callChannelId,
+        'Cuộc gọi đến',
+        description: 'Thông báo cuộc gọi video và thoại',
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
+        enableLights: true,
       );
       
       const alarmChannel = AndroidNotificationChannel(
@@ -111,10 +113,7 @@ class PushNotificationService {
     if (kIsWeb) return false;
 
     if (!kIsWeb && Platform.isAndroid) {
-      final status = await Permission.notification.request();
-      if (!status.isGranted && !status.isLimited) {
-        // Android < 13 không cần runtime permission.
-      }
+      await Permission.notification.request();
     }
 
     final settings = await _fcm.requestPermission(
@@ -196,7 +195,6 @@ class PushNotificationService {
 
   void _onLocalTap(NotificationResponse response) {
     if (response.actionId == 'decline_call') {
-      // Bỏ qua (không làm gì)
       return;
     }
     PushNavigationHandler.setPendingFromJson(response.payload);
@@ -211,26 +209,30 @@ class PushNotificationService {
     final body = notification?.body ?? data['body']?.toString() ?? '';
     final type = data['type']?.toString();
 
-    // Nếu app đang bật và có cuộc gọi đến, hiện Overlay luôn thay vì Notification
+    // Nếu app đang bật, vẫn hiện Overlay nhưng cũng có thể hiện Notification nếu cần
     if (type == 'call') {
       IncomingCallOverlay.show(data);
-      return; // Không hiện push notification cục bộ nữa
+      // Tiếp tục hiển thị notification để có nút trả lời nhanh trên thanh trạng thái
     }
 
     if (title.isEmpty && body.isEmpty) return;
 
     final payload = data.isNotEmpty ? jsonEncode(data) : null;
     
-    // Cấu hình riêng cho Cuộc gọi
     AndroidNotificationDetails androidDetails;
     if (type == 'call') {
       androidDetails = const AndroidNotificationDetails(
-        'call_channel',
-        'Cuộc gọi',
+        callChannelId,
+        'Cuộc gọi đến',
         importance: Importance.max,
         priority: Priority.max,
         icon: '@mipmap/ic_launcher',
-        fullScreenIntent: true, // Kích hoạt Full Screen Intent
+        fullScreenIntent: true,
+        category: AndroidNotificationCategory.call,
+        ongoing: true,
+        autoCancel: false,
+        visibility: NotificationVisibility.public,
+        ticker: 'Đang có cuộc gọi đến...',
         actions: [
           AndroidNotificationAction(
             'decline_call',
@@ -265,6 +267,7 @@ class PushNotificationService {
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          categoryIdentifier: 'call_category',
         ),
       ),
       payload: payload,

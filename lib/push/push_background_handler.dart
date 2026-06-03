@@ -17,10 +17,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   if (kIsWeb) return;
 
-  // Android: khi app nền/tắt, FCM tự hiện notification nếu payload có `notification`.
-  // iOS / data-only: hiện local notification thủ công.
   final notification = message.notification;
-  if (notification == null && message.data.isEmpty) return;
+  final data = message.data;
+  if (notification == null && data.isEmpty) return;
 
   final plugin = FlutterLocalNotificationsPlugin();
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -29,39 +28,92 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     const InitializationSettings(android: androidInit, iOS: iosInit),
   );
 
-  const channel = AndroidNotificationChannel(
-    kPushDefaultChannelId,
-    kPushDefaultChannelName,
-    importance: Importance.high,
-  );
-  await plugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
+  final type = data['type']?.toString();
+  final title = notification?.title ?? data['title']?.toString() ?? 'ViecNow';
+  final body = notification?.body ?? data['body']?.toString() ?? '';
 
-  final title =
-      notification?.title ?? message.data['title']?.toString() ?? 'ViecNow';
-  final body =
-      notification?.body ?? message.data['body']?.toString() ?? '';
+  if (type == 'call') {
+    const callChannel = AndroidNotificationChannel(
+      'call_channel',
+      'Cuộc gọi',
+      description: 'Thông báo cuộc gọi đến',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(callChannel);
 
-  await plugin.show(
-    message.hashCode,
-    title,
-    body,
-    NotificationDetails(
-      android: AndroidNotificationDetails(
-        kPushDefaultChannelId,
-        kPushDefaultChannelName,
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
+    await plugin.show(
+      message.hashCode,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          callChannel.id,
+          callChannel.name,
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: '@mipmap/ic_launcher',
+          fullScreenIntent: true,
+          category: AndroidNotificationCategory.call,
+          ongoing: true,
+          autoCancel: false,
+          actions: [
+            const AndroidNotificationAction(
+              'decline_call',
+              'Từ chối',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+            const AndroidNotificationAction(
+              'accept_call',
+              'Trả lời',
+              showsUserInterface: true,
+            ),
+          ],
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          categoryIdentifier: 'call_category',
+        ),
       ),
-      iOS: const DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
+      payload: jsonEncode(data),
+    );
+  } else {
+    const channel = AndroidNotificationChannel(
+      kPushDefaultChannelId,
+      kPushDefaultChannelName,
+      importance: Importance.high,
+    );
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    await plugin.show(
+      message.hashCode,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          kPushDefaultChannelId,
+          kPushDefaultChannelName,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
       ),
-    ),
-    payload: jsonEncode(message.data),
-  );
+      payload: jsonEncode(data),
+    );
+  }
 }
