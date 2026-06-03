@@ -23,7 +23,7 @@ class PushNotificationService {
 
   static const defaultChannelId = kPushDefaultChannelId;
   static const defaultChannelName = kPushDefaultChannelName;
-  static const callChannelId = 'call_channel_v6'; // Nâng lên v6 để ép cập nhật hệ thống
+  static const callChannelId = 'call_channel_final'; // Cố định ID để dễ cấp quyền
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local =
@@ -48,9 +48,9 @@ class PushNotificationService {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
     );
 
     await _local.initialize(
@@ -69,27 +69,17 @@ class PushNotificationService {
       const callChannel = AndroidNotificationChannel(
         callChannelId,
         'Cuộc gọi đến',
-        description: 'Thông báo cuộc gọi video và thoại',
-        importance: Importance.max,
+        description: 'Thông báo cuộc gọi video và thoại quan trọng',
+        importance: Importance.max, // BẮT BUỘC ĐỂ HIỆN HEADS-UP
         playSound: true,
         enableVibration: true,
         enableLights: true,
-        audioAttributesUsage: AudioAttributesUsage.notification,
+        showBadge: true,
       );
       
-      const alarmChannel = AndroidNotificationChannel(
-        'alarm_channel',
-        'Báo thức & Nhắc nhở',
-        description: 'Báo động đỏ khi có ca làm việc sắp diễn ra',
-        importance: Importance.max,
-        playSound: true,
-        enableVibration: true,
-      );
-
       final androidPlugin = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.createNotificationChannel(channel);
       await androidPlugin?.createNotificationChannel(callChannel);
-      await androidPlugin?.createNotificationChannel(alarmChannel);
     }
 
     await requestPermission();
@@ -112,55 +102,30 @@ class PushNotificationService {
 
   Future<bool> requestPermission() async {
     if (kIsWeb) return false;
-
-    if (!kIsWeb && Platform.isAndroid) {
+    if (Platform.isAndroid) {
       await Permission.notification.request();
+      if (!await Permission.systemAlertWindow.isGranted) {
+        await Permission.systemAlertWindow.request();
+      }
     }
-
-    final settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-
-    await _fcm.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    final settings = await _fcm.requestPermission(alert: true, badge: true, sound: true);
+    return settings.authorizationStatus == AuthorizationStatus.authorized;
   }
 
   Future<void> bindToUser(String userId) async {
     if (kIsWeb || userId.isEmpty) return;
     _boundUserId = userId;
-
     final token = await _fcm.getToken();
-    if (token != null) {
-      await _persistToken(userId, token);
-    }
-
+    if (token != null) await _persistToken(userId, token);
     await PushNavigationHandler.processPendingIfAny();
   }
 
   Future<void> unbindUser(String userId) async {
     if (kIsWeb || userId.isEmpty) return;
-
     final token = await _fcm.getToken();
-    if (token != null) {
-      await _removeToken(userId, token);
-    }
-
-    if (_boundUserId == userId) {
-      _boundUserId = null;
-    }
-
-    try {
-      await _fcm.deleteToken();
-    } catch (_) {}
+    if (token != null) await _removeToken(userId, token);
+    if (_boundUserId == userId) _boundUserId = null;
+    try { await _fcm.deleteToken(); } catch (_) {}
   }
 
   Future<void> _persistToken(String userId, String token) async {
@@ -173,11 +138,7 @@ class PushNotificationService {
       },
       'fcmUpdatedAt': FieldValue.serverTimestamp(),
     };
-    try {
-      await ref.update(payload);
-    } catch (_) {
-      await ref.set(payload, SetOptions(merge: true));
-    }
+    try { await ref.update(payload); } catch (_) { await ref.set(payload, SetOptions(merge: true)); }
   }
 
   Future<void> _removeToken(String userId, String token) async {
@@ -195,9 +156,7 @@ class PushNotificationService {
   }
 
   void _onLocalTap(NotificationResponse response) {
-    if (response.actionId == 'decline_call') {
-      return;
-    }
+    if (response.actionId == 'decline_call') return;
     PushNavigationHandler.setPendingFromJson(response.payload);
     PushNavigationHandler.processPendingIfAny();
   }
@@ -208,66 +167,58 @@ class PushNotificationService {
     final title = message.notification?.title ?? data['title']?.toString() ?? 'Cuộc gọi đến';
     final body = message.notification?.body ?? data['body']?.toString() ?? 'Đang gọi cho bạn...';
 
-    if (type == 'call') {
-      IncomingCallOverlay.show(data);
-    }
-
     if (title.isEmpty && body.isEmpty) return;
 
     final payload = data.isNotEmpty ? jsonEncode(data) : null;
     
-    AndroidNotificationDetails androidDetails;
     if (type == 'call') {
-      androidDetails = const AndroidNotificationDetails(
-        callChannelId,
-        'Cuộc gọi đến',
-        importance: Importance.max,
-        priority: Priority.max,
-        icon: '@mipmap/ic_launcher',
-        fullScreenIntent: true,
-        category: AndroidNotificationCategory.call,
-        ongoing: true,
-        autoCancel: false,
-        visibility: NotificationVisibility.public,
-        ticker: 'Đang có cuộc gọi đến...',
-        actions: [
-          AndroidNotificationAction(
-            'decline_call',
-            'Từ chối',
-            showsUserInterface: true,
-            cancelNotification: true,
+      // HIỆN THÔNG BÁO HỆ THỐNG TRƯỚC VỚI ƯU TIÊN MAX
+      await _local.show(
+        message.hashCode,
+        title,
+        body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            callChannelId,
+            'Cuộc gọi đến',
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: '@mipmap/ic_launcher',
+            fullScreenIntent: true,
+            category: AndroidNotificationCategory.call,
+            ongoing: true,
+            autoCancel: false,
+            visibility: NotificationVisibility.public,
+            ticker: 'Cuộc gọi đến...',
+            actions: [
+              AndroidNotificationAction('decline_call', 'Từ chối', showsUserInterface: true, cancelNotification: true),
+              AndroidNotificationAction('accept_call', 'Trả lời', showsUserInterface: true),
+            ],
           ),
-          AndroidNotificationAction(
-            'accept_call',
-            'Trả lời',
-            showsUserInterface: true,
-          ),
-        ],
+          iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+        ),
+        payload: payload,
       );
+
+      // HIỆN OVERLAY APP
+      IncomingCallOverlay.show(data);
     } else {
-      androidDetails = const AndroidNotificationDetails(
-        defaultChannelId,
-        defaultChannelName,
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
+      await _local.show(
+        message.hashCode,
+        title,
+        body,
+        NotificationDetails(
+          android: const AndroidNotificationDetails(
+            defaultChannelId,
+            defaultChannelName,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+        ),
+        payload: payload,
       );
     }
-
-    await _local.show(
-      message.hashCode,
-      title,
-      body,
-      NotificationDetails(
-        android: androidDetails,
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-          categoryIdentifier: 'call_category',
-        ),
-      ),
-      payload: payload,
-    );
   }
 }
