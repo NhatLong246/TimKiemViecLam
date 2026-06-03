@@ -64,6 +64,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       for (final post in postsToNotify) {
         if (!mounted) break;
         final missing = post.slots - post.filledSlots;
+        final canContinueUnderfilled = post.filledSlots > 0;
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -72,24 +73,25 @@ class _PostManagementScreenState extends State<PostManagementScreen>
             content: Text(
               'Công việc "${post.title}" đã đến hạn ứng tuyển nhưng chưa đủ người.\n'
               'Số lượng hiện tại: ${post.filledSlots}/${post.slots} (Thiếu $missing người).\n\n'
-              'Bạn có muốn cho job tiếp tục dù chưa đủ người không? Nếu không, công việc sẽ bị hủy và bạn sẽ được hoàn tiền.',
+              '${canContinueUnderfilled ? 'Bạn có muốn cho job tiếp tục dù chưa đủ người không? Nếu không, công việc sẽ bị hủy và bạn sẽ được hoàn tiền.' : 'Hiện chưa có ứng viên nào được nhận nên không thể tiếp tục job. Bạn chỉ có thể hủy công việc và hoàn tiền.'}',
             ),
             actions: [
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final updated = post.copyWith(underfilledAccepted: true);
-                  final ok = await _controller.updatePost(updated);
-                  if (ok) {
-                    Get.snackbar(
-                      'Đã lưu quyết định',
-                      'Job được phép tiếp tục dù chưa đủ người.',
-                      snackPosition: SnackPosition.BOTTOM,
-                    );
-                  }
-                },
-                child: const Text('Tiếp tục job'),
-              ),
+              if (canContinueUnderfilled)
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final updated = post.copyWith(underfilledAccepted: true);
+                    final ok = await _controller.updatePost(updated);
+                    if (ok) {
+                      Get.snackbar(
+                        'Đã lưu quyết định',
+                        'Job được phép tiếp tục dù chưa đủ người.',
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    }
+                  },
+                  child: const Text('Tiếp tục job'),
+                ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () {

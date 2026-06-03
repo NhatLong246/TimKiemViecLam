@@ -11,6 +11,7 @@ import '../../data/constants/job_categories.dart';
 import '../../controller/job_post_controller.dart';
 import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
+import '../../data/services/job_pricing_service.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme_colors.dart';
 
@@ -399,6 +400,101 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return null;
   }
 
+  String _money(double value) {
+    return '${NumberFormat('#,###', 'vi_VN').format(value.ceil())}đ';
+  }
+
+  String _number(double value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toStringAsFixed(1).replaceAll('.', ',');
+  }
+
+  String _depositFormula(JobPostModel post, JobDepositQuote quote) {
+    final salary = _money(post.salary);
+    final slots = post.slots;
+    final days = quote.workDays;
+    return switch (post.salaryType) {
+      'per_hour' =>
+        '$salary/giờ x ${_number(post.workHoursPerDay ?? 0)} giờ/ngày x $days ngày x $slots người = ${_money(quote.depositAmount)}',
+      'per_day' =>
+        '$salary/ngày x $days ngày x $slots người = ${_money(quote.depositAmount)}',
+      'per_month' =>
+        '$salary/tháng / 30 ngày x $days ngày x $slots người = ${_money(quote.depositAmount)}',
+      'fixed' =>
+        '$salary/người x $slots người = ${_money(quote.depositAmount)}',
+      _ => _money(quote.depositAmount),
+    };
+  }
+
+  Future<bool> _confirmDepositBeforeSubmit(JobPostModel post) async {
+    if (!post.isPartTimeManaged) return true;
+
+    late final JobDepositQuote quote;
+    try {
+      quote = JobPricingService.quote(post);
+    } catch (e) {
+      _showFormNotice(
+        'Thiếu thông tin',
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+    if (!quote.requiresDeposit) return true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Xác nhận tiền ứng'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Số tiền cần ứng trước cho bài đăng này:'),
+                const SizedBox(height: 10),
+                Text(
+                  _money(quote.depositAmount),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF7B1FA2),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Công thức tính:',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(_depositFormula(post, quote)),
+                const SizedBox(height: 12),
+                Text(
+                  'Tiền sẽ được trừ từ tiền app và tạm giữ khi bạn gửi duyệt.',
+                  style: TextStyle(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Gửi duyệt'),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
+  }
+
   Future<void> _submit({required bool isDraft}) async {
     if (!_formKey.currentState!.validate()) return;
     final extraErr = _validateBeforeSubmit();
@@ -406,7 +502,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _showFormNotice('Thiếu thông tin', extraErr);
       return;
     }
-    setState(() => _isSubmitting = true);
 
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final salary =
@@ -473,6 +568,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       groupChatId: _editing?.groupChatId,
       createdAt: _editing?.createdAt,
     );
+
+    if (!isDraft) {
+      final confirmed = await _confirmDepositBeforeSubmit(post);
+      if (!confirmed || !mounted) return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     final controller = Get.isRegistered<JobPostController>()
         ? Get.find<JobPostController>()
