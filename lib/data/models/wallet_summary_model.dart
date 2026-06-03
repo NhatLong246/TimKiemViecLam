@@ -1,8 +1,10 @@
 /// Tóm tắt ví employer (đọc từ `users/{uid}`).
 class WalletSummaryModel {
   final double walletBalance;
+  final double walletHeldBalance;
   final double totalDeposited;
   final double totalSpent;
+
   /// `null` = không giới hạn chi tiêu mỗi giao dịch.
   final double? walletSpendingLimit;
   final String? companyName;
@@ -11,6 +13,7 @@ class WalletSummaryModel {
 
   const WalletSummaryModel({
     this.walletBalance = 0,
+    this.walletHeldBalance = 0,
     this.totalDeposited = 0,
     this.totalSpent = 0,
     this.walletSpendingLimit,
@@ -19,8 +22,7 @@ class WalletSummaryModel {
     this.phone,
   });
 
-  String get defaultMomoPhone =>
-      momoWithdrawPhone ?? phone ?? '';
+  String get defaultMomoPhone => momoWithdrawPhone ?? phone ?? '';
 
   bool get hasSpendingLimit =>
       walletSpendingLimit != null && walletSpendingLimit! > 0;
@@ -30,10 +32,10 @@ class WalletSummaryModel {
     final limit = (map['walletSpendingLimit'] as num?)?.toDouble();
     return WalletSummaryModel(
       walletBalance: (map['walletBalance'] as num?)?.toDouble() ?? 0,
+      walletHeldBalance: (map['walletHeldBalance'] as num?)?.toDouble() ?? 0,
       totalDeposited: (map['totalDeposited'] as num?)?.toDouble() ?? 0,
       totalSpent: (map['totalSpent'] as num?)?.toDouble() ?? 0,
-      walletSpendingLimit:
-          limit != null && limit > 0 ? limit : null,
+      walletSpendingLimit: limit != null && limit > 0 ? limit : null,
       companyName: map['companyName'] as String?,
       momoWithdrawPhone: map['momoWithdrawPhone'] as String?,
       phone: map['phone'] as String?,

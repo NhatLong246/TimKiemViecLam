@@ -69,12 +69,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool get _isEdit => _editing != null;
   bool get _isFullTimeScreen => widget.initialJobType == 'full_time';
 
+  DateTime _dateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
   List<Map<String, String>> get _categories =>
       categoryOptionsFor(isFullTime: _isFullTimeScreen, selected: _category);
 
   @override
   void initState() {
     super.initState();
+    _startDate = _dateOnly(_startDate);
+    _applicationDeadline = _dateOnly(_applicationDeadline);
     final args = Get.arguments;
     if (args is JobPostModel) {
       _editing = args;
@@ -153,18 +159,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         _salaryType != 'per_hour') {
       _salaryType = 'per_month';
     }
-    _startDate = p.startDate;
-    _endDate = p.endDate;
+    _startDate = _dateOnly(p.startDate);
+    _endDate = p.endDate == null ? null : _dateOnly(p.endDate!);
     if (p.applicationDeadline != null) {
-      _applicationDeadline = p.applicationDeadline!;
+      _applicationDeadline = _dateOnly(p.applicationDeadline!);
       _deadlineHourCtrl.text = DateFormat('HH').format(p.applicationDeadline!);
       _deadlineMinCtrl.text = DateFormat('mm').format(p.applicationDeadline!);
     } else {
-      _applicationDeadline = p.startDate;
+      _applicationDeadline = _dateOnly(p.startDate);
       _deadlineHourCtrl.text = '23';
       _deadlineMinCtrl.text = '59';
     }
-    _endDate = p.endDate;
+    _endDate = p.endDate == null ? null : _dateOnly(p.endDate!);
     _imageBase64s
       ..clear()
       ..addAll(p.imageUrls);
@@ -207,11 +213,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _pickDate({required bool isStart}) async {
-    final now = DateTime.now();
+    final now = _dateOnly(DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? _startDate : (_endDate ?? _startDate),
-      firstDate: isStart ? now : _startDate,
+      initialDate: isStart ? _dateOnly(_startDate) : (_endDate ?? _startDate),
+      firstDate: isStart ? now : _dateOnly(_startDate),
       lastDate: DateTime(now.year + 2),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
@@ -223,24 +229,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       ),
     );
     if (picked != null) {
+      final pickedDay = _dateOnly(picked);
       setState(() {
         if (isStart) {
-          _startDate = picked;
-          if (_endDate != null && _endDate!.isBefore(_startDate)) {
+          _startDate = pickedDay;
+          if (_endDate != null &&
+              _dateOnly(_endDate!).isBefore(_dateOnly(_startDate))) {
             _endDate = null;
           }
         } else {
-          _endDate = picked;
+          _endDate = pickedDay;
         }
       });
     }
   }
 
   Future<void> _pickDeadlineDate() async {
-    final now = DateTime.now();
+    final now = _dateOnly(DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: _applicationDeadline,
+      initialDate: _dateOnly(_applicationDeadline),
       firstDate: now,
       lastDate: DateTime(now.year + 2),
       builder: (ctx, child) => Theme(
@@ -254,7 +262,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
     if (picked != null) {
       setState(() {
-        _applicationDeadline = picked;
+        _applicationDeadline = _dateOnly(picked);
       });
     }
   }
@@ -356,8 +364,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (_jobType == 'part_time' && _endDate == null) {
       return 'Part-time cần chọn ngày kết thúc (số ngày làm việc)';
     }
-    if (_endDate != null && _endDate!.isBefore(_startDate)) {
-      return 'Ngày kết thúc phải sau ngày bắt đầu';
+    if (_endDate != null &&
+        _dateOnly(_endDate!).isBefore(_dateOnly(_startDate))) {
+      return 'Ngày kết thúc không được trước ngày bắt đầu';
     }
     if (_cityCtrl.text.trim().isEmpty) {
       return 'Vui lòng nhập Tỉnh/Thành phố';
@@ -371,6 +380,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       }
     }
     final wh = _workHoursCtrl.text.trim();
+    if (_jobType == 'part_time' && _salaryType == 'per_hour' && wh.isEmpty) {
+      return 'Việc trả theo giờ cần nhập số giờ làm mỗi ngày';
+    }
     if (wh.isNotEmpty) {
       final h = double.tryParse(wh.replaceAll(',', '.'));
       if (h == null || h <= 0 || h > 24) {
@@ -439,8 +451,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           dm,
         );
       }(),
-      startDate: _startDate,
-      endDate: _isFullTimeScreen ? null : _endDate,
+      startDate: _dateOnly(_startDate),
+      endDate: _isFullTimeScreen || _endDate == null
+          ? null
+          : _dateOnly(_endDate!),
       workHoursPerDay: double.tryParse(
         _workHoursCtrl.text.trim().replaceAll(',', '.'),
       ),

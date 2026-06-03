@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/group_chat_model.dart';
 import '../models/job_post_model.dart';
+import '../../utils/job_time_helper.dart';
 import '../../utils/work_day_helper.dart';
 import 'group_chat_service.dart';
 import 'job_attendance_completion_service.dart';
@@ -122,7 +123,10 @@ class JobDisbursementReminderService {
     }
   }
 
-  Future<void> _processGroupImpl(GroupChatModel group, String employerId) async {
+  Future<void> _processGroupImpl(
+    GroupChatModel group,
+    String employerId,
+  ) async {
     final job = await _jobs.getJobPostById(group.jobId);
     if (job == null || !_isActiveJob(job)) return;
     if (!WorkDayHelper.isWorkPeriodEnded(job)) return;
@@ -200,10 +204,7 @@ class JobDisbursementReminderService {
       body:
           '"${job.title}" (${_formatRange(job)}): yêu cầu giải ngân đã gửi. '
           'Bạn sẽ được báo khi Admin cho phép thanh toán.',
-      data: {
-        'jobId': job.jobId,
-        'groupId': group.groupId,
-      },
+      data: {'jobId': job.jobId, 'groupId': group.groupId},
     );
   }
 
@@ -215,11 +216,9 @@ class JobDisbursementReminderService {
         final snap = await tx.get(ref);
         final data = snap.data();
         if (!_shouldSendReminder(data?['lastReminderAt'])) return false;
-        tx.set(
-          ref,
-          {'lastReminderAt': FieldValue.serverTimestamp()},
-          SetOptions(merge: true),
-        );
+        tx.set(ref, {
+          'lastReminderAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
         return true;
       });
     } catch (_) {
@@ -235,11 +234,9 @@ class JobDisbursementReminderService {
         final snap = await tx.get(ref);
         final data = snap.data();
         if (data != null && data[field] != null) return false;
-        tx.set(
-          ref,
-          {field: FieldValue.serverTimestamp()},
-          SetOptions(merge: true),
-        );
+        tx.set(ref, {
+          field: FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
         return true;
       });
     } catch (_) {
@@ -256,11 +253,11 @@ class JobDisbursementReminderService {
     final range = _formatRange(job);
     final body = readiness.canDisburse
         ? '"${job.title}" ($range) đã kết thúc. '
-            'Đủ điểm danh ${readiness.completedDays}/${readiness.requiredDays} ngày — '
-            'mở Giải ngân để thanh toán.'
+              'Đủ điểm danh ${readiness.completedDays}/${readiness.requiredDays} ngày — '
+              'mở Giải ngân để thanh toán.'
         : '"${job.title}" ($range) đã kết thúc. '
-            'Trong thời hạn chỉ đủ ${readiness.completedDays}/${readiness.requiredDays} ngày. '
-            'Không cần điểm danh thêm — gửi yêu cầu giải ngân để Admin xem xét.';
+              'Trong thời hạn chỉ đủ ${readiness.completedDays}/${readiness.requiredDays} ngày. '
+              'Không cần điểm danh thêm — gửi yêu cầu giải ngân để Admin xem xét.';
 
     await _notif.create(
       recipientId: employerId,
@@ -290,11 +287,7 @@ class JobDisbursementReminderService {
       body:
           '"${job.title}": đã đủ ${readiness.requiredDays} ngày điểm danh. '
           'Mở Giải ngân / Kết thúc ca để gửi yêu cầu cho Admin.',
-      data: {
-        'jobId': job.jobId,
-        'groupId': group.groupId,
-        'canDisburse': true,
-      },
+      data: {'jobId': job.jobId, 'groupId': group.groupId, 'canDisburse': true},
     );
   }
 
@@ -333,7 +326,7 @@ class JobDisbursementReminderService {
 
     final now = DateTime.now();
     if (!now.isAfter(deadline)) return false;
-    return job.startDate.isAfter(now);
+    return JobTimeHelper.startsAfterNow(job, now: now);
   }
 
   String _formatRange(JobPostModel job) {
@@ -357,8 +350,11 @@ class JobDisbursementReminderService {
     return DateTime.now().difference(dt) >= _reminderInterval;
   }
 
-  DocumentReference<Map<String, dynamic>> _logRef(String jobId) =>
-      _db.collection('jobPosts').doc(jobId).collection('workflowReminders').doc('disbursement');
+  DocumentReference<Map<String, dynamic>> _logRef(String jobId) => _db
+      .collection('jobPosts')
+      .doc(jobId)
+      .collection('workflowReminders')
+      .doc('disbursement');
 
   Future<Map<String, dynamic>> _readLog(String jobId) async {
     final snap = await _logRef(jobId).get();
@@ -376,8 +372,9 @@ class JobDisbursementReminderService {
   }) async {
     final data = <String, dynamic>{};
     if (workPeriodEndedNotifiedAt != null) {
-      data['workPeriodEndedNotifiedAt'] =
-          Timestamp.fromDate(workPeriodEndedNotifiedAt);
+      data['workPeriodEndedNotifiedAt'] = Timestamp.fromDate(
+        workPeriodEndedNotifiedAt,
+      );
     }
     if (readyNotifiedAt != null) {
       data['readyNotifiedAt'] = Timestamp.fromDate(readyNotifiedAt);
@@ -386,8 +383,9 @@ class JobDisbursementReminderService {
       data['lastReminderAt'] = Timestamp.fromDate(lastReminderAt);
     }
     if (pendingAdminNotifiedAt != null) {
-      data['pendingAdminNotifiedAt'] =
-          Timestamp.fromDate(pendingAdminNotifiedAt);
+      data['pendingAdminNotifiedAt'] = Timestamp.fromDate(
+        pendingAdminNotifiedAt,
+      );
     }
     if (noGroupEndedNotifiedAt == true) {
       data['noGroupEndedNotifiedAt'] = FieldValue.serverTimestamp();

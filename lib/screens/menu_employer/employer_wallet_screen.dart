@@ -500,6 +500,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
 
   SliverToBoxAdapter _buildHeader(WalletSummaryModel summary) {
     final balance = summary.walletBalance;
+    final heldBalance = summary.walletHeldBalance;
     final totalDeposited = summary.totalDeposited;
     final totalSpent = summary.totalSpent;
     return SliverToBoxAdapter(
@@ -558,24 +559,32 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
                         color: Colors.white,
                         fontSize: 36,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 14,
+                      runSpacing: 10,
                       children: [
                         _statPill(
                           Icons.add_circle_outline_rounded,
                           'T\u1ed5ng n\u1ea1p',
                           totalDeposited,
                         ),
-                        const SizedBox(width: 14),
                         _statPill(
                           Icons.trending_down_rounded,
                           '\u0110\u00e3 chi',
                           totalSpent,
                         ),
+                        if (heldBalance > 0) ...[
+                          _statPill(
+                            Icons.lock_clock_rounded,
+                            'T\u1ea1m gi\u1eef',
+                            heldBalance,
+                          ),
+                        ],
                       ],
                     ),
                     if (summary.hasSpendingLimit) ...[

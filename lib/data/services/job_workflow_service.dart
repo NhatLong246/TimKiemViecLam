@@ -13,12 +13,13 @@ class JobWorkflowService {
 
   /// Chưa hoàn tất / chờ admin → không xóa bài đăng.
   Future<bool> hasBlockingDisbursementNotice(String jobId) async {
-    final snap = await _notices.where('jobId', isEqualTo: jobId).limit(10).get();
+    final snap = await _notices
+        .where('jobId', isEqualTo: jobId)
+        .limit(10)
+        .get();
     for (final doc in snap.docs) {
       final s = doc.data()['status'] as String? ?? '';
-      if (s == 'pending_admin' ||
-          s == 'approved' ||
-          s == 'pending_ack') {
+      if (s == 'pending_admin' || s == 'approved' || s == 'pending_ack') {
         return true;
       }
     }
@@ -53,10 +54,10 @@ class JobWorkflowService {
         .limit(1)
         .snapshots()
         .map((snap) {
-      if (snap.docs.isEmpty) return null;
-      final d = snap.docs.first;
-      return DisbursementNoticeModel.fromMap(d.data(), d.id);
-    });
+          if (snap.docs.isEmpty) return null;
+          final d = snap.docs.first;
+          return DisbursementNoticeModel.fromMap(d.data(), d.id);
+        });
   }
 
   /// NTD gửi yêu cầu giải ngân — chờ Admin duyệt.
@@ -155,6 +156,13 @@ class JobWorkflowService {
 
     final groupId = data['groupId'] as String? ?? '';
     final jobId = data['jobId'] as String? ?? '';
+    DocumentSnapshot<Map<String, dynamic>>? jobSnap;
+    if (jobId.isNotEmpty) {
+      jobSnap = await _db.collection('jobPosts').doc(jobId).get();
+    }
+    final jobData = jobSnap?.data();
+    final depositHeld = (jobData?['depositStatus'] ?? '').toString() == 'held';
+    final heldAmount = (jobData?['totalBudget'] as num?)?.toDouble() ?? 0;
 
     await _notices.doc(noticeId).update({
       'status': 'completed',
@@ -172,8 +180,17 @@ class JobWorkflowService {
     if (jobId.isNotEmpty) {
       await _db.collection('jobPosts').doc(jobId).update({
         'status': 'closed',
+        if (depositHeld) 'depositStatus': 'released',
+        if (depositHeld) 'depositReleasedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+    }
+    if (depositHeld && heldAmount > 0) {
+      await _db.collection('users').doc(uid).set({
+        'walletHeldBalance': FieldValue.increment(-heldAmount),
+        'totalSpent': FieldValue.increment(heldAmount),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     }
 
     await _notifyAdmins(
@@ -185,7 +202,10 @@ class JobWorkflowService {
   }
 
   /// Admin từ chối yêu cầu.
-  Future<void> rejectDisbursementRequest(String noticeId, {String? reason}) async {
+  Future<void> rejectDisbursementRequest(
+    String noticeId, {
+    String? reason,
+  }) async {
     final snap = await _notices.doc(noticeId).get();
     if (!snap.exists) return;
     final data = snap.data()!;
@@ -239,7 +259,8 @@ class JobWorkflowService {
           recipientId: employerId,
           type: 'group_closed_by_admin',
           title: 'Admin đã đóng nhóm',
-          body: 'Nhóm công việc đã được Admin đóng. Không cần giải ngân qua app.',
+          body:
+              'Nhóm công việc đã được Admin đóng. Không cần giải ngân qua app.',
           data: {'groupId': groupId, 'jobId': jobId},
         );
       }
@@ -254,10 +275,11 @@ class JobWorkflowService {
         .where('status', isEqualTo: 'pending_admin')
         .limit(50)
         .get();
-    final list = snap.docs
-        .map((d) => DisbursementNoticeModel.fromMap(d.data(), d.id))
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final list =
+        snap.docs
+            .map((d) => DisbursementNoticeModel.fromMap(d.data(), d.id))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
   }
 

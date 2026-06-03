@@ -10,6 +10,7 @@ import '../data/services/application_service.dart';
 import '../data/services/group_chat_service.dart';
 import '../data/services/notification_service.dart';
 import '../routes/app_routes.dart';
+import '../utils/job_time_helper.dart';
 import 'home_controller.dart';
 import 'login_controller.dart';
 
@@ -40,8 +41,9 @@ class JobDetailController extends GetxController {
       return;
     }
 
-    final authCtrl =
-        Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    final authCtrl = Get.isRegistered<AuthController>()
+        ? Get.find<AuthController>()
+        : null;
     final cachedRole = authCtrl?.currentUser?.role;
     if (cachedRole != null && cachedRole.isNotEmpty) {
       currentRole.value = cachedRole;
@@ -206,7 +208,7 @@ class JobDetailController extends GetxController {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    if (DateTime.now().isAfter(job.startDate)) {
+    if (JobTimeHelper.hasStarted(job)) {
       Get.snackbar(
         'Không thể hủy',
         'Công việc đã bắt đầu, không thể hủy ứng tuyển.',
@@ -356,8 +358,8 @@ class JobDetailController extends GetxController {
     try {
       final doc = await _db.collection('users').doc(candidateId).get();
       final data = doc.data() ?? {};
-      final name =
-          '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim();
+      final name = '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'
+          .trim();
       if (name.isNotEmpty) return name;
     } catch (_) {}
     return 'Ứng viên';

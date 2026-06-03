@@ -6,6 +6,7 @@ import '../../data/constants/full_time_policy.dart';
 import '../../controller/job_post_controller.dart';
 import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/job_time_helper.dart';
 import '../../utils/theme_colors.dart';
 import 'post_management_actions.dart';
 
@@ -53,9 +54,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     final postsToNotify = _controller.publishedPosts.where((p) {
       if (p.applicationDeadline == null) return false;
       if (p.underfilledAccepted) return false;
-      if (!p.startDate.isAfter(DateTime.now())) return false;
+      if (!JobTimeHelper.startsAfterNow(p)) return false;
       return DateTime.now().isAfter(p.applicationDeadline!) &&
-             p.filledSlots < p.slots;
+          p.filledSlots < p.slots;
     }).toList();
 
     if (postsToNotify.isNotEmpty) {
@@ -167,7 +168,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
               if (_controller.errorMessage.value.isNotEmpty) {
                 return _buildError(_controller.errorMessage.value);
               }
-              
+
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _checkDeadlineNotices();
               });
@@ -176,21 +177,25 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                 controller: _tabController,
                 children: [
                   _buildPostList(
-                      _sorted(_filter(_controller.publishedPosts)),
-                      'published',
-                      _controller),
+                    _sorted(_filter(_controller.publishedPosts)),
+                    'published',
+                    _controller,
+                  ),
                   _buildPostList(
-                      _sorted(_filter(_controller.pendingPosts)),
-                      'pending',
-                      _controller),
+                    _sorted(_filter(_controller.pendingPosts)),
+                    'pending',
+                    _controller,
+                  ),
                   _buildPostList(
-                      _sorted(_filter(_controller.draftPosts)),
-                      'draft',
-                      _controller),
+                    _sorted(_filter(_controller.draftPosts)),
+                    'draft',
+                    _controller,
+                  ),
                   _buildPostList(
-                      _sorted(_filter(_controller.expiredPosts)),
-                      'expired',
-                      _controller),
+                    _sorted(_filter(_controller.expiredPosts)),
+                    'expired',
+                    _controller,
+                  ),
                 ],
               );
             }),
@@ -220,7 +225,8 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                 )
               : null,
           filled: true,
-          fillColor: Theme.of(context).inputDecorationTheme.fillColor ??
+          fillColor:
+              Theme.of(context).inputDecorationTheme.fillColor ??
               context.elevatedSurface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -239,8 +245,11 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 48, color: Color(0xFFE53935)),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: Color(0xFFE53935),
+            ),
             const SizedBox(height: 12),
             const Text(
               'Không tải được dữ liệu',
@@ -275,8 +284,11 @@ class _PostManagementScreenState extends State<PostManagementScreen>
             children: [
               IconButton(
                 onPressed: () => Get.back(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               const Expanded(
                 child: Text(
@@ -350,16 +362,22 @@ class _PostManagementScreenState extends State<PostManagementScreen>
 
   Widget _buildKpiStrip() {
     return Obx(() {
-      final total = _controller.allPosts.where((p) => p.status != 'cancelled' && p.status != 'deleted').length;
+      final total = _controller.allPosts
+          .where((p) => p.status != 'cancelled' && p.status != 'deleted')
+          .length;
       final recruiting = _controller.publishedPosts.length;
       final now = DateTime.now();
       final soonEnding = _controller.publishedPosts
-          .where((p) =>
-              p.endDate != null &&
-              p.endDate!.isAfter(now) &&
-              p.endDate!.difference(now).inDays <= 2)
+          .where(
+            (p) =>
+                p.endDate != null &&
+                p.endDate!.isAfter(now) &&
+                p.endDate!.difference(now).inDays <= 2,
+          )
           .length;
-      final recruitingRate = total == 0 ? 0 : ((recruiting / total) * 100).round();
+      final recruitingRate = total == 0
+          ? 0
+          : ((recruiting / total) * 100).round();
 
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -495,10 +513,14 @@ class _PostManagementScreenState extends State<PostManagementScreen>
           controller: _tabController,
           labelColor: Colors.white,
           unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          labelStyle:
-              const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-          unselectedLabelStyle:
-              const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+          labelStyle: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+          ),
           indicator: BoxDecoration(
             gradient: const LinearGradient(
               begin: _gradientBegin,
@@ -584,10 +606,12 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     final city = post.location['city'] as String? ?? '';
     final district = post.location['district'] as String? ?? '';
     final locationStr = [district, city].where((s) => s.isNotEmpty).join(', ');
-    final hasGroup = post.isPartTimeManaged &&
+    final hasGroup =
+        post.isPartTimeManaged &&
         post.groupChatId != null &&
         post.groupChatId!.isNotEmpty;
-    final isEndingSoon = post.endDate != null &&
+    final isEndingSoon =
+        post.endDate != null &&
         post.endDate!.difference(DateTime.now()).inDays <= 2 &&
         post.endDate!.isAfter(DateTime.now()) &&
         (post.status == 'approved' || post.status == 'active');
@@ -655,9 +679,13 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                                 _buildInlineWarningChip(context, 'Sắp hết hạn'),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).brightness == Brightness.dark
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
                                       ? const Color(0xFF3A2A45)
                                       : const Color(0xFFF3E5F5),
                                   borderRadius: BorderRadius.circular(6),
@@ -726,7 +754,10 @@ class _PostManagementScreenState extends State<PostManagementScreen>
   Widget _quickChip(IconData icon, String label, VoidCallback onTap) {
     return ActionChip(
       avatar: Icon(icon, size: 16, color: const Color(0xFF7B1FA2)),
-      label: Text(label, style: TextStyle(fontSize: 11, color: context.textPrimary)),
+      label: Text(
+        label,
+        style: TextStyle(fontSize: 11, color: context.textPrimary),
+      ),
       backgroundColor: Theme.of(context).brightness == Brightness.dark
           ? const Color(0xFF3A2A45)
           : const Color(0xFFF3E5F5),
@@ -945,86 +976,171 @@ class _PostManagementScreenState extends State<PostManagementScreen>
             const SizedBox(width: 10),
           ],
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: textColor),
-            ),
+            child: Text(label, style: TextStyle(color: textColor)),
           ),
         ],
       ),
     );
   }
 
-  List<PopupMenuEntry<String>> _menuItems(
-    JobPostModel post,
-    String tabType,
-  ) {
-    final hasGroup = post.isPartTimeManaged &&
+  List<PopupMenuEntry<String>> _menuItems(JobPostModel post, String tabType) {
+    final hasGroup =
+        post.isPartTimeManaged &&
         post.groupChatId != null &&
         post.groupChatId!.isNotEmpty;
     final items = <PopupMenuEntry<String>>[];
 
-    items.add(_menuItem('view', 'Xem chi tiết', icon: Icons.visibility_outlined));
+    items.add(
+      _menuItem('view', 'Xem chi tiết', icon: Icons.visibility_outlined),
+    );
 
     if (tabType == 'draft') {
       items.add(_menuItem('edit', 'Chỉnh sửa', icon: Icons.edit_outlined));
       items.add(_menuItem('submit', 'Gửi duyệt', icon: Icons.send_outlined));
-      items.add(_menuItem('duplicate', 'Sao chép bản nháp', icon: Icons.content_copy_outlined));
-      items.add(_menuItem('delete', 'Xóa',
-          icon: Icons.delete_outline, textColor: Colors.red));
+      items.add(
+        _menuItem(
+          'duplicate',
+          'Sao chép bản nháp',
+          icon: Icons.content_copy_outlined,
+        ),
+      );
+      items.add(
+        _menuItem(
+          'delete',
+          'Xóa',
+          icon: Icons.delete_outline,
+          textColor: Colors.red,
+        ),
+      );
     } else if (tabType == 'pending') {
       items.add(_menuItem('edit', 'Chỉnh sửa', icon: Icons.edit_outlined));
-      items.add(_menuItem('duplicate', 'Sao chép thành nháp', icon: Icons.content_copy_outlined));
+      items.add(
+        _menuItem(
+          'duplicate',
+          'Sao chép thành nháp',
+          icon: Icons.content_copy_outlined,
+        ),
+      );
       items.add(_menuItem('retract', 'Rút về nháp', icon: Icons.undo_outlined));
-      if (post.startDate.isAfter(DateTime.now())) {
-        items.add(_menuItem('cancel', 'Hủy công việc',
-            icon: Icons.cancel_presentation_rounded, textColor: Colors.red));
+      if (JobTimeHelper.startsAfterNow(post)) {
+        items.add(
+          _menuItem(
+            'cancel',
+            'Hủy công việc',
+            icon: Icons.cancel_presentation_rounded,
+            textColor: Colors.red,
+          ),
+        );
       }
     } else if (tabType == 'published') {
-      items.add(_menuItem('candidates', 'Xem DS ứng tuyển',
-          icon: Icons.people_outline));
-      items.add(_menuItem('extend7', 'Gia hạn thêm 7 ngày',
-          icon: Icons.update_rounded));
-      items.add(_menuItem('duplicate', 'Sao chép thành nháp',
-          icon: Icons.content_copy_outlined));
+      items.add(
+        _menuItem('candidates', 'Xem DS ứng tuyển', icon: Icons.people_outline),
+      );
+      items.add(
+        _menuItem('extend7', 'Gia hạn thêm 7 ngày', icon: Icons.update_rounded),
+      );
+      items.add(
+        _menuItem(
+          'duplicate',
+          'Sao chép thành nháp',
+          icon: Icons.content_copy_outlined,
+        ),
+      );
       if (hasGroup) {
-        items.add(_menuItem('group', 'Quản lý nhóm chat',
-            icon: Icons.groups_outlined));
-        items.add(_menuItem('attendance', 'Điểm danh',
-            icon: Icons.fact_check_outlined));
-        items.add(_menuItem('summary', 'Tổng kết điểm danh',
-            icon: Icons.summarize_outlined));
-        items.add(_menuItem('disburse', 'Giải ngân / Kết thúc ca',
-            icon: Icons.payments_outlined));
+        items.add(
+          _menuItem('group', 'Quản lý nhóm chat', icon: Icons.groups_outlined),
+        );
+        items.add(
+          _menuItem('attendance', 'Điểm danh', icon: Icons.fact_check_outlined),
+        );
+        items.add(
+          _menuItem(
+            'summary',
+            'Tổng kết điểm danh',
+            icon: Icons.summarize_outlined,
+          ),
+        );
+        items.add(
+          _menuItem(
+            'disburse',
+            'Giải ngân / Kết thúc ca',
+            icon: Icons.payments_outlined,
+          ),
+        );
       }
-      items.add(_menuItem('complaints', 'Khiếu nại & sự cố',
-          icon: Icons.report_outlined));
-      items.add(_menuItem('close', 'Đóng bài đăng',
-          icon: Icons.block_flipped, textColor: Colors.orange));
-      if (post.startDate.isAfter(DateTime.now())) {
-        items.add(_menuItem('cancel', 'Hủy công việc',
-            icon: Icons.cancel_presentation_rounded, textColor: Colors.red));
+      items.add(
+        _menuItem(
+          'complaints',
+          'Khiếu nại & sự cố',
+          icon: Icons.report_outlined,
+        ),
+      );
+      items.add(
+        _menuItem(
+          'close',
+          'Đóng bài đăng',
+          icon: Icons.block_flipped,
+          textColor: Colors.orange,
+        ),
+      );
+      if (JobTimeHelper.startsAfterNow(post)) {
+        items.add(
+          _menuItem(
+            'cancel',
+            'Hủy công việc',
+            icon: Icons.cancel_presentation_rounded,
+            textColor: Colors.red,
+          ),
+        );
       }
     } else if (tabType == 'expired') {
       if (post.status == 'rejected') {
-        items.add(_menuItem('edit', 'Chỉnh sửa & gửi lại',
-            icon: Icons.edit_outlined));
-        items.add(_menuItem('submit', 'Gửi duyệt lại',
-            icon: Icons.send_outlined));
+        items.add(
+          _menuItem('edit', 'Chỉnh sửa & gửi lại', icon: Icons.edit_outlined),
+        );
+        items.add(
+          _menuItem('submit', 'Gửi duyệt lại', icon: Icons.send_outlined),
+        );
       }
       if (post.status == 'closed') {
-        items.add(_menuItem('reopen', 'Mở lại tuyển (chờ duyệt)',
-            icon: Icons.refresh_rounded));
+        items.add(
+          _menuItem(
+            'reopen',
+            'Mở lại tuyển (chờ duyệt)',
+            icon: Icons.refresh_rounded,
+          ),
+        );
       }
-      items.add(_menuItem('extend30', 'Gia hạn thêm 30 ngày',
-          icon: Icons.calendar_month_outlined));
-      items.add(_menuItem('duplicate', 'Sao chép thành nháp',
-          icon: Icons.content_copy_outlined));
-      items.add(_menuItem('complaints', 'Khiếu nại & sự cố',
-          icon: Icons.report_outlined));
+      items.add(
+        _menuItem(
+          'extend30',
+          'Gia hạn thêm 30 ngày',
+          icon: Icons.calendar_month_outlined,
+        ),
+      );
+      items.add(
+        _menuItem(
+          'duplicate',
+          'Sao chép thành nháp',
+          icon: Icons.content_copy_outlined,
+        ),
+      );
+      items.add(
+        _menuItem(
+          'complaints',
+          'Khiếu nại & sự cố',
+          icon: Icons.report_outlined,
+        ),
+      );
       if (post.status == 'closed' || post.status == 'rejected') {
-        items.add(_menuItem('delete', 'Xóa bài đăng',
-            icon: Icons.delete_outline, textColor: Colors.red));
+        items.add(
+          _menuItem(
+            'delete',
+            'Xóa bài đăng',
+            icon: Icons.delete_outline,
+            textColor: Colors.red,
+          ),
+        );
       }
     }
 
@@ -1041,8 +1157,11 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     if (items.isEmpty) return const SizedBox.shrink();
 
     return PopupMenuButton<String>(
-      icon: Icon(Icons.more_vert_rounded,
-          color: Theme.of(context).colorScheme.onSurfaceVariant, size: 22),
+      icon: Icon(
+        Icons.more_vert_rounded,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        size: 22,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (value) =>
           _onMenuSelected(context, value, post, tabType, controller),

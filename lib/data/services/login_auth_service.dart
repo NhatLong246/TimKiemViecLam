@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../models/user_model.dart';
+import 'account_uniqueness_service.dart';
 import 'sqlite_cache_service.dart';
 import 'login_history_service.dart';
 
@@ -23,10 +24,14 @@ class LoginAuthService {
     serverClientId: googleWebClientId,
   );
   final LoginHistoryService _history = LoginHistoryService();
+  final AccountUniquenessService _uniqueness = AccountUniquenessService();
 
   // ─── Email / Password ──────────────────────────────────────
 
-  Future<UserModel> loginWithEmailPassword(String email, String password) async {
+  Future<UserModel> loginWithEmailPassword(
+    String email,
+    String password,
+  ) async {
     try {
       final UserCredential credential = await _auth
           .signInWithEmailAndPassword(email: email, password: password)
@@ -38,6 +43,7 @@ class LoginAuthService {
       if (!activeUser.emailVerified) {
         throw Exception('Email not verified');
       }
+      await _syncFirestoreEmailVerified(activeUser);
       final user = await _loadUserProfileAfterSignIn(activeUser);
       _history.recordLogin(method: 'email').ignore();
       return user;
@@ -55,7 +61,9 @@ class LoginAuthService {
     try {
       return await _fetchAndCacheUser(firebaseUser.uid);
     } catch (_) {
-      final cached = await SqliteCacheService.getCachedProfile(firebaseUser.uid);
+      final cached = await SqliteCacheService.getCachedProfile(
+        firebaseUser.uid,
+      );
       if (cached != null) {
         return UserModel(
           id: firebaseUser.uid,
@@ -70,7 +78,9 @@ class LoginAuthService {
           avatarUrl: cached['avatarUrl'] as String? ?? firebaseUser.photoURL,
         );
       }
-      return _minimalUserFromFirebase(firebaseUser);
+      throw Exception(
+        'Tài khoản chưa có hồ sơ người dùng. Vui lòng đăng ký trước khi đăng nhập.',
+      );
     }
   }
 
@@ -96,8 +106,9 @@ class LoginAuthService {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential =
-          await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
       final User? firebaseUser = userCredential.user;
       if (firebaseUser == null) {
         throw Exception('Không thể đăng nhập với Google');
@@ -105,7 +116,12 @@ class LoginAuthService {
 
       await firebaseUser.reload();
       final activeUser = _auth.currentUser ?? firebaseUser;
-      await _ensureFirestoreUser(activeUser);
+      await _requireRegisteredSocialProfile(
+        activeUser,
+        providerId: GoogleAuthProvider.PROVIDER_ID,
+        isNewAuthUser: userCredential.additionalUserInfo?.isNewUser ?? false,
+      );
+      await _markFirestoreVerified(activeUser.uid);
 
       final user = await _fetchAndCacheUser(activeUser.uid);
       _history.recordLogin(method: 'google').ignore();
@@ -132,32 +148,23 @@ class LoginAuthService {
         throw Exception('Đăng nhập Facebook bị hủy hoặc thất bại');
       }
 
-      final OAuthCredential credential =
-          FacebookAuthProvider.credential(result.accessToken!.tokenString);
-      final UserCredential userCredential =
-          await _auth.signInWithCredential(credential);
+      final OAuthCredential credential = FacebookAuthProvider.credential(
+        result.accessToken!.tokenString,
+      );
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
       final User? firebaseUser = userCredential.user;
-      if (firebaseUser == null) throw Exception('Không thể đăng nhập với Facebook');
-
-      // Nếu là user mới → tạo document
-      final docRef = _firestore.collection('users').doc(firebaseUser.uid);
-      final docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        final userData = await FacebookAuth.instance.getUserData();
-        final newUser = UserModel(
-          id: firebaseUser.uid,
-          role: 'candidate',
-          firstName: (userData['name'] as String? ?? '').split(' ').last,
-          lastName: (userData['name'] as String? ?? '').split(' ').first,
-          username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
-          email: firebaseUser.email ?? '',
-          phone: '',
-          isVerified: true,
-          isActive: true,
-          avatarUrl: firebaseUser.photoURL,
-        );
-        await docRef.set(newUser.toMap());
+      if (firebaseUser == null) {
+        throw Exception('Không thể đăng nhập với Facebook');
       }
+
+      await _requireRegisteredSocialProfile(
+        firebaseUser,
+        providerId: FacebookAuthProvider.PROVIDER_ID,
+        isNewAuthUser: userCredential.additionalUserInfo?.isNewUser ?? false,
+      );
+      await _markFirestoreVerified(firebaseUser.uid);
 
       final fbUser = await _fetchAndCacheUser(firebaseUser.uid);
       _history.recordLogin(method: 'facebook').ignore();
@@ -179,10 +186,113 @@ class LoginAuthService {
           }
           return await _fetchAndCacheUser(userCred.user!.uid);
         } catch (_) {
-          throw Exception('Email này đã được đăng ký bằng phương thức khác. Vui lòng đăng nhập bằng Google hoặc Email/Mật khẩu.');
+          throw Exception(
+            'Email này đã được đăng ký bằng phương thức khác. Vui lòng đăng nhập bằng Google hoặc Email/Mật khẩu.',
+          );
         }
       }
       throw Exception('[${e.code}] ${_mapAuthError(e.code)}');
+    }
+  }
+
+  Future<UserModel> registerWithGoogle({
+    required String role,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? phone,
+    String? companyName,
+    String? companyAddress,
+  }) async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) throw Exception('Đăng ký Google bị hủy');
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        throw Exception('Không lấy được token Google. Vui lòng thử lại.');
+      }
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        throw Exception('Không thể đăng ký với Google');
+      }
+
+      final user = await _createSocialProfile(
+        firebaseUser,
+        providerId: GoogleAuthProvider.PROVIDER_ID,
+        isNewAuthUser: userCredential.additionalUserInfo?.isNewUser ?? false,
+        role: role,
+        firstName: firstName,
+        lastName: lastName,
+        username: username,
+        phone: phone,
+        companyName: companyName,
+        companyAddress: companyAddress,
+      );
+      _history.recordLogin(method: 'google').ignore();
+      return user;
+    } on FirebaseAuthException catch (e) {
+      throw Exception(_mapAuthError(e.code));
+    }
+  }
+
+  Future<UserModel> registerWithFacebook({
+    required String role,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? phone,
+    String? companyName,
+    String? companyAddress,
+  }) async {
+    try {
+      final LoginResult result = await FacebookAuth.instance.login(
+        permissions: ['public_profile', 'email'],
+      );
+      if (result.status != LoginStatus.success) {
+        throw Exception('Đăng ký Facebook bị hủy hoặc thất bại');
+      }
+
+      final credential = FacebookAuthProvider.credential(
+        result.accessToken!.tokenString,
+      );
+      final userCredential = await _auth.signInWithCredential(credential);
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        throw Exception('Không thể đăng ký với Facebook');
+      }
+
+      final userData = await FacebookAuth.instance.getUserData();
+      final user = await _createSocialProfile(
+        firebaseUser,
+        providerId: FacebookAuthProvider.PROVIDER_ID,
+        isNewAuthUser: userCredential.additionalUserInfo?.isNewUser ?? false,
+        role: role,
+        firstName: firstName,
+        lastName: lastName,
+        username: username,
+        phone: phone,
+        companyName: companyName,
+        companyAddress: companyAddress,
+        providerName: userData['name']?.toString(),
+        providerEmail: userData['email']?.toString(),
+      );
+      _history.recordLogin(method: 'facebook').ignore();
+      return user;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        throw Exception(
+          'Email này đã được đăng ký bằng phương thức khác. Vui lòng đăng nhập bằng phương thức đã dùng trước đó.',
+        );
+      }
+      throw Exception(_mapAuthError(e.code));
     }
   }
 
@@ -191,10 +301,12 @@ class LoginAuthService {
     final firebaseUser = _auth.currentUser;
     if (firebaseUser == null) return null;
     try {
-      await _ensureFirestoreUser(firebaseUser);
+      await _syncFirestoreEmailVerified(firebaseUser);
       return await _fetchAndCacheUser(firebaseUser.uid);
     } catch (_) {
-      final cached = await SqliteCacheService.getCachedProfile(firebaseUser.uid);
+      final cached = await SqliteCacheService.getCachedProfile(
+        firebaseUser.uid,
+      );
       if (cached != null) {
         return UserModel(
           id: firebaseUser.uid,
@@ -209,7 +321,8 @@ class LoginAuthService {
           avatarUrl: cached['avatarUrl'] as String? ?? firebaseUser.photoURL,
         );
       }
-      return _minimalUserFromFirebase(firebaseUser);
+      await _auth.signOut();
+      return null;
     }
   }
 
@@ -221,7 +334,11 @@ class LoginAuthService {
         .timeout(_firestoreTimeout);
   }
 
-  Future<void> _ensureFirestoreUser(User firebaseUser) async {
+  Future<void> _requireRegisteredSocialProfile(
+    User firebaseUser, {
+    required String providerId,
+    required bool isNewAuthUser,
+  }) async {
     final docRef = _firestore.collection('users').doc(firebaseUser.uid);
     final docSnap = await docRef.get().timeout(_firestoreTimeout);
     if (docSnap.exists) {
@@ -232,41 +349,119 @@ class LoginAuthService {
       return;
     }
 
-    final displayName = firebaseUser.displayName ?? '';
-    final parts = displayName.split(' ').where((p) => p.isNotEmpty).toList();
-    final newUser = UserModel(
-      id: firebaseUser.uid,
-      role: 'candidate',
-      firstName: parts.isNotEmpty ? parts.last : '',
-      lastName: parts.length > 1
-          ? parts.sublist(0, parts.length - 1).join(' ')
-          : '',
-      username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
-      email: firebaseUser.email ?? '',
-      phone: '',
-      isVerified: true,
-      isActive: true,
-      avatarUrl: firebaseUser.photoURL,
+    if (isNewAuthUser) {
+      try {
+        await firebaseUser.delete();
+      } catch (_) {}
+    }
+    await _signOutSocialProvider(providerId);
+    throw Exception(
+      'Tài khoản chưa được đăng ký. Vui lòng vào Đăng ký, chọn đúng vai trò rồi đăng ký bằng Google/Facebook.',
     );
-    await docRef.set(newUser.toMap(), SetOptions(merge: true));
   }
 
-  UserModel _minimalUserFromFirebase(User firebaseUser) {
-    final displayName = firebaseUser.displayName ?? '';
-    final parts = displayName.split(' ').where((p) => p.isNotEmpty).toList();
+  Future<UserModel> _createSocialProfile(
+    User firebaseUser, {
+    required String providerId,
+    required bool isNewAuthUser,
+    required String role,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? phone,
+    String? companyName,
+    String? companyAddress,
+    String? providerName,
+    String? providerEmail,
+  }) async {
+    final docRef = _firestore.collection('users').doc(firebaseUser.uid);
+    final docSnap = await docRef.get().timeout(_firestoreTimeout);
+    if (docSnap.exists) {
+      await _signOutSocialProvider(providerId);
+      throw Exception(
+        'Tài khoản này đã được đăng ký. Vui lòng quay lại màn đăng nhập.',
+      );
+    }
+
+    final profile = _socialUserFromFirebase(
+      firebaseUser,
+      role: role,
+      firstName: firstName,
+      lastName: lastName,
+      username: username,
+      phone: phone,
+      companyName: companyName,
+      companyAddress: companyAddress,
+      providerName: providerName,
+      providerEmail: providerEmail,
+    );
+    try {
+      await _uniqueness.ensureEmailAvailable(
+        profile.email,
+        excludeUid: firebaseUser.uid,
+      );
+      await _uniqueness.ensurePhoneAvailable(
+        profile.phone,
+        excludeUid: firebaseUser.uid,
+      );
+      await docRef.set(profile.toMap()).timeout(_firestoreTimeout);
+    } catch (e) {
+      if (isNewAuthUser) {
+        try {
+          await firebaseUser.delete();
+        } catch (_) {}
+      }
+      await _signOutSocialProvider(providerId);
+      rethrow;
+    }
+    return _fetchAndCacheUser(firebaseUser.uid);
+  }
+
+  UserModel _socialUserFromFirebase(
+    User firebaseUser, {
+    required String role,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? phone,
+    String? companyName,
+    String? companyAddress,
+    String? providerName,
+    String? providerEmail,
+  }) {
+    final displayName =
+        _nonEmpty(providerName) ?? firebaseUser.displayName ?? '';
+    final parts = displayName
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final email = _uniqueness.normalizeEmail(
+      _nonEmpty(firebaseUser.email) ?? _nonEmpty(providerEmail) ?? '',
+    );
+    final resolvedFirstName =
+        _nonEmpty(firstName) ?? (parts.isNotEmpty ? parts.last : '');
+    final resolvedLastName =
+        _nonEmpty(lastName) ??
+        (parts.length > 1 ? parts.sublist(0, parts.length - 1).join(' ') : '');
+    final resolvedUsername =
+        _nonEmpty(username) ??
+        (email.isNotEmpty ? email.split('@').first : firebaseUser.uid);
+
     return UserModel(
       id: firebaseUser.uid,
-      role: 'candidate',
-      firstName: parts.isNotEmpty ? parts.last : 'Người',
-      lastName: parts.length > 1
-          ? parts.sublist(0, parts.length - 1).join(' ')
-          : 'dùng',
-      username: firebaseUser.email?.split('@').first ?? firebaseUser.uid,
-      email: firebaseUser.email ?? '',
-      phone: firebaseUser.phoneNumber ?? '',
+      role: role,
+      firstName: resolvedFirstName,
+      lastName: resolvedLastName,
+      username: resolvedUsername,
+      email: email,
+      phone: _uniqueness.normalizePhone(
+        _nonEmpty(phone) ?? firebaseUser.phoneNumber ?? '',
+      ),
       isVerified: true,
       isActive: true,
       avatarUrl: firebaseUser.photoURL,
+      companyName: role == 'employer' ? _nonEmpty(companyName) : null,
+      companyAddress: role == 'employer' ? _nonEmpty(companyAddress) : null,
     );
   }
 
@@ -276,17 +471,54 @@ class LoginAuthService {
     final uid = _auth.currentUser?.uid;
     await _auth.signOut();
     await _googleSignIn.signOut();
+    await FacebookAuth.instance.logOut();
     if (uid != null) await SqliteCacheService.clearProfile(uid);
   }
 
   // ─── Helpers ───────────────────────────────────────────────
+
+  Future<void> _signOutSocialProvider(String providerId) async {
+    await _auth.signOut();
+    if (providerId == GoogleAuthProvider.PROVIDER_ID) {
+      await _googleSignIn.signOut();
+    } else if (providerId == FacebookAuthProvider.PROVIDER_ID) {
+      await FacebookAuth.instance.logOut();
+    }
+  }
+
+  Future<void> _syncFirestoreEmailVerified(User firebaseUser) async {
+    if (!firebaseUser.emailVerified) return;
+    await _markFirestoreVerified(firebaseUser.uid);
+  }
+
+  Future<void> _markFirestoreVerified(String uid) async {
+    final docRef = _firestore.collection('users').doc(uid);
+    final docSnap = await docRef.get().timeout(_firestoreTimeout);
+    if (!docSnap.exists) return;
+    if (docSnap.data()?['isVerified'] == true) return;
+    await docRef
+        .update({'isVerified': true, 'updatedAt': FieldValue.serverTimestamp()})
+        .timeout(_firestoreTimeout);
+  }
+
+  String? _nonEmpty(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed;
+  }
 
   /// Fetch Firestore doc, cache vào SQLite, trả về UserModel
   Future<UserModel> _fetchAndCacheUser(String uid) async {
     final DocumentSnapshot doc = await _getUserDoc(uid);
     if (!doc.exists) throw Exception('Không tìm thấy dữ liệu người dùng');
 
-    final data = doc.data() as Map<String, dynamic>;
+    final data = Map<String, dynamic>.from(doc.data() as Map<String, dynamic>);
+    if ((data['uid'] ?? data['id'] ?? '').toString().isEmpty) {
+      data['uid'] = uid;
+      await _firestore.collection('users').doc(uid).set({
+        'uid': uid,
+      }, SetOptions(merge: true));
+    }
     final user = UserModel.fromMap(data);
 
     // Cache vào SQLite
@@ -305,14 +537,22 @@ class LoginAuthService {
 
   String _mapAuthError(String code) {
     switch (code) {
-      case 'user-not-found': return 'Email không tồn tại';
-      case 'wrong-password': return 'Mật khẩu không đúng';
-      case 'invalid-email': return 'Email không hợp lệ';
-      case 'user-disabled': return 'Tài khoản đã bị vô hiệu hóa';
-      case 'invalid-credential': return 'Thông tin đăng nhập không đúng';
-      case 'too-many-requests': return 'Quá nhiều lần thử, vui lòng thử lại sau';
-      case 'account-exists-with-different-credential': return 'Email này đã được đăng ký bằng phương thức khác (Google hoặc Email). Vui lòng đăng nhập bằng phương thức đó.';
-      default: return 'Đăng nhập thất bại';
+      case 'user-not-found':
+        return 'Email không tồn tại';
+      case 'wrong-password':
+        return 'Mật khẩu không đúng';
+      case 'invalid-email':
+        return 'Email không hợp lệ';
+      case 'user-disabled':
+        return 'Tài khoản đã bị vô hiệu hóa';
+      case 'invalid-credential':
+        return 'Thông tin đăng nhập không đúng';
+      case 'too-many-requests':
+        return 'Quá nhiều lần thử, vui lòng thử lại sau';
+      case 'account-exists-with-different-credential':
+        return 'Email này đã được đăng ký bằng phương thức khác (Google hoặc Email). Vui lòng đăng nhập bằng phương thức đó.';
+      default:
+        return 'Đăng nhập thất bại';
     }
   }
 }

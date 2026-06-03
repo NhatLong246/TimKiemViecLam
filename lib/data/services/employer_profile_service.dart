@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'file_upload_service.dart';
+import 'account_uniqueness_service.dart';
 import '../models/user_model.dart';
 import 'sqlite_cache_service.dart';
 
@@ -11,6 +11,7 @@ import 'sqlite_cache_service.dart';
 class EmployerProfileService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AccountUniquenessService _uniqueness = AccountUniquenessService();
 
   String get _uid => _auth.currentUser!.uid;
 
@@ -40,6 +41,11 @@ class EmployerProfileService {
   Future<void> updateFields(Map<String, dynamic> fields) async {
     final payload = Map<String, dynamic>.from(fields)
       ..['updatedAt'] = FieldValue.serverTimestamp();
+    if (payload['phone'] != null) {
+      final phone = _uniqueness.normalizePhone(payload['phone'].toString());
+      await _uniqueness.ensurePhoneAvailable(phone, excludeUid: _uid);
+      payload['phone'] = phone;
+    }
     await _firestore.collection('users').doc(_uid).update(payload);
   }
 
@@ -59,7 +65,9 @@ class EmployerProfileService {
     if (lastName != null) data['lastName'] = lastName;
     if (phone != null) data['phone'] = phone;
     if (gender != null) data['gender'] = gender;
-    if (dateOfBirth != null) data['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+    if (dateOfBirth != null) {
+      data['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+    }
     if (cccd != null) data['cccd'] = cccd;
     if (cccdImageUrl != null) data['cccdImageUrl'] = cccdImageUrl;
     if (cccdBackImageUrl != null) data['cccdBackImageUrl'] = cccdBackImageUrl;
@@ -90,7 +98,9 @@ class EmployerProfileService {
     if (companyTaxCode != null) data['companyTaxCode'] = companyTaxCode;
     if (companySize != null) data['companySize'] = companySize;
     if (businessType != null) data['businessType'] = businessType;
-    if (companyDescription != null) data['companyDescription'] = companyDescription;
+    if (companyDescription != null) {
+      data['companyDescription'] = companyDescription;
+    }
     await updateFields(data);
   }
 

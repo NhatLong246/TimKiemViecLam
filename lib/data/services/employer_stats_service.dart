@@ -60,7 +60,7 @@ class EmployerStatsService {
         final type = data['type'] as String? ?? '';
         final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
 
-        if (type == 'payment' || type == 'hold') {
+        if (type == 'payment' || type == 'hold' || type == 'job_deposit_hold') {
           totalSpent += amount;
         } else if (type == 'deposit') {
           totalDeposited += amount;
@@ -120,7 +120,9 @@ class EmployerStatsService {
           final status = data['status'] as String? ?? '';
           final filled = (data['filledSlots'] as num?)?.toInt() ?? 0;
           buckets[key]!.posts++;
-          if (status == 'approved' || status == 'active' || status == 'closed') {
+          if (status == 'approved' ||
+              status == 'active' ||
+              status == 'closed') {
             buckets[key]!.hired += filled;
           }
         }
@@ -134,7 +136,9 @@ class EmployerStatsService {
         if (buckets.containsKey(key)) {
           final type = data['type'] as String? ?? '';
           final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
-          if (type == 'payment' || type == 'hold') {
+          if (type == 'payment' ||
+              type == 'hold' ||
+              type == 'job_deposit_hold') {
             buckets[key]!.spent += amount;
           } else if (type == 'deposit') {
             buckets[key]!.deposited += amount;
@@ -142,13 +146,17 @@ class EmployerStatsService {
         }
       }
 
-      return buckets.entries.map((e) => EmployerChartPoint(
-            label: e.key,
-            spent: e.value.spent,
-            deposited: e.value.deposited,
-            hired: e.value.hired,
-            posts: e.value.posts,
-          )).toList();
+      return buckets.entries
+          .map(
+            (e) => EmployerChartPoint(
+              label: e.key,
+              spent: e.value.spent,
+              deposited: e.value.deposited,
+              hired: e.value.hired,
+              posts: e.value.posts,
+            ),
+          )
+          .toList();
     } catch (e) {
       print('[EmployerStatsService] fetchChartData error: $e');
       return [];
@@ -157,7 +165,11 @@ class EmployerStatsService {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
-  Map<String, _Bucket> _buildBuckets(DateTime start, DateTime end, StatsPeriod period) {
+  Map<String, _Bucket> _buildBuckets(
+    DateTime start,
+    DateTime end,
+    StatsPeriod period,
+  ) {
     final map = <String, _Bucket>{};
     DateTime cursor = _normalize(start, period);
     final limit = end.add(const Duration(days: 1));

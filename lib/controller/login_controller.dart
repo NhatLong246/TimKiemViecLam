@@ -10,7 +10,7 @@ import '../utils/push_navigation_handler.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../routes/app_routes.dart';
+
 class AuthController extends GetxController {
   final LoginAuthService _authService = LoginAuthService();
   UserModel? currentUser;
@@ -82,13 +82,60 @@ class AuthController extends GetxController {
     return await _checkAndSetSession(user);
   }
 
+  Future<UserModel> registerWithGoogle({
+    required String role,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? phone,
+    String? companyName,
+    String? companyAddress,
+  }) async {
+    final user = await _authService.registerWithGoogle(
+      role: role,
+      firstName: firstName,
+      lastName: lastName,
+      username: username,
+      phone: phone,
+      companyName: companyName,
+      companyAddress: companyAddress,
+    );
+    return await _checkAndSetSession(user);
+  }
+
+  Future<UserModel> registerWithFacebook({
+    required String role,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? phone,
+    String? companyName,
+    String? companyAddress,
+  }) async {
+    final user = await _authService.registerWithFacebook(
+      role: role,
+      firstName: firstName,
+      lastName: lastName,
+      username: username,
+      phone: phone,
+      companyName: companyName,
+      companyAddress: companyAddress,
+    );
+    return await _checkAndSetSession(user);
+  }
+
   Future<UserModel> _checkAndSetSession(UserModel user) async {
-    final docSnap = await FirebaseFirestore.instance.collection('users').doc(user.id).get();
+    final docSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.id)
+        .get();
     final data = docSnap.data();
     final remoteSessionId = data?['currentSessionId'] as String?;
     final localSessionId = await PreferencesHelper.getCurrentSessionId();
 
-    if (remoteSessionId != null && remoteSessionId.isNotEmpty && remoteSessionId != localSessionId) {
+    if (remoteSessionId != null &&
+        remoteSessionId.isNotEmpty &&
+        remoteSessionId != localSessionId) {
       await FirebaseFirestore.instance.collection('users').doc(user.id).update({
         'lastLoginAttempt': DateTime.now().millisecondsSinceEpoch,
       });
@@ -96,7 +143,8 @@ class AuthController extends GetxController {
       final completer = Completer<bool>();
       Get.defaultDialog(
         title: 'Tài khoản đang đăng nhập',
-        middleText: 'Tài khoản này đang được sử dụng ở thiết bị khác (hoặc bạn chưa đăng xuất trước khi xoá app). Bạn có muốn ép đăng nhập để gỡ kẹt không?',
+        middleText:
+            'Tài khoản này đang được sử dụng ở thiết bị khác (hoặc bạn chưa đăng xuất trước khi xoá app). Bạn có muốn ép đăng nhập để gỡ kẹt không?',
         textConfirm: 'Ép đăng nhập',
         textCancel: 'Huỷ',
         confirmTextColor: Colors.white,
@@ -113,7 +161,9 @@ class AuthController extends GetxController {
       final force = await completer.future;
       if (!force) {
         await _authService.logout();
-        throw Exception('Tài khoản đang được đăng nhập trên một thiết bị khác. Không thể đăng nhập.');
+        throw Exception(
+          'Tài khoản đang được đăng nhập trên một thiết bị khác. Không thể đăng nhập.',
+        );
       }
     }
 
@@ -123,14 +173,14 @@ class AuthController extends GetxController {
     _startAttendanceAutoIfEmployer();
     await PushNotificationService.instance.bindToUser(user.id);
     await PushNavigationHandler.processPendingIfAny();
-    
+
     final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
     await PreferencesHelper.saveCurrentSessionId(sessionId);
     await FirebaseFirestore.instance.collection('users').doc(user.id).update({
       'currentSessionId': sessionId,
     });
     _listenToSession(user.id);
-    
+
     return user;
   }
 
@@ -164,19 +214,19 @@ class AuthController extends GetxController {
         .doc(uid)
         .snapshots()
         .listen((snapshot) async {
-      if (snapshot.exists) {
-        final data = snapshot.data();
-        if (data != null) {
-          final attempt = data['lastLoginAttempt'] as int?;
-          if (attempt != null) {
-            if (_lastSeenAttempt != null && attempt > _lastSeenAttempt!) {
-              _showLoginAttemptWarning();
+          if (snapshot.exists) {
+            final data = snapshot.data();
+            if (data != null) {
+              final attempt = data['lastLoginAttempt'] as int?;
+              if (attempt != null) {
+                if (_lastSeenAttempt != null && attempt > _lastSeenAttempt!) {
+                  _showLoginAttemptWarning();
+                }
+                _lastSeenAttempt = attempt;
+              }
             }
-            _lastSeenAttempt = attempt;
           }
-        }
-      }
-    });
+        });
   }
 
   void _showLoginAttemptWarning() {

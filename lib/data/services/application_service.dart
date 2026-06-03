@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/application_model.dart';
 import '../models/job_post_model.dart';
+import '../../utils/job_time_helper.dart';
 import 'notification_service.dart';
 import 'schedule_service.dart';
 
@@ -45,7 +46,11 @@ class ApplicationService {
     if (startDate == null) {
       throw Exception('Công việc thiếu ngày bắt đầu.');
     }
-    if (!now.isBefore(startDate)) {
+    final startAt = JobTimeHelper.combineDateAndTime(
+      startDate,
+      jobData['startTime'] as String?,
+    );
+    if (!now.isBefore(startAt)) {
       throw Exception('Công việc đã bắt đầu, không thể ứng tuyển.');
     }
 
