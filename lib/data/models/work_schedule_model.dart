@@ -2,23 +2,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Phân công công việc cho 1 thành viên trong ca
 class WorkTask {
+  final String taskId;
   final String userId;
   final String userName;
   final String content; // nội dung công việc được giao
 
   const WorkTask({
+    required this.taskId,
     required this.userId,
     required this.userName,
     required this.content,
   });
 
   factory WorkTask.fromMap(Map<String, dynamic> map) => WorkTask(
+        taskId: map['taskId'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
         userId: map['userId'] as String? ?? '',
         userName: map['userName'] as String? ?? '',
         content: map['content'] as String? ?? '',
       );
 
   Map<String, dynamic> toMap() => {
+        'taskId': taskId,
         'userId': userId,
         'userName': userName,
         'content': content,

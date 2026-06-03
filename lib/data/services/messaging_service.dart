@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../models/app_notification_model.dart';
 import '../models/attendance_model.dart';
@@ -477,6 +478,37 @@ class MessagingService {
       'createdAt': FieldValue.serverTimestamp(),
     });
     await _updatePreview(groupId, content, uid);
+
+    try {
+      final snap = await _db.collection(_groups).doc(groupId).get();
+      if (snap.exists) {
+        final data = snap.data() ?? {};
+        final members = (data['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        final employerId = (data['employerId'] ?? '').toString();
+        
+        final recipientIds = <String>{...members};
+        if (employerId.isNotEmpty) recipientIds.add(employerId);
+        recipientIds.remove(uid);
+
+        final senderProfiles = await fetchParticipants({uid});
+        final callerName = senderProfiles[uid]?.name ?? 'Ai đó';
+        final jobTitle = (data['jobTitle'] ?? '').toString();
+        final finalCallerName = data['chatType'] == 'group' ? '$callerName (Nhóm $jobTitle)' : callerName;
+
+        for (final recipientId in recipientIds) {
+          await _notifications.notifyIncomingCall(
+            recipientId: recipientId,
+            groupId: groupId,
+            callerName: finalCallerName,
+            isVideo: isVideo,
+            roomUrl: roomUrl,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi gửi thông báo cuộc gọi: $e');
+    }
+
     return ref.id;
   }
 

@@ -184,6 +184,45 @@ class _JobAudioContent extends StatefulWidget {
 class _JobAudioContentState extends State<_JobAudioContent> {
   final _player = AudioPlayer();
   bool _playing = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _playing = false;
+          _position = Duration.zero;
+        });
+      }
+    });
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(d.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(d.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
+  }
+
+  Duration get _fallbackDuration {
+    final parts = widget.msg.content.split(':');
+    if (parts.length == 2) {
+      return Duration(
+        minutes: int.tryParse(parts[0]) ?? 0,
+        seconds: int.tryParse(parts[1]) ?? 0,
+      );
+    }
+    return Duration.zero;
+  }
 
   @override
   void dispose() {
@@ -209,9 +248,6 @@ class _JobAudioContentState extends State<_JobAudioContent> {
       await f.writeAsBytes(bytes, flush: true);
       await _player.play(DeviceFileSource(f.path));
       if (mounted) setState(() => _playing = true);
-      _player.onPlayerComplete.first.then((_) {
-        if (mounted) setState(() => _playing = false);
-      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -271,7 +307,14 @@ class _JobAudioContentState extends State<_JobAudioContent> {
           Icon(Icons.mic_rounded, color: mine ? Colors.white70 : Colors.grey),
           const SizedBox(width: 8),
           Text(
-            widget.msg.content,
+            (() {
+              final totalDur = _duration > Duration.zero ? _duration : _fallbackDuration;
+              if (totalDur > Duration.zero && (_playing || _position > Duration.zero)) {
+                final remaining = totalDur - _position;
+                return _formatDuration(remaining.isNegative ? Duration.zero : remaining);
+              }
+              return widget.msg.content;
+            })(),
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: mine ? Colors.white : Colors.black87,

@@ -20,6 +20,7 @@ class ConversationThread {
   final int unreadCount;
   /// User đã tắt thông báo nhóm (mutedBy).
   final bool notificationsMuted;
+  final String? groupAvatarBase64;
 
   /// Nhóm việc (không gồm chat peer/direct 1-1 giữa thành viên).
   bool get isGroupChat {
@@ -82,11 +83,13 @@ class ConversationThread {
     this.chatType = 'direct',
     this.unreadCount = 0,
     this.notificationsMuted = false,
+    this.groupAvatarBase64,
   });
 
   ConversationThread copyWith({
     int? unreadCount,
     bool? notificationsMuted,
+    String? groupAvatarBase64,
   }) {
     return ConversationThread(
       groupId: groupId,
@@ -104,6 +107,7 @@ class ConversationThread {
       chatType: chatType,
       unreadCount: unreadCount ?? this.unreadCount,
       notificationsMuted: notificationsMuted ?? this.notificationsMuted,
+      groupAvatarBase64: groupAvatarBase64 ?? this.groupAvatarBase64,
     );
   }
 
@@ -148,6 +152,7 @@ class ConversationThread {
           ? 0
           : _parseUnreadCount(map, currentUid),
       notificationsMuted: notificationsMuted,
+      groupAvatarBase64: map['groupAvatarBase64']?.toString(),
     );
   }
 

@@ -7,7 +7,9 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../data/models/work_schedule_model.dart';
+import '../../data/models/job_post_model.dart';
 import '../../data/services/work_schedule_service.dart';
+import '../../data/services/job_post_service.dart';
 
 /// Nhân viên xem phân công công việc (từ thông báo hoặc Quản lý nhóm).
 class CandidateWorkAssignmentScreen extends StatefulWidget {
@@ -31,8 +33,10 @@ class _CandidateWorkAssignmentScreenState
 
   final _scheduleSvc = WorkScheduleService();
   final _auth = Get.find<AuthController>();
+  final _jobSvc = JobPostService();
 
   GroupChatModel? _group;
+  JobPostModel? _jobPost;
   DateTime _selectedDate = DateTime.now();
 
   bool _loading = true;
@@ -41,6 +45,8 @@ class _CandidateWorkAssignmentScreenState
 
   String get _uid => _auth.currentUser?.id ?? '';
   String get _dateStr => DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+  DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 
   @override
   void initState() {
@@ -94,6 +100,22 @@ class _CandidateWorkAssignmentScreenState
       if (_group == null) {
         throw Exception('Thiếu thông tin nhóm');
       }
+
+      _jobPost = await _jobSvc.getJobPostById(_group!.jobId);
+      if (_jobPost != null) {
+        final start = _startOfDay(_jobPost!.startDate);
+        final end = _jobPost!.endDate != null 
+            ? _startOfDay(_jobPost!.endDate!) 
+            : start.add(const Duration(days: 365));
+        final current = _startOfDay(_selectedDate);
+        
+        if (current.isBefore(start)) {
+          _selectedDate = start;
+        } else if (current.isAfter(end)) {
+          _selectedDate = end;
+        }
+      }
+
       await _loadSchedule();
     } catch (e) {
       if (mounted) {
@@ -126,21 +148,21 @@ class _CandidateWorkAssignmentScreenState
     }
   }
 
-  WorkTask? get _myTask {
+  List<WorkTask> get _myTasks {
     final s = _schedule;
-    if (s == null) return null;
-    for (final t in s.tasks) {
-      if (t.userId == _uid) return t;
-    }
-    return null;
+    if (s == null) return [];
+    return s.tasks.where((t) => t.userId == _uid).toList();
   }
 
   Future<void> _pickDate() async {
+    final start = _jobPost != null ? _startOfDay(_jobPost!.startDate) : DateTime.now().subtract(const Duration(days: 30));
+    final end = _jobPost?.endDate != null ? _startOfDay(_jobPost!.endDate!) : start.add(const Duration(days: 365));
+    
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
+      firstDate: start,
+      lastDate: end,
       builder: (ctx, child) => Theme(
         data: ThemeData.light().copyWith(
           colorScheme: const ColorScheme.light(primary: _primary),
@@ -202,7 +224,7 @@ class _CandidateWorkAssignmentScreenState
 
   Widget _buildContent() {
     final s = _schedule;
-    final myTask = _myTask;
+    final myTasks = _myTasks;
     final dateLabel =
         DateFormat('EEEE, dd/MM/yyyy', 'vi').format(_selectedDate);
 
@@ -281,14 +303,20 @@ class _CandidateWorkAssignmentScreenState
             _sectionCard(
               icon: Icons.assignment_ind_rounded,
               title: 'Việc được giao cho bạn',
-              child: myTask != null && myTask.content.trim().isNotEmpty
-                  ? Text(
-                      myTask.content.trim(),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        height: 1.45,
-                      ),
+              child: myTasks.isNotEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: myTasks.map((t) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          t.content.trim(),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
+                          ),
+                        ),
+                      )).toList(),
                     )
                   : Text(
                       'Chưa có nội dung riêng. Xem yêu cầu chung phía trên.',

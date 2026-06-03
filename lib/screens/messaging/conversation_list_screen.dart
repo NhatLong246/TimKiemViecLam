@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../controller/login_controller.dart';
@@ -387,10 +388,13 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: _primary.withValues(alpha: 0.15),
-                  backgroundImage: thread.peerAvatarUrl != null
+                  backgroundImage: (!isGroupTab && thread.peerAvatarUrl != null)
                       ? NetworkImage(thread.peerAvatarUrl!)
-                      : null,
-                  child: thread.peerAvatarUrl == null || isGroupTab
+                      : (isGroupTab && thread.groupAvatarBase64 != null)
+                          ? MemoryImage(base64Decode(thread.groupAvatarBase64!))
+                          : null,
+                  child: ((!isGroupTab && thread.peerAvatarUrl == null) ||
+                          (isGroupTab && thread.groupAvatarBase64 == null))
                       ? Text(
                           avatarLetter,
                           style: TextStyle(

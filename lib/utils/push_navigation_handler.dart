@@ -8,8 +8,10 @@ import '../controller/login_controller.dart';
 import '../controller/messaging_controller.dart';
 import '../data/models/app_notification_model.dart';
 import '../routes/app_routes.dart';
+import '../screens/chat/call_screen.dart';
 import '../screens/messaging/chat_room_screen.dart';
 import '../screens/notification/notification_screen.dart';
+import '../screens/alarm/alarm_alert_screen.dart';
 import 'messaging_bootstrap.dart';
 import 'notification_navigation.dart';
 
@@ -64,6 +66,37 @@ class PushNavigationHandler {
     final type = data['type']?.toString() ?? '';
     final groupId = data['groupId']?.toString() ?? '';
 
+    if (type == 'alarm') {
+      data['title'] = data['title'] ?? 'Thông báo Khẩn!';
+      data['body'] = data['body'] ?? 'Bạn có lịch làm việc sắp diễn ra.';
+      await Get.to(() => AlarmAlertScreen(payload: data));
+      return;
+    }
+
+    if (type == 'call' && groupId.isNotEmpty) {
+      final isVideo = data['isVideo']?.toString() == 'true';
+      final roomUrl = data['roomUrl']?.toString() ?? '';
+      if (roomUrl.isNotEmpty) {
+        if (Get.isRegistered<MessagingController>()) {
+          Get.find<MessagingController>().openChatByGroupId(groupId); // Đảm bảo init thread
+        } else {
+          MessagingBootstrap.ensureController().openChatByGroupId(groupId);
+        }
+        
+        final user = Get.find<AuthController>().currentUser;
+        if (user != null) {
+          await Get.to(() => CallScreen(
+            isVideo: isVideo,
+            groupName: 'Cuộc gọi nhóm',
+            userId: user.id,
+            callId: roomUrl,
+            userName: user.fullName,
+          ));
+        }
+        return;
+      }
+    }
+
     if (type == 'message' && groupId.isNotEmpty) {
       if (Get.isRegistered<MessagingController>()) {
         await Get.find<MessagingController>().markConversationRead(groupId);
@@ -107,6 +140,14 @@ class PushNavigationHandler {
         data: data,
       );
       await NotificationNavigation.openWorkAssignment(item);
+      return;
+    }
+
+    if (type == 'employer_interest') {
+      final jobId = data['jobId']?.toString();
+      if (jobId != null && jobId.isNotEmpty) {
+        await Get.toNamed(AppRoutes.jobDetail, arguments: {'jobId': jobId});
+      }
       return;
     }
 

@@ -7,7 +7,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
+
 import '../../push/push_background_handler.dart';
+import '../../screens/chat/widgets/incoming_call_overlay.dart';
 import '../../utils/push_navigation_handler.dart';
 
 /// Push notification thật: FCM + hiển thị local khi app foreground.
@@ -30,6 +35,14 @@ class PushNotificationService {
     if (_initialized || kIsWeb) return;
     _initialized = true;
 
+    if (!kIsWeb) {
+      tz.initializeTimeZones();
+      try {
+        final locationInfo = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(locationInfo.identifier));
+      } catch (_) {}
+    }
+
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -51,10 +64,29 @@ class PushNotificationService {
         description: 'Thông báo việc làm, tin nhắn, giải ngân',
         importance: Importance.high,
       );
-      await _local
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+      
+      const callChannel = AndroidNotificationChannel(
+        'call_channel',
+        'Cuộc gọi',
+        description: 'Thông báo cuộc gọi đến',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+      
+      const alarmChannel = AndroidNotificationChannel(
+        'alarm_channel',
+        'Báo thức & Nhắc nhở',
+        description: 'Báo động đỏ khi có ca làm việc sắp diễn ra',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      final androidPlugin = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.createNotificationChannel(channel);
+      await androidPlugin?.createNotificationChannel(callChannel);
+      await androidPlugin?.createNotificationChannel(alarmChannel);
     }
 
     await requestPermission();
@@ -163,6 +195,10 @@ class PushNotificationService {
   }
 
   void _onLocalTap(NotificationResponse response) {
+    if (response.actionId == 'decline_call') {
+      // Bỏ qua (không làm gì)
+      return;
+    }
     PushNavigationHandler.setPendingFromJson(response.payload);
     PushNavigationHandler.processPendingIfAny();
   }
@@ -171,27 +207,60 @@ class PushNotificationService {
     final notification = message.notification;
     final data = message.data;
 
-    final title =
-        notification?.title ?? data['title']?.toString() ?? 'ViecNow';
-    final body =
-        notification?.body ?? data['body']?.toString() ?? '';
+    final title = notification?.title ?? data['title']?.toString() ?? 'ViecNow';
+    final body = notification?.body ?? data['body']?.toString() ?? '';
+    final type = data['type']?.toString();
+
+    // Nếu app đang bật và có cuộc gọi đến, hiện Overlay luôn thay vì Notification
+    if (type == 'call') {
+      IncomingCallOverlay.show(data);
+      return; // Không hiện push notification cục bộ nữa
+    }
 
     if (title.isEmpty && body.isEmpty) return;
 
     final payload = data.isNotEmpty ? jsonEncode(data) : null;
+    
+    // Cấu hình riêng cho Cuộc gọi
+    AndroidNotificationDetails androidDetails;
+    if (type == 'call') {
+      androidDetails = const AndroidNotificationDetails(
+        'call_channel',
+        'Cuộc gọi',
+        importance: Importance.max,
+        priority: Priority.max,
+        icon: '@mipmap/ic_launcher',
+        fullScreenIntent: true, // Kích hoạt Full Screen Intent
+        actions: [
+          AndroidNotificationAction(
+            'decline_call',
+            'Từ chối',
+            showsUserInterface: true,
+            cancelNotification: true,
+          ),
+          AndroidNotificationAction(
+            'accept_call',
+            'Trả lời',
+            showsUserInterface: true,
+          ),
+        ],
+      );
+    } else {
+      androidDetails = const AndroidNotificationDetails(
+        defaultChannelId,
+        defaultChannelName,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      );
+    }
 
     await _local.show(
       message.hashCode,
       title,
       body,
       NotificationDetails(
-        android: AndroidNotificationDetails(
-          defaultChannelId,
-          defaultChannelName,
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
+        android: androidDetails,
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
