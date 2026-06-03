@@ -23,7 +23,7 @@ class PushNotificationService {
 
   static const defaultChannelId = kPushDefaultChannelId;
   static const defaultChannelName = kPushDefaultChannelName;
-  static const callChannelId = 'call_channel_v2'; // Đổi ID để đảm bảo cập nhật importance
+  static const callChannelId = 'call_channel_v6'; // Nâng lên v6 để ép cập nhật hệ thống
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _local =
@@ -74,6 +74,7 @@ class PushNotificationService {
         playSound: true,
         enableVibration: true,
         enableLights: true,
+        audioAttributesUsage: AudioAttributesUsage.notification,
       );
       
       const alarmChannel = AndroidNotificationChannel(
@@ -186,7 +187,7 @@ class PushNotificationService {
   }
 
   void _onForegroundMessage(RemoteMessage message) {
-    _showLocalFromMessage(message);
+    showLocalFromMessage(message);
   }
 
   void _onMessageOpenedApp(RemoteMessage message) {
@@ -201,18 +202,14 @@ class PushNotificationService {
     PushNavigationHandler.processPendingIfAny();
   }
 
-  Future<void> _showLocalFromMessage(RemoteMessage message) async {
-    final notification = message.notification;
+  Future<void> showLocalFromMessage(RemoteMessage message) async {
     final data = message.data;
-
-    final title = notification?.title ?? data['title']?.toString() ?? 'ViecNow';
-    final body = notification?.body ?? data['body']?.toString() ?? '';
     final type = data['type']?.toString();
+    final title = message.notification?.title ?? data['title']?.toString() ?? 'Cuộc gọi đến';
+    final body = message.notification?.body ?? data['body']?.toString() ?? 'Đang gọi cho bạn...';
 
-    // Nếu app đang bật, vẫn hiện Overlay nhưng cũng có thể hiện Notification nếu cần
     if (type == 'call') {
       IncomingCallOverlay.show(data);
-      // Tiếp tục hiển thị notification để có nút trả lời nhanh trên thanh trạng thái
     }
 
     if (title.isEmpty && body.isEmpty) return;
