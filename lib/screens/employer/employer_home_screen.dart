@@ -86,9 +86,6 @@ class EmployerHomeScreen extends StatelessWidget {
     final name = (user?.companyName?.isNotEmpty == true)
         ? user!.companyName!
         : (user?.firstName.isNotEmpty == true ? user!.firstName : 'Bạn');
-    final location = (user?.companyAddress?.isNotEmpty == true)
-        ? user!.companyAddress!
-        : 'Chưa cập nhật vị trí';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'N';
 
     return Container(
@@ -183,7 +180,7 @@ class EmployerHomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Name + location
+                    // Name
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,25 +193,6 @@ class EmployerHomeScreen extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.1,
                             ),
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on_rounded,
-                                  color: Colors.white60, size: 12),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  location,
-                                  style: const TextStyle(
-                                    color: Colors.white60,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),

@@ -4,7 +4,9 @@ import 'dart:typed_data'; // Cần thiết cho vibrationPattern
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -45,7 +47,7 @@ class PushNotificationService {
     );
 
     if (!kIsWeb && Platform.isAndroid) {
-      const callChannel = AndroidNotificationChannel(
+      final callChannel = AndroidNotificationChannel(
         callChannelId,
         'Cuộc gọi đến',
         description: 'Thông báo cuộc gọi video và thoại khẩn cấp',
@@ -55,7 +57,22 @@ class PushNotificationService {
         showBadge: true,
         vibrationPattern: Int64List.fromList([0, 1000, 500, 1000]),
       );
-      await _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(callChannel);
+      
+      const defaultChannel = AndroidNotificationChannel(
+        'viecnow_default',
+        'Thông báo chung',
+        description: 'Thông báo tin nhắn và cập nhật hệ thống',
+        importance: Importance.max, // Đảm bảo push rớt xuống (Heads-up)
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+      );
+
+      final androidPlugin = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(callChannel);
+        await androidPlugin.createNotificationChannel(defaultChannel);
+      }
     }
 
     await requestPermission();
@@ -136,6 +153,32 @@ class PushNotificationService {
 
       // 3. HIỆN Ô CUỘC GỌI TRONG APP
       IncomingCallOverlay.show(data);
+    } else {
+      // 4. HIỆN SNACKBAR CHO TIN NHẮN BÌNH THƯỜNG KHI ĐANG Ở TRONG APP
+      final titleText = message.notification?.title ?? data['title']?.toString() ?? 'Thông báo mới';
+      final bodyText = message.notification?.body ?? data['body']?.toString() ?? 'Bạn có một tin nhắn mới';
+      
+      Get.snackbar(
+        titleText,
+        bodyText,
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.white,
+        colorText: Colors.black87,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 4),
+        icon: const Icon(Icons.notifications_active, color: Color(0xFF00B2FF)),
+        boxShadows: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+        onTap: (snack) {
+          PushNavigationHandler.handlePayload(data);
+        },
+      );
     }
   }
 

@@ -29,7 +29,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: _tabLabels.length, vsync: this);
     final args = Get.arguments;
     if (args is GroupChatModel) {
       _groupForCreate = args;
@@ -60,6 +60,20 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
   }
 
   List<ComplaintCatalogItem> _filtered(int tabIndex) {
+    if (_isEmployer) {
+      switch (tabIndex) {
+        case 0:
+          return _all
+              .where((e) => e.direction == ComplaintDirection.received && e.type != ComplaintCatalogType.warning)
+              .toList();
+        case 1:
+          return _all
+              .where((e) => e.type == ComplaintCatalogType.warning)
+              .toList();
+        default:
+          return _all;
+      }
+    }
     switch (tabIndex) {
       case 1:
         return _all
@@ -84,7 +98,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
       return const ['Tất cả', 'Tôi gửi', 'Ca làm của tôi'];
     }
     if (_isEmployer) {
-      return const ['Tất cả', 'Tôi gửi', 'Về tin đăng'];
+      return const ['Nhận về', 'Cảnh báo'];
     }
     return const ['Tất cả', 'Đã gửi', 'Nhận về'];
   }
@@ -129,7 +143,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
           tabs: _tabLabels.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      floatingActionButton: _isAdmin
+      floatingActionButton: (_isAdmin || _isEmployer)
           ? null
           : FloatingActionButton.extended(
               onPressed: _createComplaint,
@@ -145,7 +159,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
                 Expanded(
                   child: TabBarView(
               controller: _tabs,
-              children: List.generate(3, (tab) {
+              children: List.generate(_tabLabels.length, (tab) {
                 final items = _filtered(tab);
                 return RefreshIndicator(
                   onRefresh: _load,
@@ -157,16 +171,20 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
                                 child: Text(
-                                  tab == 1
-                                      ? (_isCandidate
-                                          ? 'Chưa khiếu nại về công việc bạn gửi.'
-                                          : 'Chưa có khiếu nại bạn gửi.')
-                                      : tab == 2
+                                  _isEmployer
+                                      ? (tab == 0
+                                          ? 'Chưa có UV khiếu nại về tin đăng của bạn.'
+                                          : 'Chưa có cảnh báo nào từ Admin.')
+                                      : (tab == 1
                                           ? (_isCandidate
-                                              ? 'Chưa có khiếu nại về ca làm của bạn.\n'
-                                                  'NTD khiếu nại sẽ hiện ở đây.'
-                                              : 'Chưa có UV khiếu nại về tin đăng của bạn.')
-                                          : 'Chưa có khiếu nại.',
+                                              ? 'Chưa khiếu nại về công việc bạn gửi.'
+                                              : 'Chưa có khiếu nại bạn gửi.')
+                                          : tab == 2
+                                              ? (_isCandidate
+                                                  ? 'Chưa có khiếu nại về ca làm của bạn.\n'
+                                                      'NTD khiếu nại sẽ hiện ở đây.'
+                                                  : 'Chưa có khiếu nại nhận về.')
+                                              : 'Chưa có khiếu nại.'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: Colors.grey.shade700),
                                 ),
@@ -202,8 +220,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
             ? 'Theo dõi khiếu nại bạn gửi và khiếu nại NTD gửi về ca làm của bạn. '
                 'Gửi khiếu nại mới sau khi nhóm công việc đã giải tán.'
             : _isEmployer
-                ? 'Theo dõi khiếu nại bạn gửi về nhân viên và khiếu nại UV gửi về tin đăng. '
-                    'Gửi khiếu nại mới sau khi nhóm đã giải tán.'
+                ? 'Theo dõi khiếu nại UV gửi về tin đăng và cảnh báo từ Admin.'
                 : 'Tất cả khiếu nại nhân viên và công việc trong hệ thống.',
         style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
       ),
@@ -212,11 +229,15 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
 
   Widget _tile(ComplaintCatalogItem item) {
     final isReceived = item.direction == ComplaintDirection.received;
-    final color = isReceived
-        ? const Color(0xFFEF6C00)
-        : item.type == ComplaintCatalogType.worker
-            ? const Color(0xFFC62828)
-            : const Color(0xFF1565C0);
+    final isWarning = item.type == ComplaintCatalogType.warning;
+
+    final color = isWarning
+        ? const Color(0xFFD32F2F)
+        : isReceived
+            ? const Color(0xFFEF6C00)
+            : item.type == ComplaintCatalogType.worker
+                ? const Color(0xFFC62828)
+                : const Color(0xFF1565C0);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -224,7 +245,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
         leading: CircleAvatar(
           backgroundColor: color.withValues(alpha: 0.12),
           child: Icon(
-            isReceived ? Icons.inbox_outlined : Icons.send_outlined,
+            isWarning ? Icons.warning_amber_rounded : (isReceived ? Icons.inbox_outlined : Icons.send_outlined),
             color: color,
           ),
         ),

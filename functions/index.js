@@ -346,3 +346,85 @@ exports.onUserInboxNotificationCreated = onDocumentCreated(
     return sendPushToUser(userId, buildPayloadFromInbox(data));
   },
 );
+
+exports.autoRequestDisbursement = onSchedule(
+  {
+    schedule: 'every 30 minutes',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  },
+  async () => {
+    // endDate là 00:00:00 của ngày đó. Công việc kết thúc vào 24:00:00.
+    // Chờ thêm 3 giờ sau khi kết thúc => 27 giờ sau mốc 00:00:00 của endDate.
+    const thresholdTime = new Date(Date.now() - 27 * 60 * 60 * 1000);
+    const snap = await db
+      .collection('jobPosts')
+      .where('endDate', '<=', Timestamp.fromDate(thresholdTime))
+      .get();
+
+    let createdCount = 0;
+    for (const doc of snap.docs) {
+      const job = doc.data();
+      if (!isActiveJob(job)) continue;
+
+      const employerId = (job.employerId || '').toString();
+      if (!employerId) continue;
+
+      const claimed = await claimJobWorkflowOnce(doc.id, 'autoDisbursementRequestedAt');
+      if (!claimed) continue;
+
+      const groupId = (job.groupChatId || '').toString();
+      if (!groupId) continue; // Không có group chat = không có thành viên
+
+      // Kiểm tra group chat có thành viên nào không
+      const groupSnap = await db.collection('groupChats').doc(groupId).get();
+      if (!groupSnap.exists) continue;
+      const groupData = groupSnap.data();
+      const memberIds = groupData.memberIds || [];
+      // Lọc bỏ employerId ra khỏi danh sách member, nếu chỉ có employer thì tức là không có UV
+      const candidates = memberIds.filter(id => id !== employerId);
+      if (candidates.length === 0) continue; // Không có ứng viên nào -> không giải ngân
+
+      // Đảm bảo không tạo trùng lặp
+      const noticesSnap = await db
+        .collection('disbursementNotices')
+        .where('jobId', '==', doc.id)
+        .get();
+      if (!noticesSnap.empty) continue;
+
+      const amount = Number(job.salary || 0);
+      const titleText = (job.title || 'Công việc').toString();
+      
+      const workDate = job.endDate 
+        ? new Date(job.endDate.toDate().getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+
+      await db.collection('disbursementNotices').add({
+        jobId: doc.id,
+        groupId: groupId,
+        employerId: employerId,
+        workDate: workDate,
+        amount: amount,
+        jobTitle: titleText,
+        status: 'pending_admin',
+        employerAck: false,
+        adminAck: false,
+        createdAt: FieldValue.serverTimestamp(),
+        isAutoRequested: true,
+      });
+
+      await notifyEmployerFromFunction({
+        employerId,
+        type: 'disbursement_auto_requested',
+        title: 'Tự động yêu cầu giải ngân',
+        body: `Công việc "${titleText}" đã kết thúc quá 3 giờ. Hệ thống đã tự động gửi yêu cầu giải ngân đến Admin.`,
+        data: {
+          jobId: doc.id,
+        },
+      });
+
+      createdCount += 1;
+    }
+
+    console.log(`Auto disbursement requests created: ${createdCount}`);
+  },
+);

@@ -267,7 +267,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildDayEndBar() {
     final r = _readiness;
-    if (r == null || r.requiredDays == 0) return const SizedBox.shrink();
+    if (r == null) return const SizedBox.shrink();
+    if (!r.canRequestDisbursement && r.requiredDays == 0) return const SizedBox.shrink();
 
     return Container(
       color: Colors.white,
@@ -541,6 +542,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _startSession() async {
+    final timeParts = _timeCtrl.text.split(':');
+    if (timeParts.length == 2) {
+      final now = DateTime.now();
+      final expectedTime = DateTime(now.year, now.month, now.day, int.parse(timeParts[0]), int.parse(timeParts[1]));
+      if (now.isBefore(expectedTime)) {
+        Get.snackbar(
+          'Chưa đến giờ',
+          'Bạn chỉ có thể bắt đầu điểm danh từ ${_timeCtrl.text} trở đi.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+    }
+
     final workers = (_members ?? [])
         .where((u) => u.id != _employerId)
         .map((u) => AttendanceRecord(

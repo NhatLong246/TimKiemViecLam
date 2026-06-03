@@ -17,7 +17,6 @@ class EmployerReviewService {
       final snap = await _firestore
           .collection('reviews')
           .where('revieweeId', isEqualTo: _uid)
-          .orderBy('createdAt', descending: true)
           .get();
 
       if (snap.docs.isEmpty) return [];
@@ -40,6 +39,10 @@ class EmployerReviewService {
           reviewerAvatarUrl: reviewer?['avatarUrl'],
         );
       }).toList();
+
+      // Sort locally to fix missing Firestore composite index
+      items.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
 
       // Cache xuống SQLite
       await _cacheReviews(items);

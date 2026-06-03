@@ -73,7 +73,7 @@ class JobAttendanceCompletionService {
         mandatoryDates: mandatory,
         incompleteDates: const [],
         message: workPeriodEnded
-            ? 'Công việc đã kết thúc. Chưa có lịch ngày làm — liên hệ Admin hoặc đóng nhóm.'
+            ? 'Công việc đã kết thúc. Vui lòng gửi yêu cầu giải ngân.'
             : 'Chưa xác định số ngày làm (cần ngày kết thúc hoặc lịch làm)',
       );
     }

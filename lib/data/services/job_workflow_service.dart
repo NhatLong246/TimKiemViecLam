@@ -100,7 +100,7 @@ class JobWorkflowService {
       type: 'disbursement_pending',
       title: 'Đang chờ Admin duyệt',
       body:
-          'Yêu cầu giải ngân $amount₫ đã gửi. Bạn chỉ giải ngân sau khi Admin cho phép.',
+          'Yêu cầu giải ngân $amount₫ cho "$jobTitle" đã gửi. Bạn chỉ giải ngân sau khi Admin cho phép.',
       data: {'noticeId': ref.id, 'jobId': jobId},
     );
 
@@ -248,6 +248,50 @@ class JobWorkflowService {
 
   CollectionReference<Map<String, dynamic>> get _groups =>
       _db.collection('groupChats');
+
+  /// Tự động quét và gửi yêu cầu giải ngân cho các công việc quá hạn 3 tiếng
+  Future<void> autoRequestPendingDisbursements() async {
+    final employerId = FirebaseAuth.instance.currentUser?.uid;
+    if (employerId == null) return;
+
+    try {
+      final threeHoursAgo = DateTime.now().subtract(const Duration(hours: 3));
+      
+      final snap = await _db
+          .collection('jobPosts')
+          .where('employerId', isEqualTo: employerId)
+          .where('status', whereIn: ['approved', 'active'])
+          .get();
+
+      for (final doc in snap.docs) {
+        final job = doc.data();
+        final endDateTs = job['endDate'] as Timestamp?;
+        if (endDateTs == null) continue;
+
+        if (endDateTs.toDate().isBefore(threeHoursAgo)) {
+          // Check if any notice already exists
+          final allNotices = await _notices.where('jobId', isEqualTo: doc.id).get();
+          if (allNotices.docs.isEmpty) {
+            final groupId = (job['groupChatId'] ?? '').toString();
+            final amount = (job['salary'] as num?)?.toDouble() ?? 0;
+            final jobTitle = (job['title'] ?? 'Công việc').toString();
+            final workDate = endDateTs.toDate().toIso8601String().split('T')[0];
+            
+            await requestDisbursement(
+              jobId: doc.id,
+              groupId: groupId,
+              employerId: employerId,
+              workDate: workDate,
+              amount: amount,
+              jobTitle: jobTitle,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // Bỏ qua lỗi ngầm
+    }
+  }
 
   Future<List<DisbursementNoticeModel>> listPendingForAdmin() async {
     final snap = await _notices

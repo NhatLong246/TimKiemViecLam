@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Một dòng trong danh mục khiếu nại (gộp incidents + jobComplaints).
-enum ComplaintCatalogType { worker, job }
+enum ComplaintCatalogType { worker, job, warning }
 
 /// Bạn gửi đi hay người khác gửi về bạn.
 enum ComplaintDirection { sent, received }
@@ -35,8 +35,10 @@ class ComplaintCatalogItem {
     required this.createdAt,
   });
 
-  String get typeLabel =>
-      type == ComplaintCatalogType.worker ? 'Khiếu nại nhân viên' : 'Khiếu nại công việc';
+  String get typeLabel {
+    if (type == ComplaintCatalogType.warning) return 'Cảnh báo từ Admin';
+    return type == ComplaintCatalogType.worker ? 'Khiếu nại nhân viên' : 'Khiếu nại công việc';
+  }
 
   String get directionLabel =>
       direction == ComplaintDirection.sent ? 'Bạn gửi' : 'Gửi về bạn';
@@ -55,6 +57,9 @@ class ComplaintCatalogItem {
   String headlineForRole(String role) {
     if (postDissolution && direction == ComplaintDirection.sent) {
       return 'Khiếu nại sau giải tán';
+    }
+    if (type == ComplaintCatalogType.warning) {
+      return 'Cảnh báo từ Admin';
     }
     if (role == 'candidate') {
       if (direction == ComplaintDirection.sent) {
@@ -126,6 +131,26 @@ class ComplaintCatalogItem {
       summary: map['description'] as String? ?? '',
       status: map['status'] as String? ?? 'pending',
       postDissolution: map['postDissolution'] == true,
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  factory ComplaintCatalogItem.fromAdminWarning(
+    Map<String, dynamic> map,
+    String id,
+  ) {
+    return ComplaintCatalogItem(
+      id: id,
+      type: ComplaintCatalogType.warning,
+      direction: ComplaintDirection.received,
+      jobId: '',
+      groupId: '',
+      jobTitle: map['title'] as String? ?? 'Cảnh báo hệ thống',
+      reporterId: 'admin',
+      targetUserId: map['targetUserId'] as String? ?? '',
+      summary: map['description'] as String? ?? '',
+      status: 'warning',
+      postDissolution: false,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

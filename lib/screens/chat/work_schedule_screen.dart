@@ -279,8 +279,9 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
         var endMin = int.parse(eParts[0]) * 60 + int.parse(eParts[1]);
         if (endMin <= startMin) endMin += 24 * 60;
         final diffHours = (endMin - startMin) / 60.0;
-        if (diffHours < 10) {
-          Get.snackbar('Lỗi', 'Ca làm việc phải đủ 10 tiếng',
+        final expectedHours = _jobPost!.workHoursPerDay!;
+        if (diffHours < expectedHours) {
+          Get.snackbar('Lỗi', 'Ca làm việc phải đủ ${expectedHours.toStringAsFixed(1).replaceAll('.0', '')} tiếng (theo bài đăng)',
               snackPosition: SnackPosition.BOTTOM,
               backgroundColor: Colors.red,
               colorText: Colors.white);

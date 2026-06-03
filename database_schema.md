@@ -276,6 +276,20 @@ Khiếu nại công việc từ ứng viên sau khi hoàn thành.
 | `status` | `String` | `pending` \| … |
 | `createdAt` | `Timestamp` | ✅ |
 
+---
+
+### Collection: `adminWarnings`
+**Path:** `adminWarnings/{warningId}`  
+Cảnh báo từ Admin gửi đến Nhà tuyển dụng hoặc Ứng viên.
+
+| Field | Kiểu | Mô tả |
+|---|---|---|
+| `warningId` | `String` | Auto-generated ID |
+| `targetUserId` | `String` | UID người nhận cảnh báo (thường là Employer) |
+| `title` | `String` | Tiêu đề cảnh báo |
+| `description` | `String` | Nội dung chi tiết cảnh báo |
+| `createdAt` | `Timestamp` | Server timestamp |
+
 **`jobPosts` thêm field:** `imageUrls` (`List<String>`) — ảnh minh họa bài đăng (base64 hoặc URL).
 
 ---

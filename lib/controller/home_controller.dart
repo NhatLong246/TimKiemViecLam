@@ -14,6 +14,7 @@ class HomeController extends GetxController {
   final RxList<JobPostModel> latestJobs = <JobPostModel>[].obs;
   final RxSet<String> appliedJobIds = <String>{}.obs;
   final RxMap<String, String> appliedJobStatus = <String, String>{}.obs;
+  final RxInt profileViewCount = 0.obs;
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
 
@@ -23,6 +24,7 @@ class HomeController extends GetxController {
   final RxString filterJobType = 'Tất cả'.obs;
 
   StreamSubscription? _applicationsSub;
+  StreamSubscription? _profileViewsSub;
   StreamSubscription? _authSub;
 
   @override
@@ -31,12 +33,14 @@ class HomeController extends GetxController {
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       fetchLatestJobs();
       _listenToApplications(user?.uid);
+      _listenToProfileViews(user?.uid);
     });
   }
 
   @override
   void onClose() {
     _applicationsSub?.cancel();
+    _profileViewsSub?.cancel();
     _authSub?.cancel();
     super.onClose();
   }
@@ -68,6 +72,40 @@ class HomeController extends GetxController {
       }
       _setAppliedStatus(map);
     });
+  }
+
+  void _listenToProfileViews(String? uid) {
+    _profileViewsSub?.cancel();
+    profileViewCount.value = 0;
+    if (uid == null) return;
+
+    _profileViewsSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((doc) {
+      final data = doc.data();
+      if (data == null) {
+        profileViewCount.value = 0;
+        return;
+      }
+      profileViewCount.value = _parseProfileViewCount(data);
+    });
+  }
+
+  int _parseProfileViewCount(Map<String, dynamic> data) {
+    for (final key in const [
+      'profileViewCount',
+      'profileViewsCount',
+      'profileViews',
+      'viewCount',
+    ]) {
+      final raw = data[key];
+      if (raw is num) return raw.toInt();
+      if (raw is List) return raw.length;
+      if (raw is Map) return raw.length;
+    }
+    return 0;
   }
 
   Future<void> fetchLatestJobs() async {
