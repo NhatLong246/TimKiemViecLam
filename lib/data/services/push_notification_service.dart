@@ -1,33 +1,27 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:typed_data'; // Cần thiết cho vibrationPattern
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_timezone/flutter_timezone.dart';
 
 import '../../push/push_background_handler.dart';
 import '../../screens/chat/widgets/incoming_call_overlay.dart';
 import '../../utils/push_navigation_handler.dart';
+import '../services/notification_service.dart';
+import '../models/app_notification_model.dart';
 
-/// Push notification thật: FCM + hiển thị local khi app foreground.
 class PushNotificationService {
   PushNotificationService._();
-
   static final PushNotificationService instance = PushNotificationService._();
 
-  static const defaultChannelId = kPushDefaultChannelId;
-  static const defaultChannelName = kPushDefaultChannelName;
-  static const callChannelId = 'call_channel_final'; // Cố định ID để dễ cấp quyền
+  static const callChannelId = 'call_channel_ultimate_v100_final'; // ID CHỐT CUỐI CÙNG
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _local =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
   String? _boundUserId;
@@ -35,14 +29,6 @@ class PushNotificationService {
   Future<void> initialize() async {
     if (_initialized || kIsWeb) return;
     _initialized = true;
-
-    if (!kIsWeb) {
-      tz.initializeTimeZones();
-      try {
-        final locationInfo = await FlutterTimezone.getLocalTimezone();
-        tz.setLocalLocation(tz.getLocation(locationInfo.identifier));
-      } catch (_) {}
-    }
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -59,120 +45,68 @@ class PushNotificationService {
     );
 
     if (!kIsWeb && Platform.isAndroid) {
-      const channel = AndroidNotificationChannel(
-        defaultChannelId,
-        defaultChannelName,
-        description: 'Thông báo việc làm, tin nhắn, giải ngân',
-        importance: Importance.high,
-      );
-      
       const callChannel = AndroidNotificationChannel(
         callChannelId,
         'Cuộc gọi đến',
-        description: 'Thông báo cuộc gọi video và thoại quan trọng',
-        importance: Importance.max, // BẮT BUỘC ĐỂ HIỆN HEADS-UP
+        description: 'Thông báo cuộc gọi video và thoại khẩn cấp',
+        importance: Importance.max,
         playSound: true,
         enableVibration: true,
-        enableLights: true,
         showBadge: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000]),
       );
-      
-      final androidPlugin = _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      await androidPlugin?.createNotificationChannel(channel);
-      await androidPlugin?.createNotificationChannel(callChannel);
+      await _local.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(callChannel);
     }
 
     await requestPermission();
 
-    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
+    // IN TOKEN RA ĐỂ TEST
+    String? token = await _fcm.getToken();
+    debugPrint('FCM TOKEN CỦA BẠN: $token');
 
-    final initial = await _fcm.getInitialMessage();
-    if (initial != null) {
-      PushNavigationHandler.setPending(initial.data);
-    }
-
-    _fcm.onTokenRefresh.listen((token) {
-      final uid = _boundUserId;
-      if (uid != null && uid.isNotEmpty) {
-        _persistToken(uid, token);
-      }
-    });
+    FirebaseMessaging.onMessage.listen((msg) => _showLocalFromMessage(msg));
+    FirebaseMessaging.onMessageOpenedApp.listen((msg) => PushNavigationHandler.handlePayload(msg.data));
   }
 
-  Future<bool> requestPermission() async {
-    if (kIsWeb) return false;
+  Future<void> requestPermission() async {
+    if (kIsWeb) return;
     if (Platform.isAndroid) {
       await Permission.notification.request();
       if (!await Permission.systemAlertWindow.isGranted) {
         await Permission.systemAlertWindow.request();
       }
     }
-    final settings = await _fcm.requestPermission(alert: true, badge: true, sound: true);
-    return settings.authorizationStatus == AuthorizationStatus.authorized;
-  }
-
-  Future<void> bindToUser(String userId) async {
-    if (kIsWeb || userId.isEmpty) return;
-    _boundUserId = userId;
-    final token = await _fcm.getToken();
-    if (token != null) await _persistToken(userId, token);
-    await PushNavigationHandler.processPendingIfAny();
-  }
-
-  Future<void> unbindUser(String userId) async {
-    if (kIsWeb || userId.isEmpty) return;
-    final token = await _fcm.getToken();
-    if (token != null) await _removeToken(userId, token);
-    if (_boundUserId == userId) _boundUserId = null;
-    try { await _fcm.deleteToken(); } catch (_) {}
-  }
-
-  Future<void> _persistToken(String userId, String token) async {
-    final platform = !kIsWeb && Platform.isIOS ? 'ios' : 'android';
-    final ref = FirebaseFirestore.instance.collection('users').doc(userId);
-    final payload = {
-      'fcmTokens.$token': {
-        'platform': platform,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      'fcmUpdatedAt': FieldValue.serverTimestamp(),
-    };
-    try { await ref.update(payload); } catch (_) { await ref.set(payload, SetOptions(merge: true)); }
-  }
-
-  Future<void> _removeToken(String userId, String token) async {
-    await FirebaseFirestore.instance.collection('users').doc(userId).update({
-      'fcmTokens.$token': FieldValue.delete(),
-    });
-  }
-
-  void _onForegroundMessage(RemoteMessage message) {
-    showLocalFromMessage(message);
-  }
-
-  void _onMessageOpenedApp(RemoteMessage message) {
-    PushNavigationHandler.handlePayload(message.data);
+    await _fcm.requestPermission(alert: true, badge: true, sound: true);
   }
 
   void _onLocalTap(NotificationResponse response) {
-    if (response.actionId == 'decline_call') return;
-    PushNavigationHandler.setPendingFromJson(response.payload);
-    PushNavigationHandler.processPendingIfAny();
+    if (response.actionId == 'decline_call') {
+      _local.cancel(response.id ?? 0);
+      return;
+    }
+    final data = jsonDecode(response.payload ?? '{}');
+    PushNavigationHandler.handlePayload(data);
   }
 
-  Future<void> showLocalFromMessage(RemoteMessage message) async {
+  Future<void> _showLocalFromMessage(RemoteMessage message) async {
     final data = message.data;
     final type = data['type']?.toString();
     final title = message.notification?.title ?? data['title']?.toString() ?? 'Cuộc gọi đến';
-    final body = message.notification?.body ?? data['body']?.toString() ?? 'Đang gọi cho bạn...';
+    final body = message.notification?.body ?? data['body']?.toString() ?? 'Đang gọi video cho bạn...';
 
-    if (title.isEmpty && body.isEmpty) return;
-
-    final payload = data.isNotEmpty ? jsonEncode(data) : null;
-    
     if (type == 'call') {
-      // HIỆN THÔNG BÁO HỆ THỐNG TRƯỚC VỚI ƯU TIÊN MAX
+      // 1. LƯU VÀO DANH SÁCH THÔNG BÁO (Trong app)
+      if (_boundUserId != null) {
+        NotificationService().sendToUser(
+          userId: _boundUserId!,
+          title: title,
+          body: body,
+          category: NotificationCategory.message,
+          data: data,
+        );
+      }
+
+      // 2. HIỆN THANH THÔNG BÁO ĐẨY XUỐNG (Heads-up)
       await _local.show(
         message.hashCode,
         title,
@@ -197,28 +131,38 @@ class PushNotificationService {
           ),
           iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
         ),
-        payload: payload,
+        payload: jsonEncode(data),
       );
 
-      // HIỆN OVERLAY APP
+      // 3. HIỆN Ô CUỘC GỌI TRONG APP
       IncomingCallOverlay.show(data);
-    } else {
-      await _local.show(
-        message.hashCode,
-        title,
-        body,
-        NotificationDetails(
-          android: const AndroidNotificationDetails(
-            defaultChannelId,
-            defaultChannelName,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-          ),
-          iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
-        ),
-        payload: payload,
-      );
     }
+  }
+
+  Future<void> bindToUser(String userId) async {
+    _boundUserId = userId;
+    final token = await _fcm.getToken();
+    if (token != null) _persistToken(userId, token);
+  }
+
+  Future<void> _persistToken(String userId, String token) async {
+    final ref = FirebaseFirestore.instance.collection('users').doc(userId);
+    try {
+      await ref.update({
+        'fcmTokens.$token': {'platform': Platform.isIOS ? 'ios' : 'android', 'updatedAt': FieldValue.serverTimestamp()},
+      });
+    } catch (_) {
+      await ref.set({
+        'fcmTokens': {token: {'platform': Platform.isIOS ? 'ios' : 'android', 'updatedAt': FieldValue.serverTimestamp()}},
+      }, SetOptions(merge: true));
+    }
+  }
+
+  Future<void> unbindUser(String userId) async {
+    final token = await _fcm.getToken();
+    if (token != null) {
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({'fcmTokens.$token': FieldValue.delete()});
+    }
+    _boundUserId = null;
   }
 }

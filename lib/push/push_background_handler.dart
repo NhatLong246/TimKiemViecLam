@@ -6,7 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 const String kPushDefaultChannelId = 'viecnow_default';
 const String kPushDefaultChannelName = 'Thông báo ViecNow';
-const String kCallChannelId = 'call_channel_final'; // Đồng bộ tuyệt đối với Service
+const String kCallChannelId = 'call_channel_ultimate_v100_final'; // ĐỒNG BỘ TUYỆT ĐỐI
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -25,17 +25,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final plugin = FlutterLocalNotificationsPlugin();
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
   const iosInit = DarwinInitializationSettings();
-  await plugin.initialize(const InitializationSettings(android: androidInit, iOS: iosInit));
+  await plugin.initialize(
+    const InitializationSettings(android: androidInit, iOS: iosInit),
+  );
 
-  // TẠO KÊNH ƯU TIÊN CAO NHẤT
+  // TẠO KÊNH SIÊU ƯU TIÊN
   const callChannel = AndroidNotificationChannel(
     kCallChannelId,
     'Cuộc gọi đến',
-    description: 'Thông báo cuộc gọi video và thoại quan trọng',
+    description: 'Thông báo cuộc gọi video và thoại khẩn cấp',
     importance: Importance.max,
     playSound: true,
     enableVibration: true,
-    enableLights: true,
     showBadge: true,
   );
 
@@ -43,8 +44,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(callChannel);
 
-  final title = data['title']?.toString() ?? 'Cuộc gọi đến';
-  final body = data['body']?.toString() ?? 'Đang gọi video cho bạn...';
+  final title = message.notification?.title ?? data['title']?.toString() ?? 'Cuộc gọi đến';
+  final body = message.notification?.body ?? data['body']?.toString() ?? 'Đang gọi video cho bạn...';
 
   await plugin.show(
     message.hashCode,
@@ -57,15 +58,24 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         importance: Importance.max,
         priority: Priority.max,
         icon: '@mipmap/ic_launcher',
-        fullScreenIntent: true, // Ép hiển thị trên màn hình khóa và Heads-up
+        fullScreenIntent: true, // HIỂN THỊ TRÊN MÀN HÌNH KHÓA
         category: AndroidNotificationCategory.call,
         ongoing: true,
         autoCancel: false,
         visibility: NotificationVisibility.public,
-        ticker: 'Có cuộc gọi đến...',
+        ticker: 'Có cuộc gọi đến...', // Kích hoạt cơ chế đẩy ra ngoài
         actions: [
-          const AndroidNotificationAction('decline_call', 'Từ chối', showsUserInterface: true, cancelNotification: true),
-          const AndroidNotificationAction('accept_call', 'Trả lời', showsUserInterface: true),
+          const AndroidNotificationAction(
+            'decline_call',
+            'Từ chối',
+            showsUserInterface: true,
+            cancelNotification: true,
+          ),
+          const AndroidNotificationAction(
+            'accept_call',
+            'Trả lời',
+            showsUserInterface: true,
+          ),
         ],
       ),
       iOS: const DarwinNotificationDetails(
