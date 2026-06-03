@@ -400,6 +400,43 @@ class NotificationService {
     );
   }
 
+  Future<void> notifyIncomingCall({
+    required String recipientId,
+    required String groupId,
+    required String callerName,
+    required bool isVideo,
+    required String roomUrl,
+  }) async {
+    final data = {
+      'groupId': groupId,
+      'type': 'call',
+      'isVideo': isVideo,
+      'roomUrl': roomUrl,
+    };
+
+    final role = await _roleForUser(recipientId);
+
+    if (role == 'employer') {
+      await notifyEmployer(
+        employerId: recipientId,
+        type: 'call',
+        title: callerName,
+        body: isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại',
+        category: NotificationCategory.message,
+        data: data,
+      );
+      return;
+    }
+
+    await sendToUser(
+      userId: recipientId,
+      title: callerName,
+      body: isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại',
+      category: NotificationCategory.message,
+      data: data,
+    );
+  }
+
   Future<String> _roleForUser(String userId) async {
     if (userId.isEmpty) return 'candidate';
     final doc = await _db.collection('users').doc(userId).get();

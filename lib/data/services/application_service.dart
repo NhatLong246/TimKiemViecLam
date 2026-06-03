@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/application_model.dart';
+import '../models/job_post_model.dart';
 import 'notification_service.dart';
 
 class ApplicationService {
@@ -55,8 +56,15 @@ class ApplicationService {
     try {
       final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
       if (jobDoc.exists) {
-        jobTitle = (jobDoc.data()?['title'] ?? jobTitle).toString();
+        final jobData = jobDoc.data()!;
+        jobTitle = (jobData['title'] ?? jobTitle).toString();
+        
+        // Validate schedule overlap
+        final newJob = JobPostModel.fromMap(jobData);
+        newJob.toMap()['jobId'] = jobId; // Ensure jobId is set if missing
+        await _checkScheduleOverlap(newJob, candidateId);
       }
+      
       final userDoc = await _db.collection('users').doc(candidateId).get();
       if (userDoc.exists) {
         final d = userDoc.data() ?? {};
@@ -74,5 +82,61 @@ class ApplicationService {
       appId: docRef.id,
       candidateId: candidateId,
     );
+  }
+
+  Future<void> _checkScheduleOverlap(JobPostModel newJob, String candidateId) async {
+    if (newJob.startTime == null || newJob.workHoursPerDay == null) return;
+    
+    final newStartParts = newJob.startTime!.split(':');
+    if (newStartParts.length != 2) return;
+    final newStartMin = int.parse(newStartParts[0]) * 60 + int.parse(newStartParts[1]);
+    final newEndMin = newStartMin + (newJob.workHoursPerDay! * 60).round();
+
+    final newStartDay = _startOfDay(newJob.startDate);
+    final newEndDay = _startOfDay(newJob.endDate ?? newJob.startDate);
+
+    final appsSnap = await _db.collection('applications')
+        .where('candidateId', isEqualTo: candidateId)
+        .get();
+        
+    for (final doc in appsSnap.docs) {
+      final status = (doc.data()['status'] ?? '').toString();
+      if (status == 'rejected' || status == 'canceled' || status == 'withdrawn') continue;
+
+      final oldJobId = (doc.data()['jobId'] ?? '').toString();
+      if (oldJobId == newJob.jobId) continue;
+
+      final oldJobDoc = await _db.collection('jobPosts').doc(oldJobId).get();
+      if (!oldJobDoc.exists) continue;
+
+      final oldJobData = oldJobDoc.data()!;
+      oldJobData['jobId'] = oldJobId;
+      final oldJob = JobPostModel.fromMap(oldJobData);
+      
+      if (oldJob.startTime == null || oldJob.workHoursPerDay == null) continue;
+
+      final oldStartDay = _startOfDay(oldJob.startDate);
+      final oldEndDay = _startOfDay(oldJob.endDate ?? oldJob.startDate);
+
+      if (newStartDay.compareTo(oldEndDay) <= 0 && newEndDay.compareTo(oldStartDay) >= 0) {
+        final oldStartParts = oldJob.startTime!.split(':');
+        if (oldStartParts.length != 2) continue;
+        final oldStartMin = int.parse(oldStartParts[0]) * 60 + int.parse(oldStartParts[1]);
+        final oldEndMin = oldStartMin + (oldJob.workHoursPerDay! * 60).round();
+
+        if (newStartMin < oldEndMin && newEndMin > oldStartMin) {
+          throw Exception('Trùng lịch với "${oldJob.title}". Bạn đã ứng tuyển ca ${oldJob.startTime} đến ${_formatTime(oldEndMin)}.');
+        }
+      }
+    }
+  }
+
+  DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
+  
+  String _formatTime(int totalMin) {
+    var min = totalMin % (24 * 60);
+    final h = min ~/ 60;
+    final m = min % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
   }
 }

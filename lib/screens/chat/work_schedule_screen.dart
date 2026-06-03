@@ -5,8 +5,11 @@ import '../../common/styles/app_colors.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/work_schedule_model.dart';
+import '../../data/models/job_post_model.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../data/services/work_schedule_service.dart';
+import '../../data/services/job_post_service.dart';
+import 'assigned_tasks_list_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkScheduleScreen — Phân công công việc (ca + nhiệm vụ theo ngày)
@@ -23,6 +26,7 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
   late final GroupChatModel _group;
   final _service = WorkScheduleService();
   final _groupChatSvc = GroupChatService();
+  final _jobSvc = JobPostService();
 
   DateTime _selectedDate = DateTime.now();
   final _shiftStartCtrl = TextEditingController(text: '08:00');
@@ -32,11 +36,14 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
 
   List<UserModel>? _members;
   WorkScheduleModel? _existing;
+  JobPostModel? _jobPost;
   bool _loading = true;
   bool _saving = false;
   bool _sending = false;
 
   String get _dateStr => DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+  DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 
   @override
   void initState() {
@@ -58,6 +65,22 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
+
+    _jobPost = await _jobSvc.getJobPostById(_group.jobId);
+    if (_jobPost != null) {
+      final start = _startOfDay(_jobPost!.startDate);
+      final end = _jobPost!.endDate != null 
+          ? _startOfDay(_jobPost!.endDate!) 
+          : start.add(const Duration(days: 365));
+      final current = _startOfDay(_selectedDate);
+      
+      if (current.isBefore(start)) {
+        _selectedDate = start;
+      } else if (current.isAfter(end)) {
+        _selectedDate = end;
+      }
+    }
+
     final members =
         await _groupChatSvc.getGroupMembers(_group.memberIds);
     final schedule =
@@ -71,8 +94,33 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
       _shiftStartCtrl.text = schedule.shiftStart;
       _shiftEndCtrl.text = schedule.shiftEnd;
       _generalCtrl.text = schedule.generalContent;
+      final Map<String, List<String>> userTasksMap = {};
       for (final task in schedule.tasks) {
-        _taskCtrls[task.userId]?.text = task.content;
+        if (task.content.trim().isNotEmpty) {
+          userTasksMap.putIfAbsent(task.userId, () => []).add(task.content.trim());
+        }
+      }
+      for (final entry in userTasksMap.entries) {
+        _taskCtrls[entry.key]?.text = entry.value.join('\n---\n');
+      }
+    } else if (_jobPost != null) {
+      final startT = (_jobPost!.startTime != null && _jobPost!.startTime!.isNotEmpty) 
+          ? _jobPost!.startTime! 
+          : '08:00';
+      _shiftStartCtrl.text = startT;
+      
+      if (_jobPost!.workHoursPerDay != null) {
+        final parts = startT.split(':');
+        if (parts.length == 2) {
+          final h = int.tryParse(parts[0]) ?? 8;
+          final m = int.tryParse(parts[1]) ?? 0;
+          final totalMinutes = h * 60 + m + (_jobPost!.workHoursPerDay! * 60).toInt();
+          final endH = (totalMinutes ~/ 60) % 24;
+          final endM = totalMinutes % 60;
+          _shiftEndCtrl.text = '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
+        }
+      } else {
+        _shiftEndCtrl.text = '17:00';
       }
     }
 
@@ -90,8 +138,29 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
       _selectedDate = date;
       _loading = true;
       // Reset form
-      _shiftStartCtrl.text = '08:00';
-      _shiftEndCtrl.text = '17:00';
+      if (_jobPost != null) {
+        final startT = (_jobPost!.startTime != null && _jobPost!.startTime!.isNotEmpty) 
+            ? _jobPost!.startTime! 
+            : '08:00';
+        _shiftStartCtrl.text = startT;
+        
+        if (_jobPost!.workHoursPerDay != null) {
+          final parts = startT.split(':');
+          if (parts.length == 2) {
+            final h = int.tryParse(parts[0]) ?? 8;
+            final m = int.tryParse(parts[1]) ?? 0;
+            final totalMinutes = h * 60 + m + (_jobPost!.workHoursPerDay! * 60).toInt();
+            final endH = (totalMinutes ~/ 60) % 24;
+            final endM = totalMinutes % 60;
+            _shiftEndCtrl.text = '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
+          }
+        } else {
+          _shiftEndCtrl.text = '17:00';
+        }
+      } else {
+        _shiftStartCtrl.text = '08:00';
+        _shiftEndCtrl.text = '17:00';
+      }
       _generalCtrl.clear();
       for (final c in _taskCtrls.values) {
         c.clear();
@@ -105,8 +174,14 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
       _shiftStartCtrl.text = schedule.shiftStart;
       _shiftEndCtrl.text = schedule.shiftEnd;
       _generalCtrl.text = schedule.generalContent;
+      final Map<String, List<String>> userTasksMap = {};
       for (final task in schedule.tasks) {
-        _taskCtrls[task.userId]?.text = task.content;
+        if (task.content.trim().isNotEmpty) {
+          userTasksMap.putIfAbsent(task.userId, () => []).add(task.content.trim());
+        }
+      }
+      for (final entry in userTasksMap.entries) {
+        _taskCtrls[entry.key]?.text = entry.value.join('\n---\n');
       }
     }
 
@@ -120,13 +195,23 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
 
   WorkScheduleModel _buildScheduleModel() {
     final members = _members ?? [];
-    final tasks = members
-        .map((m) => WorkTask(
-              userId: m.id,
-              userName: '${m.firstName} ${m.lastName}'.trim(),
-              content: _taskCtrls[m.id]?.text.trim() ?? '',
-            ))
-        .toList();
+    final tasks = <WorkTask>[];
+    for (final m in members) {
+      final currentText = _taskCtrls[m.id]?.text.trim() ?? '';
+      final existingUserTasks = _existing?.tasks.where((t) => t.userId == m.id).toList() ?? [];
+      final existingText = existingUserTasks.map((t) => t.content.trim()).where((s) => s.isNotEmpty).join('\n---\n');
+      
+      if (currentText == existingText) {
+        tasks.addAll(existingUserTasks);
+      } else {
+        tasks.add(WorkTask(
+          taskId: DateTime.now().microsecondsSinceEpoch.toString() + m.id,
+          userId: m.id,
+          userName: '${m.firstName} ${m.lastName}'.trim(),
+          content: currentText,
+        ));
+      }
+    }
 
     return WorkScheduleModel(
       scheduleId: _existing?.scheduleId ?? '',
@@ -175,12 +260,45 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
     return true;
   }
 
-  Future<void> _save() async {
+  bool _validateBeforeSave() {
+    final today = _startOfDay(DateTime.now());
+    final current = _startOfDay(_selectedDate);
+    if (current.isBefore(today)) {
+      Get.snackbar('Lỗi', 'Không thể phân công cho ngày trong quá khứ',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white);
+      return false;
+    }
+
+    if (_jobPost != null && _jobPost!.workHoursPerDay != null) {
+      final sParts = _shiftStartCtrl.text.split(':');
+      final eParts = _shiftEndCtrl.text.split(':');
+      if (sParts.length == 2 && eParts.length == 2) {
+        final startMin = int.parse(sParts[0]) * 60 + int.parse(sParts[1]);
+        var endMin = int.parse(eParts[0]) * 60 + int.parse(eParts[1]);
+        if (endMin <= startMin) endMin += 24 * 60;
+        final diffHours = (endMin - startMin) / 60.0;
+        if (diffHours < 10) {
+          Get.snackbar('Lỗi', 'Ca làm việc phải đủ 10 tiếng',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red,
+              colorText: Colors.white);
+          return false;
+        }
+      }
+    }
+
     if ((_members ?? []).isEmpty) {
       Get.snackbar('Lỗi', 'Không có thành viên',
           snackPosition: SnackPosition.BOTTOM);
-      return;
+      return false;
     }
+    return true;
+  }
+
+  Future<void> _save() async {
+    if (!_validateBeforeSave()) return;
 
     setState(() => _saving = true);
     try {
@@ -200,6 +318,8 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
   }
 
   Future<void> _sendToEmployees() async {
+    if (!_validateBeforeSave()) return;
+
     final employees = _employeeMembers;
     if (employees.isEmpty) {
       Get.snackbar('Lỗi', 'Không có nhân viên trong nhóm',
@@ -300,6 +420,21 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.list_alt_rounded, color: Colors.white),
+            tooltip: 'Danh sách phân công',
+            onPressed: _loading
+                ? null
+                : () async {
+                    await Get.to(() => AssignedTasksListScreen(
+                          group: _group,
+                          date: _selectedDate,
+                        ));
+                    if (mounted) {
+                      await _onDateChanged(_selectedDate);
+                    }
+                  },
+          ),
           IconButton(
             icon: _saving
                 ? const SizedBox(
@@ -435,11 +570,14 @@ class _WorkScheduleScreenState extends State<WorkScheduleScreen> {
   Widget _buildDatePicker() {
     return GestureDetector(
       onTap: () async {
+        final start = _jobPost != null ? _startOfDay(_jobPost!.startDate) : DateTime.now().subtract(const Duration(days: 30));
+        final end = _jobPost?.endDate != null ? _startOfDay(_jobPost!.endDate!) : start.add(const Duration(days: 365));
+        
         final picked = await showDatePicker(
           context: context,
           initialDate: _selectedDate,
-          firstDate: DateTime.now().subtract(const Duration(days: 30)),
-          lastDate: DateTime.now().add(const Duration(days: 90)),
+          firstDate: start,
+          lastDate: end,
           builder: (ctx, child) => Theme(
             data: ThemeData.light().copyWith(
                 colorScheme: const ColorScheme.light(

@@ -18,13 +18,6 @@ class EmployerMenuScreen extends StatelessWidget {
       route: AppRoutes.complaintsCatalog,
     ),
     _MenuItem(
-      icon: Icons.bar_chart_rounded,
-      iconColor: Color(0xFF2E7D32),
-      title: 'Báo cáo',
-      subtitle: 'Xem báo cáo tuyển dụng và chi phí',
-      route: AppRoutes.employerStats,
-    ),
-    _MenuItem(
       icon: Icons.account_balance_wallet_outlined,
       iconColor: Color(0xFFAD1457),
       title: 'Tiền app',

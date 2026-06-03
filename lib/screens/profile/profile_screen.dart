@@ -7,6 +7,7 @@ import '../../routes/app_routes.dart';
 import 'job_criteria_screen.dart';
 import 'my_profile_screen.dart';
 import 'work_experience_screen.dart';
+import '../alarm/alarm_setup_screen.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/controller/login_controller.dart';
 import 'package:viecnow/controller/update_account_controller.dart';
@@ -684,6 +685,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildOverviewCard(),
                       _buildVisibilityCard(),
                       const SizedBox(height: 22),
+                      _buildAlarmCard(context),
+                      const SizedBox(height: 22),
                       _buildJobCriteriaCard(),
                     ],
                   ),
@@ -693,6 +696,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAlarmCard(BuildContext context) {
+    return _ProfileCard(
+      child: InkWell(
+        onTap: () {
+          Get.to(() => const AlarmSetupScreen());
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.alarm_on_rounded, color: Colors.red.shade800, size: 28),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Báo thức & Nhắc nhở khẩn',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF262626),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Cài đặt chuông báo lịch làm việc',
+                      style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -42,18 +42,34 @@ class _CallScreenState extends State<CallScreen> {
   bool _localJoined = false;
   bool _muted = false;
   bool _cameraOff = false;
-  bool _speakerOn = true;
-  int? _remoteUid;
+  late bool _speakerOn;
+  final Set<int> _remoteUids = {};
   String? _errorMsg;
+
+  Timer? _timer;
+  int _seconds = 0;
+
+  void _startTimer() {
+    _timer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) setState(() => _seconds++);
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
 
   @override
   void initState() {
     super.initState();
+    _speakerOn = widget.isVideo;
     _initAgora();
   }
 
   @override
   void dispose() {
+    _stopTimer();
     _engine?.leaveChannel();
     _engine?.release();
     super.dispose();
@@ -86,28 +102,45 @@ class _CallScreenState extends State<CallScreen> {
       // 3. Đăng ký event handlers
       engine.registerEventHandler(RtcEngineEventHandler(
         onJoinChannelSuccess: (connection, elapsed) {
-          if (mounted) setState(() => _localJoined = true);
+          if (mounted) {
+            setState(() => _localJoined = true);
+            _engine?.setEnableSpeakerphone(_speakerOn);
+          }
         },
         onUserJoined: (connection, remoteUid, elapsed) {
-          if (mounted) setState(() => _remoteUid = remoteUid);
+          if (mounted) {
+            setState(() => _remoteUids.add(remoteUid));
+            _startTimer();
+          }
         },
         onUserOffline: (connection, remoteUid, reason) {
-          if (mounted) setState(() => _remoteUid = null);
+          if (mounted) {
+            setState(() => _remoteUids.remove(remoteUid));
+            if (_remoteUids.isEmpty) {
+              _stopTimer();
+              _seconds = 0;
+            }
+          }
+        },
+        onConnectionStateChanged: (connection, state, reason) {
+          if (state == ConnectionStateType.connectionStateFailed) {
+            if (mounted) {
+              setState(() => _errorMsg = 'Lỗi kết nối Agora: ${reason.name}');
+            }
+          }
         },
         onError: (err, msg) {
           if (mounted) setState(() => _errorMsg = 'Lỗi Agora: $msg');
         },
       ));
 
+      await engine.enableAudio();
+
       if (widget.isVideo) {
         await engine.enableVideo();
         await engine.startPreview();
       }
       await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-      await engine.setAudioProfile(
-        profile: AudioProfileType.audioProfileMusicHighQualityStereo,
-        scenario: AudioScenarioType.audioScenarioChatroom,
-      );
 
       // 4. Join channel — token = '' cho dev (không cần token)
       await engine.joinChannel(
@@ -188,49 +221,108 @@ class _CallScreenState extends State<CallScreen> {
 
   Widget _buildRemoteView() {
     if (!widget.isVideo) {
+      final String statusText;
+      if (_remoteUids.isNotEmpty) {
+        final mm = (_seconds ~/ 60).toString().padLeft(2, '0');
+        final ss = (_seconds % 60).toString().padLeft(2, '0');
+        statusText = '$mm:$ss';
+      } else {
+        statusText = 'Đang chờ...';
+      }
+
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircleAvatar(
-              radius: 56,
-              backgroundColor: Color(0xFF7B1FA2),
-              child: Icon(Icons.person, size: 64, color: Colors.white),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.center,
+              children: _remoteUids.isNotEmpty
+                  ? _remoteUids
+                      .map((uid) => const CircleAvatar(
+                            radius: 36,
+                            backgroundColor: Color(0xFF7B1FA2),
+                            child: Icon(Icons.person, size: 40, color: Colors.white),
+                          ))
+                      .toList()
+                  : [
+                      const CircleAvatar(
+                        radius: 56,
+                        backgroundColor: Color(0xFF7B1FA2),
+                        child: Icon(Icons.person, size: 64, color: Colors.white),
+                      ),
+                    ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               widget.groupName,
-              style: const TextStyle(color: Colors.white, fontSize: 18),
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
+            if (_remoteUids.isNotEmpty) ...[
+              Text(
+                'Đang gọi với ${_remoteUids.length} người khác',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+            ],
             Text(
-              _remoteUid != null ? 'Đang kết nối...' : 'Đang đổ chuông...',
-              style: const TextStyle(color: Colors.white54),
+              statusText,
+              style: const TextStyle(color: Colors.white54, fontSize: 16),
             ),
           ],
         ),
       );
     }
-    if (_remoteUid != null) {
-      return AgoraVideoView(
-        controller: VideoViewController.remote(
-          rtcEngine: _engine!,
-          canvas: VideoCanvas(uid: _remoteUid),
-          connection:
-              RtcConnection(channelId: widget.callId),
+
+    if (_remoteUids.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            CircularProgressIndicator(color: Colors.white),
+            SizedBox(height: 16),
+            Text('Đang chờ người tham gia...',
+                style: TextStyle(color: Colors.white70)),
+          ],
         ),
       );
     }
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          CircularProgressIndicator(color: Colors.white),
-          SizedBox(height: 16),
-          Text('Đang chờ người tham gia...',
-              style: TextStyle(color: Colors.white70)),
-        ],
+
+    final uids = _remoteUids.toList();
+    if (uids.length == 1) {
+      return AgoraVideoView(
+        controller: VideoViewController.remote(
+          rtcEngine: _engine!,
+          canvas: VideoCanvas(uid: uids[0]),
+          connection: RtcConnection(channelId: widget.callId),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: EdgeInsets.zero,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: uids.length > 2 ? 2 : 1,
+        childAspectRatio: uids.length > 2 ? 1.0 : 1.2,
       ),
+      itemCount: uids.length,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black, width: 1),
+          ),
+          child: AgoraVideoView(
+            controller: VideoViewController.remote(
+              rtcEngine: _engine!,
+              canvas: VideoCanvas(uid: uids[index]),
+              connection: RtcConnection(channelId: widget.callId),
+            ),
+          ),
+        );
+      },
     );
   }
 
