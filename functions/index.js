@@ -1,6 +1,7 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
 initializeApp();
@@ -21,7 +22,15 @@ function categoryFromPayload(payload) {
   if (payload.category) return payload.category;
   const type = (payload.type || '').toString();
   if (type === 'message') return 'message';
-  if (type === 'application' || type.startsWith('disbursement')) return 'job';
+  if (
+    type === 'application' ||
+    type.startsWith('application_') ||
+    type.startsWith('disbursement') ||
+    type === 'job_work_period_ended' ||
+    type === 'job_cancelled'
+  ) {
+    return 'job';
+  }
   if (type === 'review') return 'profile';
   if (type.includes('complaint')) return 'system';
   return 'system';
@@ -186,6 +195,130 @@ function buildPayloadFromInbox(data) {
     data: nested,
   };
 }
+
+async function claimJobWorkflowOnce(jobId, field) {
+  try {
+    return await db.runTransaction(async (tx) => {
+      const ref = db
+        .collection('jobPosts')
+        .doc(jobId)
+        .collection('workflowReminders')
+        .doc('disbursement');
+      const snap = await tx.get(ref);
+      const data = snap.exists ? snap.data() : {};
+      if (data && data[field]) return false;
+      tx.set(ref, { [field]: FieldValue.serverTimestamp() }, { merge: true });
+      return true;
+    });
+  } catch (err) {
+    console.error('Failed to claim workflow reminder', jobId, field, err);
+    return false;
+  }
+}
+
+async function notifyEmployerFromFunction({
+  employerId,
+  type,
+  title,
+  body,
+  data,
+}) {
+  const nestedData = { type, ...(data || {}) };
+  await db.collection('notifications').add({
+    recipientId: employerId,
+    type,
+    title,
+    body,
+    data: nestedData,
+    isRead: false,
+    suppressPush: true,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  await db
+    .collection('users')
+    .doc(employerId)
+    .collection('notifications')
+    .add({
+      title,
+      body,
+      category: 'job',
+      isRead: false,
+      data: nestedData,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+}
+
+function isActiveJob(job) {
+  return job.status === 'approved' || job.status === 'active';
+}
+
+function shouldNotifyUnderfilledApplicationDeadline(job, nowDate) {
+  const deadline = job.applicationDeadline?.toDate?.();
+  const startDate = job.startDate?.toDate?.();
+  if (!deadline || !startDate) return false;
+  if (!isActiveJob(job)) return false;
+  if (job.underfilledAccepted === true) return false;
+
+  const slots = Number(job.slots || 0);
+  const filledSlots = Number(job.filledSlots || 0);
+  if (slots <= 0 || filledSlots >= slots) return false;
+  if (deadline >= nowDate) return false;
+  return startDate > nowDate;
+}
+
+exports.notifyUnderfilledApplicationDeadlines = onSchedule(
+  {
+    schedule: 'every 15 minutes',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  },
+  async () => {
+    const now = Timestamp.now();
+    const nowDate = now.toDate();
+    const snap = await db
+      .collection('jobPosts')
+      .where('applicationDeadline', '<=', now)
+      .get();
+
+    let sent = 0;
+    for (const doc of snap.docs) {
+      const job = doc.data();
+      if (!shouldNotifyUnderfilledApplicationDeadline(job, nowDate)) continue;
+
+      const employerId = (job.employerId || '').toString();
+      if (!employerId) continue;
+
+      const claimed = await claimJobWorkflowOnce(
+        doc.id,
+        'applicationDeadlineUnderfilledNotifiedAt',
+      );
+      if (!claimed) continue;
+
+      const slots = Number(job.slots || 0);
+      const filledSlots = Number(job.filledSlots || 0);
+      const missingSlots = Math.max(slots - filledSlots, 0);
+      const titleText = (job.title || 'Công việc').toString();
+
+      await notifyEmployerFromFunction({
+        employerId,
+        type: 'application_deadline_underfilled',
+        title: 'Hết hạn ứng tuyển - chưa đủ người',
+        body:
+          `"${titleText}" hiện có ${filledSlots}/${slots} ứng viên, ` +
+          `thiếu ${missingSlots} người. Mở Quản lý bài đăng để tiếp tục job hoặc hủy.`,
+        data: {
+          jobId: doc.id,
+          filledSlots,
+          slots,
+          missingSlots,
+        },
+      });
+      sent += 1;
+    }
+
+    console.log(`Underfilled application deadline notifications sent=${sent}`);
+  },
+);
 
 /** NTD legacy collection — bỏ qua nếu đã push qua inbox. */
 exports.onLegacyNotificationCreated = onDocumentCreated(

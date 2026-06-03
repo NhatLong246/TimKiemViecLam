@@ -46,6 +46,64 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     super.dispose();
   }
 
+  bool _hasCheckedDeadlines = false;
+
+  void _checkDeadlineNotices() async {
+    if (_hasCheckedDeadlines || _controller.isLoading.value) return;
+    final postsToNotify = _controller.publishedPosts.where((p) {
+      if (p.applicationDeadline == null) return false;
+      if (p.underfilledAccepted) return false;
+      if (!p.startDate.isAfter(DateTime.now())) return false;
+      return DateTime.now().isAfter(p.applicationDeadline!) &&
+             p.filledSlots < p.slots;
+    }).toList();
+
+    if (postsToNotify.isNotEmpty) {
+      _hasCheckedDeadlines = true;
+      for (final post in postsToNotify) {
+        if (!mounted) break;
+        final missing = post.slots - post.filledSlots;
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Hết hạn ứng tuyển!'),
+            content: Text(
+              'Công việc "${post.title}" đã đến hạn ứng tuyển nhưng chưa đủ người.\n'
+              'Số lượng hiện tại: ${post.filledSlots}/${post.slots} (Thiếu $missing người).\n\n'
+              'Bạn có muốn cho job tiếp tục dù chưa đủ người không? Nếu không, công việc sẽ bị hủy và bạn sẽ được hoàn tiền.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final updated = post.copyWith(underfilledAccepted: true);
+                  final ok = await _controller.updatePost(updated);
+                  if (ok) {
+                    Get.snackbar(
+                      'Đã lưu quyết định',
+                      'Job được phép tiếp tục dù chưa đủ người.',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                  }
+                },
+                child: const Text('Tiếp tục job'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _controller.cancelPost(post);
+                },
+                child: const Text('Hủy Job & Hoàn tiền'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   void _syncSortWithActiveTab() {
     final shouldSortByEndingSoon = _tabController.index == 0;
     if (_sortByEndingSoon == shouldSortByEndingSoon) return;
@@ -109,6 +167,11 @@ class _PostManagementScreenState extends State<PostManagementScreen>
               if (_controller.errorMessage.value.isNotEmpty) {
                 return _buildError(_controller.errorMessage.value);
               }
+              
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _checkDeadlineNotices();
+              });
+
               return TabBarView(
                 controller: _tabController,
                 children: [
@@ -287,7 +350,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
 
   Widget _buildKpiStrip() {
     return Obx(() {
-      final total = _controller.allPosts.length;
+      final total = _controller.allPosts.where((p) => p.status != 'cancelled' && p.status != 'deleted').length;
       final recruiting = _controller.publishedPosts.length;
       final now = DateTime.now();
       final soonEnding = _controller.publishedPosts
@@ -576,22 +639,20 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Row(
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               _buildStatusBadge(context, post.status),
-                              if (post.isFullTimeReferral) ...[
-                                const SizedBox(width: 6),
+                              if (post.isFullTimeReferral)
                                 _buildInlineWarningChip(
                                   context,
                                   kFullTimeReferralBadge,
                                   color: const Color(0xFF1565C0),
                                 ),
-                              ],
-                              if (isEndingSoon) ...[
-                                const SizedBox(width: 6),
+                              if (isEndingSoon)
                                 _buildInlineWarningChip(context, 'Sắp hết hạn'),
-                              ],
-                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3),
@@ -610,8 +671,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                                   ),
                                 ),
                               ),
-                              if (post.filledSlots > 0) ...[
-                                const SizedBox(width: 8),
+                              if (post.filledSlots > 0)
                                 Text(
                                   '${post.filledSlots}/${post.slots} UV',
                                   style: TextStyle(
@@ -619,7 +679,6 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                                     color: context.textSecondary,
                                   ),
                                 ),
-                              ],
                             ],
                           ),
                         ],
@@ -917,6 +976,10 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       items.add(_menuItem('edit', 'Chỉnh sửa', icon: Icons.edit_outlined));
       items.add(_menuItem('duplicate', 'Sao chép thành nháp', icon: Icons.content_copy_outlined));
       items.add(_menuItem('retract', 'Rút về nháp', icon: Icons.undo_outlined));
+      if (post.startDate.isAfter(DateTime.now())) {
+        items.add(_menuItem('cancel', 'Hủy công việc',
+            icon: Icons.cancel_presentation_rounded, textColor: Colors.red));
+      }
     } else if (tabType == 'published') {
       items.add(_menuItem('candidates', 'Xem DS ứng tuyển',
           icon: Icons.people_outline));
@@ -938,6 +1001,10 @@ class _PostManagementScreenState extends State<PostManagementScreen>
           icon: Icons.report_outlined));
       items.add(_menuItem('close', 'Đóng bài đăng',
           icon: Icons.block_flipped, textColor: Colors.orange));
+      if (post.startDate.isAfter(DateTime.now())) {
+        items.add(_menuItem('cancel', 'Hủy công việc',
+            icon: Icons.cancel_presentation_rounded, textColor: Colors.red));
+      }
     } else if (tabType == 'expired') {
       if (post.status == 'rejected') {
         items.add(_menuItem('edit', 'Chỉnh sửa & gửi lại',
@@ -1040,6 +1107,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         break;
       case 'retract':
         await controller.updatePostStatus(post.jobId, 'draft');
+        break;
+      case 'cancel':
+        await PostManagementActions.confirmCancelJob(context, post);
         break;
     }
   }

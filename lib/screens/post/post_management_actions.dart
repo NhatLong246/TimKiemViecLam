@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../routes/app_routes.dart';
+import '../../controller/job_post_controller.dart';
 
 /// Điều hướng từ Quản lý bài đăng NTD.
 class PostManagementActions {
@@ -24,10 +25,7 @@ class PostManagementActions {
   static void openCandidates(JobPostModel post) {
     Get.toNamed(
       AppRoutes.employerCandidates,
-      arguments: {
-        'jobId': post.jobId,
-        'jobType': post.jobType,
-      },
+      arguments: {'jobId': post.jobId, 'jobType': post.jobType},
     );
   }
 
@@ -119,10 +117,7 @@ class PostManagementActions {
     }
     final g = await _groups.getGroup(gid);
     if (g == null) return;
-    Get.toNamed(
-      AppRoutes.jobDayEndFlow,
-      arguments: {'group': g},
-    );
+    Get.toNamed(AppRoutes.jobDayEndFlow, arguments: {'group': g});
   }
 
   static Future<bool> confirmClose(
@@ -136,9 +131,9 @@ class PostManagementActions {
             content: Text(
               post.isFullTimeReferral
                   ? 'Bài đăng sẽ không nhận ứng viên mới. '
-                      'Ứng viên đã apply vẫn do NTD tự liên hệ — ViecNow không quản lý Full-time.'
+                        'Ứng viên đã apply vẫn do NTD tự liên hệ — ViecNow không quản lý Full-time.'
                   : 'Bài đăng sẽ không nhận ứng viên mới. '
-                      'Nhóm chat vẫn hoạt động cho đến khi giải ngân/giải tán.',
+                        'Nhóm chat vẫn hoạt động cho đến khi giải ngân/giải tán.',
             ),
             actions: [
               TextButton(
@@ -177,4 +172,36 @@ class PostManagementActions {
         false;
   }
 
+  static Future<bool> confirmCancelJob(
+    BuildContext context,
+    JobPostModel post,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Hủy công việc?'),
+            content: Text(
+              post.filledSlots >= post.slots
+                  ? 'Công việc đã đủ người. Việc hủy công việc sẽ khiến bạn mất 10% ngân sách cọc để đền bù cho ứng viên.'
+                  : 'Công việc chưa đủ người, việc hủy sẽ hoàn lại 100% ngân sách.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Đóng'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () {
+                  Navigator.pop(ctx, true);
+                  final controller = Get.find<JobPostController>();
+                  controller.cancelPost(post);
+                },
+                child: const Text('Hủy Job'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 }

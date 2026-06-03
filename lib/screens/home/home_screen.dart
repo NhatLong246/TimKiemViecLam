@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildJobCard(jobs[index]),
+                    (context, index) => _JobCard(job: jobs[index]),
                     childCount: jobs.length,
                   ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -981,6 +981,255 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+/// Widget riêng biệt cho từng thẻ Job - Obx bên trong sẽ hoạt động độc lập
+/// và tự cập nhật màu khi appliedJobStatus thay đổi
+class _JobCard extends StatelessWidget {
+  final JobPostModel job;
+  const _JobCard({required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Get.toNamed(AppRoutes.jobDetail, arguments: job);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  child: Builder(builder: (context) {
+                    if (job.imageUrls.isEmpty) {
+                      return Image.asset(
+                        'assets/images/banners/default_image.png',
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    final img = job.imageUrls.first;
+                    if (img.startsWith('http')) {
+                      return Image.network(
+                        img,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Image.asset(
+                          'assets/images/banners/default_image.png',
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    }
+                    try {
+                      var b64 = img;
+                      if (b64.contains(',')) {
+                        b64 = b64.split(',').last;
+                      }
+                      final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+                      final padded = sanitized.padRight(
+                        sanitized.length + (4 - sanitized.length % 4) % 4,
+                        '=',
+                      );
+                      return Image.memory(
+                        base64Decode(padded),
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Image.asset(
+                          'assets/images/banners/default_image.png',
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    } catch (e) {
+                      return Image.asset(
+                        'assets/images/banners/default_image.png',
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                  }),
+                ),
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  child: Container(
+                    height: 100,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0x99000000)],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      job.salaryDisplay,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job.title,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 11,
+                          color: Color(0xFF9E9E9E),
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            job.locationDisplay,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF9E9E9E),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        job.jobType == 'part_time' ? 'Part-time' : 'Full-time',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF757575),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 32,
+                      child: Obx(() {
+                        final homeCtrl = Get.find<HomeController>();
+                        final status = homeCtrl.appliedJobStatus[job.jobId];
+                        final isAccepted = status == 'accepted';
+                        final isPending = status == 'pending';
+                        final isWithdrawn = status == 'withdrawn';
+
+                        Color btnColor = _primary;
+                        String text = 'Ứng tuyển';
+
+                        if (isWithdrawn) {
+                          btnColor = Colors.grey.shade500;
+                          text = 'Không thể ứng tuyển';
+                        } else if (isAccepted) {
+                          btnColor = Colors.red;
+                          text = 'Đã được nhận';
+                        } else if (isPending) {
+                          btnColor = Colors.amber.shade700;
+                          text = 'Đã ứng tuyển';
+                        }
+
+                        return ElevatedButton(
+                          onPressed: isWithdrawn
+                              ? null  // Không cho click nếu đã withdrawn
+                              : () {
+                                  Get.toNamed(AppRoutes.jobDetail, arguments: job);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: btnColor,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey.shade500,
+                            disabledForegroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            text,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
 
 /// Chuông thông báo: lọc tin nhóm đã tắt thông báo + Obx tin nhắn.
 class _NotificationBellButton extends StatelessWidget {

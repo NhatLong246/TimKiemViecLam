@@ -60,6 +60,7 @@
 | 2026-05-20 | Rà soát `feature_map.md` | Đánh dấu ✅ toàn bộ tính năng đã làm (auth, candidate home/search/apply, employer post/candidates/stats, chat CH1–CH19, attendance, notifications, chatbot). |
 | 2026-06-01 | Cập nhật Multiple Logins & Lịch làm việc candidate | Triển khai check `currentSessionId` và `lastLoginAttempt` để báo thiết bị đang đăng nhập khi có máy khác chen vào; Tự động fetch `applications` để hiển thị job vào Candidate Schedule (cho cả trạng thái đang chờ và đã duyệt). |
 | 2026-06-01 | Cập nhật hình ảnh Job và Trạng thái ứng tuyển | Hiển thị hình ảnh thật của job (lấy từ `imageUrls.first`) tại `HomeScreen` và `JobDetailScreen`. Thêm logic kiểm tra trạng thái ứng tuyển (hasApplied) trong `JobDetailController`. Nếu đã ứng tuyển, nút Ứng tuyển chuyển sang màu xám, hiển thị "Đã ứng tuyển" và không bấm được nữa. |
+| 2026-05-31 | Tính năng Hạn ứng tuyển & Hủy công việc/ứng tuyển | Thêm logic `applicationDeadline` vào JobPostModel, CreatePostScreen. Sửa `PostManagementScreen` thêm dialog cảnh báo thiếu ứng viên khi quá hạn. Thêm logic Hủy công việc & đền bù 10% trong `JobPostController` và `WalletService`. Thêm logic Hủy ứng tuyển trong `JobDetailController`. |
 
 ---
 

@@ -9,6 +9,7 @@ import '../../controller/login_controller.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
 import '../../routes/app_routes.dart';
+import '../post/post_history_screen.dart';
 
 // ── Màu employer (tím → xanh) ──────────────────────────────────────────────
 const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
@@ -42,7 +43,7 @@ class EmployerHomeScreen extends StatelessWidget {
               SliverToBoxAdapter(child: _buildHeader(context, user)),
               SliverToBoxAdapter(child: _buildQuickTools(context)),
               SliverToBoxAdapter(child: _buildQuickStats(homeCtrl, user)),
-              SliverToBoxAdapter(child: _buildSectionTitle()),
+              SliverToBoxAdapter(child: _buildSectionTitle(context, homeCtrl)),
               if (homeCtrl.isLoading.value)
                 const SliverToBoxAdapter(
                   child: Padding(
@@ -580,12 +581,63 @@ class EmployerHomeScreen extends StatelessWidget {
   }
 
   // ── SECTION TITLE ──────────────────────────────────────────────────────────
-  Widget _buildSectionTitle() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Text(
-        'Bài đăng tuyển dụng của bạn',
-        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF212121)),
+  Widget _buildSectionTitle(BuildContext context, EmployerHomeController homeCtrl) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Bài đăng tuyển dụng của bạn',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF212121)),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Get.to(
+                () => const PostHistoryScreen(),
+                transition: Transition.rightToLeft,
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: _gradientBegin,
+                  end: _gradientEnd,
+                  colors: _gradientColors,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7B1FA2).withOpacity(0.28),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.history_rounded,
+                      color: Colors.white, size: 15),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'Lịch sử',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -804,8 +856,10 @@ class EmployerHomeScreen extends StatelessWidget {
         return 'Đã đóng';
       case 'rejected':
         return 'Từ chối';
-      default:
+      case 'draft':
         return 'Bản nháp';
+      default:
+        return 'Không xác định';
     }
   }
 

@@ -10,6 +10,7 @@ import '../../data/models/group_chat_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../data/services/messaging_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../utils/messaging_bootstrap.dart';
 import '../../routes/app_routes.dart';
 import '../messaging/chat_room_screen.dart';
@@ -47,8 +48,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     } else {
       _initGroup = args as GroupChatModel;
       final uid = _auth.currentUser?.id ?? '';
-      _isCandidateTheme =
-          uid.isNotEmpty && _initGroup.employerId != uid;
+      _isCandidateTheme = uid.isNotEmpty && _initGroup.employerId != uid;
     }
   }
 
@@ -90,26 +90,31 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 8),
             Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2))),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             ListTile(
               leading: Icon(Icons.camera_alt_rounded, color: _accent),
               title: const Text('Chụp ảnh'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading:
-                  const Icon(Icons.photo_library_rounded, color: Color(0xFF1565C0)),
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: Color(0xFF1565C0),
+              ),
               title: const Text('Chọn từ thư viện'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -129,10 +134,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 
     final bytes = await picked.readAsBytes();
     if (bytes.length > 500 * 1024) {
-      Get.snackbar('Ảnh quá lớn', 'Vui lòng chọn ảnh nhỏ hơn 500KB',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Ảnh quá lớn',
+        'Vui lòng chọn ảnh nhỏ hơn 500KB',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
       return;
     }
 
@@ -140,15 +148,21 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
     try {
       final b64 = base64Encode(bytes);
       await _service.updateGroupAvatar(group.groupId, b64);
-      Get.snackbar('Thành công', 'Đã cập nhật ảnh nhóm',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Thành công',
+        'Đã cập nhật ảnh nhóm',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
-      Get.snackbar('Lỗi', 'Không thể cập nhật ảnh nhóm',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể cập nhật ảnh nhóm',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
@@ -158,13 +172,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   void _openMembers(GroupChatModel group) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, anim, __) => _MembersScreen(
-              group: group,
-              isCandidateTheme: _isCandidateTheme,
-            ),
+        pageBuilder: (_, anim, __) =>
+            _MembersScreen(group: group, isCandidateTheme: _isCandidateTheme),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
-          position:
-              Tween(begin: const Offset(1, 0), end: Offset.zero).animate(anim),
+          position: Tween(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(anim),
           child: child,
         ),
       ),
@@ -183,13 +197,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   void _openNicknames(GroupChatModel group) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, anim, __) => _NicknamesScreen(
-              group: group,
-              isCandidateTheme: _isCandidateTheme,
-            ),
+        pageBuilder: (_, anim, __) =>
+            _NicknamesScreen(group: group, isCandidateTheme: _isCandidateTheme),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
-          position:
-              Tween(begin: const Offset(1, 0), end: Offset.zero).animate(anim),
+          position: Tween(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(anim),
           child: child,
         ),
       ),
@@ -301,8 +315,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                                             ],
                                     )
                                   : null,
-                              border:
-                                  Border.all(color: Colors.white, width: 3),
+                              border: Border.all(color: Colors.white, width: 3),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.25),
@@ -318,8 +331,11 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                                   : null,
                             ),
                             child: avatarBytes == null
-                                ? const Icon(Icons.group,
-                                    color: Colors.white, size: 40)
+                                ? const Icon(
+                                    Icons.group,
+                                    color: Colors.white,
+                                    size: 40,
+                                  )
                                 : null,
                           ),
                           Positioned(
@@ -335,8 +351,9 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                        color: Colors.black.withOpacity(0.18),
-                                        blurRadius: 6),
+                                      color: Colors.black.withOpacity(0.18),
+                                      blurRadius: 6,
+                                    ),
                                   ],
                                 ),
                                 child: _isUploadingAvatar
@@ -347,8 +364,11 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                                           color: _accent,
                                         ),
                                       )
-                                    : Icon(Icons.camera_alt_rounded,
-                                        size: 16, color: _accent),
+                                    : Icon(
+                                        Icons.camera_alt_rounded,
+                                        size: 16,
+                                        color: _accent,
+                                      ),
                               ),
                             ),
                           ),
@@ -371,13 +391,18 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.people_alt_outlined,
-                              color: Colors.white70, size: 15),
+                          const Icon(
+                            Icons.people_alt_outlined,
+                            color: Colors.white70,
+                            size: 15,
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             '${group.memberIds.length} thành viên',
                             style: const TextStyle(
-                                color: Colors.white70, fontSize: 13),
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -390,14 +415,20 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         ),
       ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new,
-            color: Colors.white, size: 20),
+        icon: const Icon(
+          Icons.arrow_back_ios_new,
+          color: Colors.white,
+          size: 20,
+        ),
         onPressed: () => Get.back(),
       ),
       title: const Text(
         'Quản lý nhóm',
         style: TextStyle(
-            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 17,
+        ),
       ),
     );
   }
@@ -409,18 +440,20 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         icon: Icons.people_alt_rounded,
         label: 'Thành viên',
         gradient: const LinearGradient(
-            colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+          colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         onTap: () => _openMembers(group),
       ),
       _Tool(
         icon: Icons.badge_rounded,
         label: 'Biệt danh',
         gradient: const LinearGradient(
-            colors: [Color(0xFF7B1FA2), Color(0xFFCE93D8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+          colors: [Color(0xFF7B1FA2), Color(0xFFCE93D8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         onTap: () => _openNicknames(group),
       ),
       _Tool(
@@ -439,9 +472,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         icon: Icons.fact_check_rounded,
         label: 'Điểm danh',
         gradient: const LinearGradient(
-            colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+          colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         onTap: () async {
           if (_isCandidateTheme) {
             Get.to(
@@ -468,9 +502,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         icon: Icons.assignment_rounded,
         label: 'Phân công công việc',
         gradient: const LinearGradient(
-            colors: [Color(0xFFE65100), Color(0xFFFFB74D)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+          colors: [Color(0xFFE65100), Color(0xFFFFB74D)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         onTap: () {
           if (_isCandidateTheme) {
             Get.to(() => CandidateWorkAssignmentScreen(group: group));
@@ -483,9 +518,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         icon: Icons.report_problem_rounded,
         label: 'Khiếu nại',
         gradient: const LinearGradient(
-            colors: [Color(0xFFC62828), Color(0xFFEF9A9A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+          colors: [Color(0xFFC62828), Color(0xFFEF9A9A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         onTap: () {
           if (group.isDissolved) {
             Get.toNamed(AppRoutes.postDissolutionComplaint, arguments: group);
@@ -503,9 +539,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
           icon: Icons.table_chart_rounded,
           label: 'Bảng điểm danh',
           gradient: const LinearGradient(
-              colors: [Color(0xFF1565C0), Color(0xFF64B5F6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight),
+            colors: [Color(0xFF1565C0), Color(0xFF64B5F6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           onTap: () =>
               Get.toNamed(AppRoutes.jobAttendanceSummary, arguments: group),
         ),
@@ -513,9 +550,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         icon: Icons.search_rounded,
         label: 'Tìm tin nhắn',
         gradient: const LinearGradient(
-            colors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+          colors: [Color(0xFF00695C), Color(0xFF4DB6AC)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         onTap: () => _openSearch(group),
       ),
     ];
@@ -526,9 +564,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4)),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       padding: const EdgeInsets.all(16),
@@ -586,12 +625,14 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
               ? const SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2))
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : Switch(
                   value: !isMuted,
                   onChanged: (_) => _toggleMute(group),
                   activeColor: _accent,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
           onTap: () => _toggleMute(group),
         ),
         if (!_isCandidateTheme)
@@ -612,9 +653,8 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
               ? 'Thoát nhóm chat này'
               : 'Xóa nhóm và toàn bộ dữ liệu',
           titleColor: const Color(0xFFC62828),
-          onTap: () => _showLeaveGroup
-              ? _confirmLeave(group)
-              : _confirmDisband(group),
+          onTap: () =>
+              _showLeaveGroup ? _confirmLeave(group) : _confirmDisband(group),
           isLast: true,
         ),
       ],
@@ -631,8 +671,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
           children: [
             Icon(Icons.edit_rounded, color: _accent, size: 22),
             const SizedBox(width: 8),
-            const Text('Đổi tên nhóm',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+            const Text(
+              'Đổi tên nhóm',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+            ),
           ],
         ),
         content: TextField(
@@ -644,24 +686,30 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
             filled: true,
             fillColor: const Color(0xFFF5F5F5),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
             contentPadding: const EdgeInsets.all(12),
           ),
         ),
         actions: [
           TextButton(
-              onPressed: Get.back,
-              child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
+            onPressed: Get.back,
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-                backgroundColor: _accent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
-            icon: const Icon(Icons.check_rounded,
-                color: Colors.white, size: 18),
-            label: const Text('Lưu',
-                style: TextStyle(color: Colors.white)),
+              backgroundColor: _accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(
+              Icons.check_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            label: const Text('Lưu', style: TextStyle(color: Colors.white)),
             onPressed: () async {
               final name = ctrl.text.trim();
               if (name.isEmpty || name == group.jobTitle) {
@@ -673,11 +721,14 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                   .doc(group.groupId)
                   .update({'jobTitle': name});
               Get.back();
-              Get.snackbar('Đổi tên thành công', 'Tên nhóm: $name',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.green,
-                  colorText: Colors.white,
-                  duration: const Duration(seconds: 2));
+              Get.snackbar(
+                'Đổi tên thành công',
+                'Tên nhóm: $name',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 2),
+              );
             },
           ),
         ],
@@ -724,11 +775,47 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
             onPressed: () async {
               Get.back();
               try {
+                // Hủy ứng tuyển nếu user là candidate
+                final db = FirebaseFirestore.instance;
+                final snap = await db
+                    .collection('applications')
+                    .where('jobId', isEqualTo: group.jobId)
+                    .where('candidateId', isEqualTo: _currentUserId)
+                    .where('status', whereIn: ['pending', 'accepted'])
+                    .get();
+
+                var appId = '';
+                var wasAccepted = false;
+
+                if (snap.docs.isNotEmpty) {
+                  final doc = snap.docs.first;
+                  final data = doc.data();
+                  appId = (data['appId'] ?? doc.id).toString();
+                  final status = data['status'] as String?;
+                  wasAccepted = status == 'accepted';
+                  await doc.reference.update({
+                    'status': 'withdrawn',
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                  if (wasAccepted) {
+                    await db.collection('jobPosts').doc(group.jobId).update({
+                      'filledSlots': FieldValue.increment(-1),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+                    await _cancelCurrentUserSchedules(group.jobId);
+                  }
+                }
+
                 await _service.leaveGroup(group.groupId, _currentUserId);
+                await _notifyEmployerMemberLeftJob(
+                  group: group,
+                  appId: appId,
+                  wasAccepted: wasAccepted,
+                );
                 Get.close(2);
                 Get.snackbar(
                   'Đã rời nhóm',
-                  'Bạn đã rời khỏi "${group.jobTitle}"',
+                  'Bạn đã rời khỏi "${group.jobTitle}" và hủy ứng tuyển.',
                   snackPosition: SnackPosition.BOTTOM,
                   backgroundColor: _accent,
                   colorText: Colors.white,
@@ -744,12 +831,59 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                 );
               }
             },
-            child: const Text('Rời nhóm',
-                style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Rời nhóm',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _cancelCurrentUserSchedules(String jobId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('schedules')
+        .where('candidateId', isEqualTo: _currentUserId)
+        .get();
+    final batch = FirebaseFirestore.instance.batch();
+    var updated = 0;
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      if ((data['jobId'] ?? '').toString() != jobId) continue;
+      final status = (data['status'] ?? '').toString();
+      if (status == 'cancelled' || status == 'completed') continue;
+      batch.update(doc.reference, {
+        'status': 'cancelled',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      updated++;
+    }
+    if (updated > 0) await batch.commit();
+  }
+
+  Future<void> _notifyEmployerMemberLeftJob({
+    required GroupChatModel group,
+    required String appId,
+    required bool wasAccepted,
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      final candidateName = currentUser?.fullName.trim().isNotEmpty == true
+          ? currentUser!.fullName
+          : 'Ứng viên';
+      await NotificationService.notifyApplicationWithdrawn(
+        employerId: group.employerId,
+        jobTitle: group.jobTitle,
+        candidateName: candidateName,
+        wasAccepted: wasAccepted,
+        jobId: group.jobId,
+        appId: appId,
+        candidateId: _currentUserId,
+      );
+    } catch (_) {
+      // Không chặn thao tác rời nhóm nếu chỉ lỗi gửi thông báo.
+    }
   }
 
   void _confirmDisband(GroupChatModel group) {
@@ -758,18 +892,25 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: Color(0xFFC62828), size: 26),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFC62828),
+                size: 26,
+              ),
               SizedBox(width: 8),
-              Text('Giải tán nhóm',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFC62828),
-                      fontSize: 17)),
+              Text(
+                'Giải tán nhóm',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFC62828),
+                  fontSize: 17,
+                ),
+              ),
             ],
           ),
           content: Column(
@@ -789,9 +930,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Gõ "GIẢI TÁN" để xác nhận:',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text(
+                'Gõ "GIẢI TÁN" để xác nhận:',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: confirmCtrl,
@@ -802,8 +944,9 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                   filled: true,
                   fillColor: const Color(0xFFF5F5F5),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none),
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
                   contentPadding: const EdgeInsets.all(12),
                 ),
               ),
@@ -811,27 +954,33 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
           ),
           actions: [
             TextButton(
-                onPressed: Get.back,
-                child: const Text('Hủy',
-                    style: TextStyle(color: Colors.grey))),
+              onPressed: Get.back,
+              child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+            ),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      confirmCtrl.text.trim() == 'GIẢI TÁN'
-                          ? const Color(0xFFC62828)
-                          : Colors.grey.shade300,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10))),
-              icon: Icon(Icons.delete_forever_rounded,
+                backgroundColor: confirmCtrl.text.trim() == 'GIẢI TÁN'
+                    ? const Color(0xFFC62828)
+                    : Colors.grey.shade300,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: Icon(
+                Icons.delete_forever_rounded,
+                color: confirmCtrl.text.trim() == 'GIẢI TÁN'
+                    ? Colors.white
+                    : Colors.grey.shade500,
+                size: 18,
+              ),
+              label: Text(
+                'Giải tán',
+                style: TextStyle(
                   color: confirmCtrl.text.trim() == 'GIẢI TÁN'
                       ? Colors.white
                       : Colors.grey.shade500,
-                  size: 18),
-              label: Text('Giải tán',
-                  style: TextStyle(
-                      color: confirmCtrl.text.trim() == 'GIẢI TÁN'
-                          ? Colors.white
-                          : Colors.grey.shade500)),
+                ),
+              ),
               onPressed: confirmCtrl.text.trim() != 'GIẢI TÁN'
                   ? null
                   : () async {
@@ -843,8 +992,10 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                         builder: (_) => const Center(
                           child: Card(
                             shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(16))),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(16),
+                              ),
+                            ),
                             child: Padding(
                               padding: EdgeInsets.all(24),
                               child: Column(
@@ -873,10 +1024,13 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                         );
                       } catch (e) {
                         Get.back(); // đóng loading
-                        Get.snackbar('Lỗi', 'Không thể giải tán nhóm: $e',
-                            backgroundColor: Colors.red,
-                            colorText: Colors.white,
-                            snackPosition: SnackPosition.BOTTOM);
+                        Get.snackbar(
+                          'Lỗi',
+                          'Không thể giải tán nhóm: $e',
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
                       }
                     },
             ),
@@ -893,10 +1047,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
 class _MembersScreen extends StatefulWidget {
   final GroupChatModel group;
   final bool isCandidateTheme;
-  const _MembersScreen({
-    required this.group,
-    this.isCandidateTheme = false,
-  });
+  const _MembersScreen({required this.group, this.isCandidateTheme = false});
 
   @override
   State<_MembersScreen> createState() => _MembersScreenState();
@@ -925,8 +1076,7 @@ class _MembersScreenState extends State<_MembersScreen> {
       member.id == widget.group.employerId || member.role == 'employer';
 
   Future<void> _load() async {
-    final members =
-        await _service.getGroupMembers(widget.group.memberIds);
+    final members = await _service.getGroupMembers(widget.group.memberIds);
     members.sort((a, b) {
       final aAdmin = _isGroupAdmin(a);
       final bAdmin = _isGroupAdmin(b);
@@ -935,7 +1085,11 @@ class _MembersScreenState extends State<_MembersScreen> {
       final bn = '${b.firstName} ${b.lastName}'.trim().toLowerCase();
       return an.compareTo(bn);
     });
-    if (mounted) setState(() { _members = members; _loading = false; });
+    if (mounted)
+      setState(() {
+        _members = members;
+        _loading = false;
+      });
   }
 
   @override
@@ -947,32 +1101,40 @@ class _MembersScreenState extends State<_MembersScreen> {
           decoration: BoxDecoration(gradient: _headerGradient),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: Colors.white, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.white,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Thành viên (${widget.group.memberIds.length})',
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold),
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _loading
           ? Center(child: CircularProgressIndicator(color: _accent))
           : _members == null || _members!.isEmpty
-              ? Center(
-                  child: Text('Chưa có thành viên',
-                      style: TextStyle(color: Colors.grey.shade500)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _members!.length,
-                  itemBuilder: (_, i) => _MemberCard(
-                    member: _members![i],
-                    group: widget.group,
-                    isCandidateTheme: widget.isCandidateTheme,
-                  ),
-                ),
+          ? Center(
+              child: Text(
+                'Chưa có thành viên',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _members!.length,
+              itemBuilder: (_, i) => _MemberCard(
+                member: _members![i],
+                group: widget.group,
+                isCandidateTheme: widget.isCandidateTheme,
+              ),
+            ),
     );
   }
 }
@@ -1042,8 +1204,7 @@ class _MemberCardState extends State<_MemberCard> {
     try {
       final String groupId;
       if (_useEmployerDirectChat) {
-        final candidateId =
-            _currentUid == employerId ? member.id : _currentUid;
+        final candidateId = _currentUid == employerId ? member.id : _currentUid;
         groupId = await messaging.getOrCreateDirectChat(
           jobId: group.jobId,
           jobTitle: group.jobTitle,
@@ -1086,8 +1247,7 @@ class _MemberCardState extends State<_MemberCard> {
   @override
   Widget build(BuildContext context) {
     final nick = group.nicknames[member.id];
-    final displayName =
-        '${member.firstName} ${member.lastName}'.trim();
+    final displayName = '${member.firstName} ${member.lastName}'.trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1096,29 +1256,29 @@ class _MemberCardState extends State<_MemberCard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           radius: 24,
           backgroundColor: _accent.withOpacity(0.15),
           child: Text(
             displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
             style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: _accent,
-                fontSize: 18),
+              fontWeight: FontWeight.bold,
+              color: _accent,
+              fontSize: 18,
+            ),
           ),
         ),
         title: Text(
           nick != null && nick.isNotEmpty ? nick : displayName,
-          style: const TextStyle(
-              fontWeight: FontWeight.w700, fontSize: 15),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -1128,10 +1288,7 @@ class _MemberCardState extends State<_MemberCard> {
               if (nick != null && nick.isNotEmpty)
                 Text(
                   displayName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                 ),
               if (nick != null && nick.isNotEmpty) const SizedBox(height: 4),
               _MemberRoleChip(isAdmin: _isAdmin, accent: _accent),
@@ -1180,7 +1337,9 @@ class _MemberRoleChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isAdmin ? Icons.admin_panel_settings_outlined : Icons.person_outline,
+            isAdmin
+                ? Icons.admin_panel_settings_outlined
+                : Icons.person_outline,
             size: 13,
             color: isAdmin ? accent : const Color(0xFF607080),
           ),
@@ -1205,10 +1364,7 @@ class _MemberRoleChip extends StatelessWidget {
 class _NicknamesScreen extends StatefulWidget {
   final GroupChatModel group;
   final bool isCandidateTheme;
-  const _NicknamesScreen({
-    required this.group,
-    this.isCandidateTheme = false,
-  });
+  const _NicknamesScreen({required this.group, this.isCandidateTheme = false});
 
   @override
   State<_NicknamesScreen> createState() => _NicknamesScreenState();
@@ -1234,19 +1390,20 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
   }
 
   Future<void> _load() async {
-    final members =
-        await _service.getGroupMembers(widget.group.memberIds);
-    if (mounted) setState(() { _members = members; _loading = false; });
+    final members = await _service.getGroupMembers(widget.group.memberIds);
+    if (mounted)
+      setState(() {
+        _members = members;
+        _loading = false;
+      });
   }
 
-  void _editNickname(BuildContext context, UserModel user,
-      String currentNick) {
+  void _editNickname(BuildContext context, UserModel user, String currentNick) {
     final ctrl = TextEditingController(text: currentNick);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Biệt danh cho\n${user.firstName} ${user.lastName}'.trim(),
           style: const TextStyle(fontWeight: FontWeight.w800),
@@ -1256,31 +1413,30 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
           autofocus: true,
           decoration: InputDecoration(
             hintText: 'Nhập biệt danh (bỏ trống để xóa)',
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
           TextButton(
-              onPressed: Get.back,
-              child: const Text('Hủy',
-                  style: TextStyle(color: Colors.grey))),
+            onPressed: Get.back,
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: _accent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
+              backgroundColor: _accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             onPressed: () async {
               final nick = ctrl.text.trim();
-              final displayName =
-                  '${user.firstName} ${user.lastName}'.trim();
+              final displayName = '${user.firstName} ${user.lastName}'.trim();
               final auth = Get.find<AuthController>();
               final cu = auth.currentUser;
-              var setterName =
-                  '${cu?.firstName ?? ''} ${cu?.lastName ?? ''}'.trim();
+              var setterName = '${cu?.firstName ?? ''} ${cu?.lastName ?? ''}'
+                  .trim();
               if (setterName.isEmpty) {
-                setterName =
-                    (cu?.companyName ?? '').trim();
+                setterName = (cu?.companyName ?? '').trim();
               }
               if (setterName.isEmpty) {
                 setterName = cu?.role == 'employer'
@@ -1291,8 +1447,9 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                 widget.group.groupId,
                 user.id,
                 nick,
-                memberDisplayName:
-                    displayName.isNotEmpty ? displayName : 'Thành viên',
+                memberDisplayName: displayName.isNotEmpty
+                    ? displayName
+                    : 'Thành viên',
                 setterDisplayName: setterName,
               );
               Get.back();
@@ -1302,8 +1459,7 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
                 snackPosition: SnackPosition.BOTTOM,
               );
             },
-            child: const Text('Lưu',
-                style: TextStyle(color: Colors.white)),
+            child: const Text('Lưu', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1323,88 +1479,115 @@ class _NicknamesScreenState extends State<_NicknamesScreen> {
               decoration: BoxDecoration(gradient: _headerGradient),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new,
-                  color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text('Đặt biệt danh',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+            title: const Text(
+              'Đặt biệt danh',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: _loading
               ? Center(child: CircularProgressIndicator(color: _accent))
               : _members == null || _members!.isEmpty
-                  ? Center(
-                      child: Text('Chưa có thành viên',
-                          style:
-                              TextStyle(color: Colors.grey.shade500)))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _members!.length,
-                      itemBuilder: (_, i) {
-                        final member = _members![i];
-                        final nick =
-                            liveGroup.nicknames[member.id] ?? '';
-                        final displayName =
-                            '${member.firstName} ${member.lastName}'
-                                .trim();
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2))
-                            ],
+              ? Center(
+                  child: Text(
+                    'Chưa có thành viên',
+                    style: TextStyle(color: Colors.grey.shade500),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _members!.length,
+                  itemBuilder: (_, i) {
+                    final member = _members![i];
+                    final nick = liveGroup.nicknames[member.id] ?? '';
+                    final displayName = '${member.firstName} ${member.lastName}'
+                        .trim();
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            leading: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: _accent.withOpacity(0.15),
-                              child: Text(
-                                displayName.isNotEmpty
-                                    ? displayName[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: _accent),
-                              ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        leading: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: _accent.withOpacity(0.15),
+                          child: Text(
+                            displayName.isNotEmpty
+                                ? displayName[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _accent,
                             ),
-                            title: Text(displayName,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14)),
-                            subtitle: nick.isNotEmpty
-                                ? Row(children: [
-                                    Icon(Icons.label_outline,
-                                        size: 13, color: _accent),
-                                    const SizedBox(width: 4),
-                                    Text(nick,
-                                        style: TextStyle(
-                                            color: _accent,
-                                            fontSize: 12,
-                                            fontStyle: FontStyle.italic)),
-                                  ])
-                                : Text('Chưa đặt biệt danh',
+                          ),
+                        ),
+                        title: Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: nick.isNotEmpty
+                            ? Row(
+                                children: [
+                                  Icon(
+                                    Icons.label_outline,
+                                    size: 13,
+                                    color: _accent,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    nick,
                                     style: TextStyle(
-                                        color: Colors.grey.shade400,
-                                        fontSize: 12)),
-                            trailing: IconButton(
-                              icon: Icon(Icons.edit_rounded,
-                                  color: _accent, size: 20),
-                              onPressed: () =>
-                                  _editNickname(context, member, nick),
-                            ),
+                                      color: _accent,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                'Chưa đặt biệt danh',
+                                style: TextStyle(
+                                  color: Colors.grey.shade400,
+                                  fontSize: 12,
+                                ),
+                              ),
+                        trailing: IconButton(
+                          icon: Icon(
+                            Icons.edit_rounded,
+                            color: _accent,
+                            size: 20,
                           ),
-                        );
-                      },
-                    ),
+                          onPressed: () => _editNickname(context, member, nick),
+                        ),
+                      ),
+                    );
+                  },
+                ),
         );
       },
     );
@@ -1441,11 +1624,12 @@ class _Tool {
   final String label;
   final LinearGradient gradient;
   final VoidCallback onTap;
-  const _Tool(
-      {required this.icon,
-      required this.label,
-      required this.gradient,
-      required this.onTap});
+  const _Tool({
+    required this.icon,
+    required this.label,
+    required this.gradient,
+    required this.onTap,
+  });
 }
 
 class _ToolCell extends StatelessWidget {
@@ -1467,9 +1651,10 @@ class _ToolCell extends StatelessWidget {
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                    color: tool.gradient.colors.first.withOpacity(0.38),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5)),
+                  color: tool.gradient.colors.first.withOpacity(0.38),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
               ],
             ),
             child: Icon(tool.icon, color: Colors.white, size: 28),
@@ -1478,9 +1663,10 @@ class _ToolCell extends StatelessWidget {
           Text(
             tool.label,
             style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF212121)),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF212121),
+            ),
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1503,9 +1689,10 @@ class _FeatureCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4)),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -1553,9 +1740,10 @@ class _FeatureItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(13),
                     boxShadow: [
                       BoxShadow(
-                          color: iconBg.withOpacity(0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4)),
+                        color: iconBg.withOpacity(0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
                   ),
                   child: Icon(icon, color: Colors.white, size: 22),
@@ -1565,35 +1753,45 @@ class _FeatureItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
-                          style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: titleColor ?? const Color(0xFF212121))),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: titleColor ?? const Color(0xFF212121),
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(subtitle,
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
                 trailing ??
-                    Icon(Icons.chevron_right_rounded,
-                        color: Colors.grey.shade400, size: 22),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.grey.shade400,
+                      size: 22,
+                    ),
               ],
             ),
           ),
         ),
         if (!isLast)
           Divider(
-              height: 1,
-              indent: 76,
-              endIndent: 16,
-              color: Colors.grey.shade100),
+            height: 1,
+            indent: 76,
+            endIndent: 16,
+            color: Colors.grey.shade100,
+          ),
       ],
     );
   }
 }
-

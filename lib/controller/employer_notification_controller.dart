@@ -14,14 +14,15 @@ class EmployerNotificationController extends GetxController {
   final _db = FirebaseFirestore.instance;
 
   final RxList<NotificationModel> notifications = <NotificationModel>[].obs;
+
   /// Số hiển thị trên chuông — reactive, gồm thông báo + tin nhắn chưa đọc.
   final RxInt unreadBadgeCount = 0.obs;
   final RxBool isLoading = false.obs;
 
   StreamSubscription<List<NotificationModel>>? _notifSub;
   StreamSubscription<List<AppNotificationItem>>? _inboxSub;
-  StreamSubscription<QuerySnapshot>? _appSub;    // applications
-  StreamSubscription<QuerySnapshot>? _postSub;   // job posts
+  StreamSubscription<QuerySnapshot>? _appSub; // applications
+  StreamSubscription<QuerySnapshot>? _postSub; // job posts
 
   List<NotificationModel> _legacyList = [];
   List<NotificationModel> _inboxList = [];
@@ -88,22 +89,16 @@ class EmployerNotificationController extends GetxController {
 
     // 1. Gộp thông báo legacy (`notifications`) + hộp thư (`users/.../notifications`)
     _notifSub?.cancel();
-    _notifSub = _svc.streamByRecipient(uid).listen(
-      (list) {
-        _legacyList = list;
-        _mergeNotifications();
-      },
-      onError: (_) => _fetchLegacyFallback(uid),
-    );
+    _notifSub = _svc.streamByRecipient(uid).listen((list) {
+      _legacyList = list;
+      _mergeNotifications();
+    }, onError: (_) => _fetchLegacyFallback(uid));
 
     _inboxSub?.cancel();
-    _inboxSub = _svc.streamNotifications(userId: uid).listen(
-      (items) {
-        _inboxList = items.map((i) => _fromAppItem(i, uid)).toList();
-        _mergeNotifications();
-      },
-      onError: (_) => _fetchInboxFallback(uid),
-    );
+    _inboxSub = _svc.streamNotifications(userId: uid).listen((items) {
+      _inboxList = items.map((i) => _fromAppItem(i, uid)).toList();
+      _mergeNotifications();
+    }, onError: (_) => _fetchInboxFallback(uid));
 
     // 2. Theo dõi bài đăng — phát hiện approved/rejected
     _postSub = _db
@@ -111,53 +106,54 @@ class EmployerNotificationController extends GetxController {
         .where('employerId', isEqualTo: uid)
         .snapshots()
         .listen((snap) async {
-      if (_postInitialLoad) {
-        // Ghi nhớ trạng thái ban đầu, không tạo thông báo
-        for (final doc in snap.docs) {
-          final status = doc.data()['status'] as String? ?? '';
-          _prevPostStatuses[doc.id] = status;
-        }
-        _postInitialLoad = false;
-        return;
-      }
+          if (_postInitialLoad) {
+            // Ghi nhớ trạng thái ban đầu, không tạo thông báo
+            for (final doc in snap.docs) {
+              final status = doc.data()['status'] as String? ?? '';
+              _prevPostStatuses[doc.id] = status;
+            }
+            _postInitialLoad = false;
+            return;
+          }
 
-      for (final change in snap.docChanges) {
-        if (change.type == DocumentChangeType.modified) {
-          final data = change.doc.data() as Map<String, dynamic>;
-          final newStatus = data['status'] as String? ?? '';
-          final oldStatus = _prevPostStatuses[change.doc.id] ?? '';
-          final title = data['title'] as String? ?? 'Bài đăng';
+          for (final change in snap.docChanges) {
+            if (change.type == DocumentChangeType.modified) {
+              final data = change.doc.data() as Map<String, dynamic>;
+              final newStatus = data['status'] as String? ?? '';
+              final oldStatus = _prevPostStatuses[change.doc.id] ?? '';
+              final title = data['title'] as String? ?? 'Bài đăng';
 
-          if (oldStatus != newStatus) {
-            if (newStatus == 'approved') {
-              await _svc.notifyEmployer(
-                employerId: uid,
-                type: 'post_approved',
-                title: '✅ Bài đăng được duyệt',
-                body:
-                    '"$title" đã được admin phê duyệt và hiển thị trên ứng dụng.',
-                category: NotificationCategory.system,
-                data: {'postId': change.doc.id, 'title': title},
-              );
-            } else if (newStatus == 'rejected') {
-              await _svc.notifyEmployer(
-                employerId: uid,
-                type: 'post_rejected',
-                title: '❌ Bài đăng bị từ chối',
-                body: '"$title" đã bị từ chối. Vui lòng chỉnh sửa và gửi lại.',
-                category: NotificationCategory.system,
-                data: {'postId': change.doc.id, 'title': title},
-              );
+              if (oldStatus != newStatus) {
+                if (newStatus == 'approved') {
+                  await _svc.notifyEmployer(
+                    employerId: uid,
+                    type: 'post_approved',
+                    title: '✅ Bài đăng được duyệt',
+                    body:
+                        '"$title" đã được admin phê duyệt và hiển thị trên ứng dụng.',
+                    category: NotificationCategory.system,
+                    data: {'postId': change.doc.id, 'title': title},
+                  );
+                } else if (newStatus == 'rejected') {
+                  await _svc.notifyEmployer(
+                    employerId: uid,
+                    type: 'post_rejected',
+                    title: '❌ Bài đăng bị từ chối',
+                    body:
+                        '"$title" đã bị từ chối. Vui lòng chỉnh sửa và gửi lại.',
+                    category: NotificationCategory.system,
+                    data: {'postId': change.doc.id, 'title': title},
+                  );
+                }
+              }
+              _prevPostStatuses[change.doc.id] = newStatus;
+            } else if (change.type == DocumentChangeType.added) {
+              final data = change.doc.data() as Map<String, dynamic>;
+              _prevPostStatuses[change.doc.id] =
+                  data['status'] as String? ?? '';
             }
           }
-          _prevPostStatuses[change.doc.id] = newStatus;
-        } else if (change.type == DocumentChangeType.added) {
-          final data = change.doc.data() as Map<String, dynamic>;
-          _prevPostStatuses[change.doc.id] =
-              data['status'] as String? ?? '';
-        }
-      }
-    });
+        });
 
     // 3. Theo dõi đơn ứng tuyển — phát hiện đơn mới
     _appSub = _db
@@ -168,20 +164,20 @@ class EmployerNotificationController extends GetxController {
         .limit(30)
         .snapshots()
         .listen((snap) async {
-      if (_appInitialLoad) {
-        for (final doc in snap.docs) {
-          _knownAppIds.add(doc.id);
-        }
-        _appInitialLoad = false;
-        return;
-      }
+          if (_appInitialLoad) {
+            for (final doc in snap.docs) {
+              _knownAppIds.add(doc.id);
+            }
+            _appInitialLoad = false;
+            return;
+          }
 
-      for (final change in snap.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          _knownAppIds.add(change.doc.id);
-        }
-      }
-    });
+          for (final change in snap.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              _knownAppIds.add(change.doc.id);
+            }
+          }
+        });
   }
 
   void _mergeNotifications() {
@@ -232,8 +228,7 @@ class EmployerNotificationController extends GetxController {
     final chatUnread = Get.isRegistered<MessagingController>()
         ? Get.find<MessagingController>().unreadTotal.value
         : 0;
-    unreadBadgeCount.value =
-        fromList > chatUnread ? fromList : chatUnread;
+    unreadBadgeCount.value = fromList > chatUnread ? fromList : chatUnread;
   }
 
   String _dedupeKey(NotificationModel n) {
@@ -241,9 +236,26 @@ class EmployerNotificationController extends GetxController {
       final gid = (n.data['groupId'] ?? '').toString();
       if (gid.isNotEmpty) return 'msg_$gid';
     }
+    if (n.type == 'application' || n.type == 'application_withdrawn') {
+      final appId = (n.data['appId'] ?? '').toString();
+      if (appId.isNotEmpty) return '${n.type}_app_$appId';
+      final jobId = (n.data['jobId'] ?? '').toString();
+      final candidateId = (n.data['candidateId'] ?? '').toString();
+      if (jobId.isNotEmpty && candidateId.isNotEmpty) {
+        return '${n.type}_job_${jobId}_candidate_$candidateId';
+      }
+    }
+    if (n.type == 'post_approved' || n.type == 'post_rejected') {
+      final postId = (n.data['postId'] ?? n.data['jobId'] ?? '').toString();
+      if (postId.isNotEmpty) return '${n.type}_post_$postId';
+    }
     if (n.type == 'attendance_result') {
       final gid = (n.data['groupId'] ?? '').toString();
       if (gid.isNotEmpty) return 'att_$gid';
+    }
+    if (n.type == 'application_deadline_underfilled') {
+      final jobId = (n.data['jobId'] ?? '').toString();
+      if (jobId.isNotEmpty) return 'underfilled_job_$jobId';
     }
     if (n.type == 'job_work_period_ended' ||
         n.type == 'disbursement_ready' ||
@@ -309,10 +321,11 @@ class EmployerNotificationController extends GetxController {
       return;
     }
     final threads = Get.find<MessagingController>().conversations.where(
-          (t) => t.unreadCount > 0 && !t.notificationsMuted,
-        );
-    _chatUnreadList =
-        threads.map((t) => _fromUnreadThread(t, uid)).toList(growable: false);
+      (t) => t.unreadCount > 0 && !t.notificationsMuted,
+    );
+    _chatUnreadList = threads
+        .map((t) => _fromUnreadThread(t, uid))
+        .toList(growable: false);
     _mergeNotifications();
   }
 
@@ -348,10 +361,16 @@ class EmployerNotificationController extends GetxController {
           .collection('notifications')
           .limit(80)
           .get();
-      _inboxList = snap.docs
-          .map((d) => _fromAppItem(AppNotificationItem.fromMap(d.id, d.data()), uid))
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _inboxList =
+          snap.docs
+              .map(
+                (d) => _fromAppItem(
+                  AppNotificationItem.fromMap(d.id, d.data()),
+                  uid,
+                ),
+              )
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _mergeNotifications();
     } catch (_) {}
   }
@@ -363,15 +382,11 @@ class EmployerNotificationController extends GetxController {
           .where('recipientId', isEqualTo: uid)
           .limit(80)
           .get();
-      _legacyList = snap.docs
-          .map(
-            (d) => NotificationModel.fromMap(
-              d.data(),
-              d.id,
-            ),
-          )
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _legacyList =
+          snap.docs
+              .map((d) => NotificationModel.fromMap(d.data(), d.id))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _mergeNotifications();
     } catch (_) {}
   }

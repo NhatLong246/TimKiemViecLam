@@ -45,15 +45,16 @@ class NotificationService {
         .limit(80)
         .snapshots()
         .map((snap) {
-          final list = snap.docs
-              .map(
-                (d) => NotificationModel.fromMap(
-                  d.data() as Map<String, dynamic>,
-                  d.id,
-                ),
-              )
-              .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final list =
+              snap.docs
+                  .map(
+                    (d) => NotificationModel.fromMap(
+                      d.data() as Map<String, dynamic>,
+                      d.id,
+                    ),
+                  )
+                  .toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list.take(50).toList();
         });
   }
@@ -109,16 +110,14 @@ class NotificationService {
     if (uid == null) return Stream.value([]);
 
     // Không orderBy trên Firestore — tránh stream lỗi im lặng (thiếu index).
-    return _userNotificationsCol(uid)!
-        .limit(80)
-        .snapshots()
-        .map((snap) {
-          final list = snap.docs
+    return _userNotificationsCol(uid)!.limit(80).snapshots().map((snap) {
+      final list =
+          snap.docs
               .map((d) => AppNotificationItem.fromMap(d.id, d.data()))
               .toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
+      return list;
+    });
   }
 
   /// Cùng logic với màn Thông báo: đếm `isRead == false` (không lọc watermark).
@@ -126,14 +125,17 @@ class NotificationService {
     final uid = userId ?? _uid;
     if (uid == null) return Stream.value(0);
 
-    return streamNotifications(userId: uid)
-        .map((list) => list.where((n) => !n.isRead).length);
+    return streamNotifications(
+      userId: uid,
+    ).map((list) => list.where((n) => !n.isRead).length);
   }
 
   Future<void> markRead(String notificationId) async {
     final uid = _uid;
     if (uid == null) return;
-    await _userNotificationsCol(uid)!.doc(notificationId).update({'isRead': true});
+    await _userNotificationsCol(
+      uid,
+    )!.doc(notificationId).update({'isRead': true});
   }
 
   bool _notificationIsUnread(Map<String, dynamic> data) =>
@@ -184,9 +186,7 @@ class NotificationService {
     final uid = userId ?? _uid;
     if (uid == null || groupId.isEmpty) return;
 
-    final snap = await _userNotificationsCol(uid)!
-        .limit(80)
-        .get();
+    final snap = await _userNotificationsCol(uid)!.limit(80).get();
     final batch = _db.batch();
     var n = 0;
     for (final doc in snap.docs) {
@@ -206,9 +206,7 @@ class NotificationService {
     final uid = userId ?? _uid;
     if (uid == null) return;
 
-    final snap = await _userNotificationsCol(uid)!
-        .limit(80)
-        .get();
+    final snap = await _userNotificationsCol(uid)!.limit(80).get();
     final batch = _db.batch();
     var n = 0;
     for (final doc in snap.docs) {
@@ -224,9 +222,9 @@ class NotificationService {
   Future<void> markAllRead() async {
     final uid = _uid;
     if (uid == null) return;
-    final snap = await _userNotificationsCol(uid)!
-        .where('isRead', isEqualTo: false)
-        .get();
+    final snap = await _userNotificationsCol(
+      uid,
+    )!.where('isRead', isEqualTo: false).get();
     final batch = _db.batch();
     for (final doc in snap.docs) {
       batch.update(doc.reference, {'isRead': true});
@@ -271,10 +269,10 @@ class NotificationService {
   Future<void> savePrefs(Map<String, bool> prefs) async {
     final uid = _uid;
     if (uid == null) return;
-    await _db.collection('users').doc(uid).set(
-      {'notificationPrefs': prefs, 'updatedAt': FieldValue.serverTimestamp()},
-      SetOptions(merge: true),
-    );
+    await _db.collection('users').doc(uid).set({
+      'notificationPrefs': prefs,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   static const _defaultPrefs = {
@@ -481,8 +479,9 @@ class NotificationService {
     bool isFullTimeReferral = false,
   }) async {
     final svc = NotificationService();
-    final name =
-        employerName?.trim().isNotEmpty == true ? employerName! : 'Nhà tuyển dụng';
+    final name = employerName?.trim().isNotEmpty == true
+        ? employerName!
+        : 'Nhà tuyển dụng';
     await svc.sendToUser(
       userId: candidateId,
       title: isFullTimeReferral
@@ -504,6 +503,16 @@ class NotificationService {
     String? candidateId,
   }) async {
     final svc = NotificationService();
+    // ── Chống trùng: nếu 30s vừa rồi đã có thông báo cùng type+job+candidate thì bỏ qua
+    final isDup = await svc._hasRecentEmployerNotif(
+      employerId: employerId,
+      type: 'application',
+      jobId: jobId ?? '',
+      candidateId: candidateId ?? '',
+      within: const Duration(seconds: 30),
+    );
+    if (isDup) return;
+
     await svc.notifyEmployer(
       employerId: employerId,
       type: 'application',
@@ -516,6 +525,111 @@ class NotificationService {
         if (appId != null && appId.isNotEmpty) 'appId': appId,
         if (candidateId != null && candidateId.isNotEmpty)
           'candidateId': candidateId,
+      },
+    );
+  }
+
+  static Future<void> notifyApplicationWithdrawn({
+    required String employerId,
+    required String jobTitle,
+    required String candidateName,
+    required bool wasAccepted,
+    String? jobId,
+    String? appId,
+    String? candidateId,
+  }) async {
+    final svc = NotificationService();
+    // ── Chống trùng: nếu 30s vừa rồi đã có thông báo cùng type+job+candidate thì bỏ qua
+    final isDup = await svc._hasRecentEmployerNotif(
+      employerId: employerId,
+      type: 'application_withdrawn',
+      jobId: jobId ?? '',
+      candidateId: candidateId ?? '',
+      within: const Duration(seconds: 30),
+    );
+    if (isDup) return;
+
+    final name = candidateName.trim().isNotEmpty
+        ? candidateName.trim()
+        : 'Ứng viên';
+    final titleText = jobTitle.trim().isNotEmpty
+        ? jobTitle.trim()
+        : 'Công việc';
+    await svc.notifyEmployer(
+      employerId: employerId,
+      type: 'application_withdrawn',
+      title: 'Ứng viên đã hủy ứng tuyển',
+      body: wasAccepted
+          ? '$name đã rút khỏi "$titleText".'
+          : '$name đã hủy đơn ứng tuyển vào "$titleText".',
+      category: NotificationCategory.job,
+      data: {
+        'type': 'application_withdrawn',
+        'wasAccepted': wasAccepted,
+        if (jobId != null && jobId.isNotEmpty) 'jobId': jobId,
+        if (appId != null && appId.isNotEmpty) 'appId': appId,
+        if (candidateId != null && candidateId.isNotEmpty)
+          'candidateId': candidateId,
+      },
+    );
+  }
+
+  static Future<void> notifyApplicationDeadlineUnderfilled({
+    required String employerId,
+    required String jobTitle,
+    required String jobId,
+    required int filledSlots,
+    required int slots,
+  }) async {
+    if (employerId.isEmpty || jobId.isEmpty) return;
+    final svc = NotificationService();
+    final titleText = jobTitle.trim().isNotEmpty
+        ? jobTitle.trim()
+        : 'Công việc';
+    final missingSlots = (slots - filledSlots).clamp(0, slots).toInt();
+    await svc.notifyEmployer(
+      employerId: employerId,
+      type: 'application_deadline_underfilled',
+      title: 'Hết hạn ứng tuyển - chưa đủ người',
+      body:
+          '"$titleText" hiện có $filledSlots/$slots ứng viên, thiếu '
+          '$missingSlots người. Mở Quản lý bài đăng để tiếp tục job hoặc hủy.',
+      category: NotificationCategory.job,
+      data: {
+        'type': 'application_deadline_underfilled',
+        'jobId': jobId,
+        'filledSlots': filledSlots,
+        'slots': slots,
+        'missingSlots': missingSlots,
+      },
+    );
+  }
+
+  static Future<void> notifyJobCancelledToCandidate({
+    required String candidateId,
+    required String jobTitle,
+    required String employerId,
+    String? jobId,
+    double compensationAmount = 0,
+  }) async {
+    if (candidateId.isEmpty) return;
+    final svc = NotificationService();
+    final titleText = jobTitle.trim().isNotEmpty
+        ? jobTitle.trim()
+        : 'Công việc';
+    final hasCompensation = compensationAmount > 0;
+    await svc.sendToUser(
+      userId: candidateId,
+      title: 'Công việc đã bị hủy',
+      body: hasCompensation
+          ? '"$titleText" đã bị hủy. Bạn được đền bù ${_formatVnd(compensationAmount)} vào ví ViecNow.'
+          : '"$titleText" đã bị hủy. Đơn ứng tuyển và nhóm liên quan đã được cập nhật.',
+      category: NotificationCategory.job,
+      data: {
+        'type': 'job_cancelled',
+        'employerId': employerId,
+        if (jobId != null && jobId.isNotEmpty) 'jobId': jobId,
+        'compensationAmount': compensationAmount,
       },
     );
   }
@@ -541,5 +655,52 @@ class NotificationService {
         'rating': rating,
       },
     );
+  }
+
+  static String _formatVnd(double value) {
+    final raw = value.round().toString();
+    final out = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      if (i > 0 && (raw.length - i) % 3 == 0) out.write('.');
+      out.write(raw[i]);
+    }
+    return '${out.toString()}đ';
+  }
+
+  /// Kiểm tra xem NTD đã nhận thông báo cùng type + jobId + candidateId
+  /// trong khoảng thời gian [within] gần nhất chưa — dùng để chống gửi trùng.
+  Future<bool> _hasRecentEmployerNotif({
+    required String employerId,
+    required String type,
+    required String jobId,
+    required String candidateId,
+    Duration within = const Duration(seconds: 30),
+  }) async {
+    if (employerId.isEmpty) return false;
+    try {
+      final since = DateTime.now().subtract(within);
+      // Kiểm tra trong legacy collection `notifications`
+      final snap = await _legacyCol
+          .where('recipientId', isEqualTo: employerId)
+          .where('type', isEqualTo: type)
+          .limit(20)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+        if (createdAt == null || createdAt.isBefore(since)) continue;
+        final meta = data['data'];
+        if (meta is Map) {
+          final existingJob = (meta['jobId'] ?? '').toString();
+          final existingCandidate = (meta['candidateId'] ?? '').toString();
+          if (existingJob == jobId && existingCandidate == candidateId) {
+            return true; // Đã có thông báo trùng trong khoảng thời gian
+          }
+        }
+      }
+    } catch (_) {
+      // Nếu lỗi kiểm tra thì vẫn cho phép gửi thông báo (fail-open)
+    }
+    return false;
   }
 }

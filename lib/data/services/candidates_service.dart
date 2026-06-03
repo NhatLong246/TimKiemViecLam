@@ -26,17 +26,16 @@ class CandidatesService {
 
     if (jobsSnap.docs.isEmpty) return [];
 
-    final jobs = jobsSnap.docs
-        .map((d) => JobPostModel.fromMap(d.data()))
-        .toList()
-      ..sort((a, b) {
-        final aTime = a.createdAt;
-        final bTime = b.createdAt;
-        if (aTime == null && bTime == null) return 0;
-        if (aTime == null) return 1;
-        if (bTime == null) return -1;
-        return bTime.compareTo(aTime);
-      });
+    final jobs =
+        jobsSnap.docs.map((d) => JobPostModel.fromMap(d.data())).toList()
+          ..sort((a, b) {
+            final aTime = a.createdAt;
+            final bTime = b.createdAt;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime);
+          });
 
     final jobIds = jobs.map((j) => j.jobId).toList();
 
@@ -57,9 +56,7 @@ class CandidatesService {
     }
 
     if (allApps.isEmpty) {
-      return jobs
-          .map((j) => JobWithApplications(job: j, entries: []))
-          .toList();
+      return jobs.map((j) => JobWithApplications(job: j, entries: [])).toList();
     }
 
     // 3. Lấy thông tin ứng viên (batch 30)
@@ -73,8 +70,7 @@ class CandidatesService {
           .where(FieldPath.documentId, whereIn: batch)
           .get();
       for (final doc in snap.docs) {
-        candidateMap[doc.id] =
-            CandidateSnapshot.fromMap(doc.id, doc.data());
+        candidateMap[doc.id] = CandidateSnapshot.fromMap(doc.id, doc.data());
       }
     }
 
@@ -91,44 +87,119 @@ class CandidatesService {
     }
 
     // 5. Sort entries: pending → accepted → rejected → withdrawn
-    const _statusOrder = {
+    const statusOrder = {
       'pending': 0,
       'accepted': 1,
       'rejected': 2,
-      'withdrawn': 3
+      'withdrawn': 3,
     };
     appsByJob.forEach((_, entries) {
-      entries.sort((a, b) =>
-          (_statusOrder[a.application.status] ?? 4)
-              .compareTo(_statusOrder[b.application.status] ?? 4));
+      entries.sort(
+        (a, b) => (statusOrder[a.application.status] ?? 4).compareTo(
+          statusOrder[b.application.status] ?? 4,
+        ),
+      );
     });
 
     return jobs.map((job) {
-      return JobWithApplications(
-        job: job,
-        entries: appsByJob[job.jobId] ?? [],
-      );
+      return JobWithApplications(job: job, entries: appsByJob[job.jobId] ?? []);
     }).toList();
+  }
+
+  Future<List<ApplicationEntry>> fetchAcceptedByJob(JobPostModel job) async {
+    final snap = await _db
+        .collection('applications')
+        .where('jobId', isEqualTo: job.jobId)
+        .get();
+
+    final apps = snap.docs
+        .map((d) => ApplicationModel.fromMap(d.data()))
+        .where((app) => app.status == 'accepted')
+        .toList();
+    if (apps.isEmpty) return [];
+
+    final candidateIds = apps.map((a) => a.candidateId).toSet().toList();
+    final Map<String, CandidateSnapshot> candidateMap = {};
+    for (var i = 0; i < candidateIds.length; i += 30) {
+      final end = (i + 30).clamp(0, candidateIds.length);
+      final batch = candidateIds.sublist(i, end);
+      final usersSnap = await _db
+          .collection('users')
+          .where(FieldPath.documentId, whereIn: batch)
+          .get();
+      for (final doc in usersSnap.docs) {
+        candidateMap[doc.id] = CandidateSnapshot.fromMap(doc.id, doc.data());
+      }
+    }
+
+    final entries = <ApplicationEntry>[];
+    for (final app in apps) {
+      final candidate = candidateMap[app.candidateId];
+      if (candidate == null) continue;
+      if (!candidate.isCandidate) continue;
+      if (app.candidateId == app.employerId) continue;
+      entries.add(ApplicationEntry(application: app, candidate: candidate));
+    }
+
+    entries.sort((a, b) {
+      final aTime = a.application.updatedAt ?? a.application.appliedAt;
+      final bTime = b.application.updatedAt ?? b.application.appliedAt;
+      if (aTime == null && bTime == null) {
+        return a.candidate.fullName.compareTo(b.candidate.fullName);
+      }
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime);
+    });
+    return entries;
   }
 
   // ── Duyệt đơn: set status='accepted' + tăng filledSlots ─────────────────
   Future<void> acceptApplication(String appId, String jobId) async {
-    final appDoc = await _db.collection('applications').doc(appId).get();
-    final appData = appDoc.data() ?? {};
+    final appRef = _db.collection('applications').doc(appId);
+    final jobRef = _db.collection('jobPosts').doc(jobId);
+    late Map<String, dynamic> appData;
+    late Map<String, dynamic> jobData;
 
-    final batch = _db.batch();
-    batch.update(_db.collection('applications').doc(appId), {
-      'status': 'accepted',
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    batch.update(_db.collection('jobPosts').doc(jobId), {
-      'filledSlots': FieldValue.increment(1),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
+    await _db.runTransaction((tx) async {
+      final appSnap = await tx.get(appRef);
+      final jobSnap = await tx.get(jobRef);
+      if (!appSnap.exists) {
+        throw Exception('Không tìm thấy đơn ứng tuyển.');
+      }
+      if (!jobSnap.exists) {
+        throw Exception('Không tìm thấy công việc.');
+      }
 
-    final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
-    final jobData = jobSnap.data() ?? {};
+      appData = appSnap.data() ?? {};
+      jobData = jobSnap.data() ?? {};
+
+      final appStatus = (appData['status'] ?? '').toString();
+      if (appStatus != 'pending') {
+        throw Exception('Đơn ứng tuyển đã được xử lý.');
+      }
+
+      final jobStatus = (jobData['status'] ?? '').toString();
+      if (jobStatus != 'approved' && jobStatus != 'active') {
+        throw Exception('Công việc hiện không thể duyệt thêm ứng viên.');
+      }
+
+      final slots = (jobData['slots'] as num?)?.toInt() ?? 0;
+      final filledSlots = (jobData['filledSlots'] as num?)?.toInt() ?? 0;
+      if (slots <= 0 || filledSlots >= slots) {
+        throw Exception('Công việc đã đủ số lượng ứng viên.');
+      }
+
+      tx.update(appRef, {
+        'status': 'accepted',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(jobRef, {
+        'filledSlots': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+
     final jobTitle = (jobData['title'] ?? 'Công việc').toString();
     final jobType = (jobData['jobType'] ?? 'part_time').toString();
     final candidateId = (appData['candidateId'] ?? '').toString();

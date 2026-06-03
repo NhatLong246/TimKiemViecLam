@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../constants/job_categories.dart' as job_cats;
 import 'full_time_job_details.dart';
@@ -20,11 +20,14 @@ class JobPostModel {
   final double? workHoursPerDay;
   final String? startTime; // "HH:mm"
   final String? requirements;
-  final String status; // "draft"|"pending"|"approved"|"active"|"closed"|"rejected"
+  final String
+  status; // "draft"|"pending"|"approved"|"active"|"closed"|"rejected"|"cancelled"|"deleted"
   final double totalBudget;
   final String? groupChatId;
   final List<String> imageUrls;
   final FullTimeJobDetails? fullTimeDetails;
+  final DateTime? applicationDeadline;
+  final bool underfilledAccepted;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -50,6 +53,8 @@ class JobPostModel {
     this.groupChatId,
     this.imageUrls = const [],
     this.fullTimeDetails,
+    this.applicationDeadline,
+    this.underfilledAccepted = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -115,7 +120,7 @@ class JobPostModel {
   }
 
   factory JobPostModel.fromMap(Map<String, dynamic> map) {
-    DateTime _toDateTime(dynamic v) {
+    DateTime toDateTime(dynamic v) {
       if (v is Timestamp) return v.toDate();
       if (v is DateTime) return v;
       return DateTime.now();
@@ -133,25 +138,31 @@ class JobPostModel {
       salaryType: map['salaryType'] as String? ?? 'per_day',
       slots: (map['slots'] as num?)?.toInt() ?? 1,
       filledSlots: (map['filledSlots'] as num?)?.toInt() ?? 0,
-      startDate: _toDateTime(map['startDate']),
-      endDate: map['endDate'] != null ? _toDateTime(map['endDate']) : null,
+      startDate: toDateTime(map['startDate']),
+      endDate: map['endDate'] != null ? toDateTime(map['endDate']) : null,
       workHoursPerDay: (map['workHoursPerDay'] as num?)?.toDouble(),
       startTime: map['startTime'] as String?,
       requirements: map['requirements'] as String?,
       status: map['status'] as String? ?? 'draft',
       totalBudget: (map['totalBudget'] as num?)?.toDouble() ?? 0,
       groupChatId: map['groupChatId'] as String?,
-      imageUrls: (map['imageUrls'] as List?)
+      imageUrls:
+          (map['imageUrls'] as List?)
               ?.map((e) => e.toString())
               .where((s) => s.isNotEmpty)
               .toList() ??
           const [],
       fullTimeDetails: map['fullTimeDetails'] != null
           ? FullTimeJobDetails.fromMap(
-              map['fullTimeDetails'] as Map<String, dynamic>)
+              map['fullTimeDetails'] as Map<String, dynamic>,
+            )
           : null,
-      createdAt: map['createdAt'] != null ? _toDateTime(map['createdAt']) : null,
-      updatedAt: map['updatedAt'] != null ? _toDateTime(map['updatedAt']) : null,
+      applicationDeadline: map['applicationDeadline'] != null
+          ? toDateTime(map['applicationDeadline'])
+          : null,
+      underfilledAccepted: map['underfilledAccepted'] == true,
+      createdAt: map['createdAt'] != null ? toDateTime(map['createdAt']) : null,
+      updatedAt: map['updatedAt'] != null ? toDateTime(map['updatedAt']) : null,
     );
   }
 
@@ -178,6 +189,9 @@ class JobPostModel {
       if (groupChatId != null) 'groupChatId': groupChatId,
       if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
       if (fullTimeDetails != null) 'fullTimeDetails': fullTimeDetails!.toMap(),
+      if (applicationDeadline != null)
+        'applicationDeadline': Timestamp.fromDate(applicationDeadline!),
+      'underfilledAccepted': underfilledAccepted,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -205,6 +219,8 @@ class JobPostModel {
     String? groupChatId,
     List<String>? imageUrls,
     FullTimeJobDetails? fullTimeDetails,
+    DateTime? applicationDeadline,
+    bool? underfilledAccepted,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -230,6 +246,8 @@ class JobPostModel {
       groupChatId: groupChatId ?? this.groupChatId,
       imageUrls: imageUrls ?? this.imageUrls,
       fullTimeDetails: fullTimeDetails ?? this.fullTimeDetails,
+      applicationDeadline: applicationDeadline ?? this.applicationDeadline,
+      underfilledAccepted: underfilledAccepted ?? this.underfilledAccepted,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
