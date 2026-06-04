@@ -104,6 +104,25 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
     });
     try {
       final name = _displayName();
+
+      final jobDoc = await FirebaseFirestore.instance.collection('jobPosts').doc(_group!.jobId).get();
+      if (jobDoc.exists) {
+        final jobData = jobDoc.data()!;
+        final endDateTs = jobData['endDate'] as Timestamp?;
+        if (endDateTs != null) {
+          final endDate = endDateTs.toDate();
+          final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+          if (DateTime.now().isAfter(endOfDay)) {
+            if (!mounted) return;
+            setState(() {
+              _error = 'Công việc này đã kết thúc. Bạn không thể điểm danh nữa.';
+              _loading = false;
+            });
+            return;
+          }
+        }
+      }
+
       final attendanceId = await _attendanceSvc.ensureCandidateRecord(
         jobId: _group!.jobId,
         groupId: _group!.groupId,
@@ -166,6 +185,49 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
       Get.snackbar('Lỗi', 'Chưa có phiên điểm danh hôm nay');
       return;
     }
+
+    final now = DateTime.now();
+    try {
+      final startParts = session.expectedStartTime.split(':');
+      if (startParts.length >= 2) {
+        final sh = int.tryParse(startParts[0]) ?? 0;
+        final sm = int.tryParse(startParts[1]) ?? 0;
+        final startDt = DateTime(now.year, now.month, now.day, sh, sm);
+
+        if (isCheckIn) {
+          if (now.isBefore(startDt)) {
+            Get.snackbar(
+              'Chưa đến giờ',
+              'Bạn chỉ được điểm danh đầu ca đúng giờ hoặc sau giờ bắt đầu ca ($sh:${sm.toString().padLeft(2, '0')}).',
+              backgroundColor: Colors.orange,
+              colorText: Colors.white,
+            );
+            return;
+          }
+        } else {
+          if (session.expectedEndTime.isNotEmpty) {
+            final endParts = session.expectedEndTime.split(':');
+            if (endParts.length >= 2) {
+              final eh = int.tryParse(endParts[0]) ?? 0;
+              final em = int.tryParse(endParts[1]) ?? 0;
+              DateTime endDt = DateTime(now.year, now.month, now.day, eh, em);
+              if (eh < sh || (eh == sh && em < sm)) {
+                endDt = endDt.add(const Duration(days: 1));
+              }
+              if (now.isBefore(endDt)) {
+                Get.snackbar(
+                  'Chưa tan ca',
+                  'Bạn chỉ được điểm danh cuối ca đúng giờ hoặc sau giờ kết thúc ca ($eh:${em.toString().padLeft(2, '0')}).',
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+                return;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
 
     final job = await _jobSvc.getJobPostById(_group!.jobId);
     final scheduled = await _scheduleSvc.listScheduledDates(_group!.groupId);
@@ -343,7 +405,9 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Giờ bắt đầu ca: ${session.expectedStartTime}',
+                  session.expectedEndTime.isNotEmpty 
+                    ? 'Giờ làm việc: ${session.expectedStartTime} - ${session.expectedEndTime}'
+                    : 'Giờ bắt đầu ca: ${session.expectedStartTime}',
                   style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 const SizedBox(height: 12),

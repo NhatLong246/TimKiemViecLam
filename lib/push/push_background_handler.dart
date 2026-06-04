@@ -47,44 +47,72 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final title = message.notification?.title ?? data['title']?.toString() ?? 'Cuộc gọi đến';
   final body = message.notification?.body ?? data['body']?.toString() ?? 'Đang gọi video cho bạn...';
 
-  await plugin.show(
-    message.hashCode,
-    title,
-    body,
-    NotificationDetails(
-      android: AndroidNotificationDetails(
-        callChannel.id,
-        callChannel.name,
-        importance: Importance.max,
-        priority: Priority.max,
-        icon: '@mipmap/ic_launcher',
-        fullScreenIntent: true, // HIỂN THỊ TRÊN MÀN HÌNH KHÓA
-        category: AndroidNotificationCategory.call,
-        ongoing: true,
-        autoCancel: false,
-        visibility: NotificationVisibility.public,
-        ticker: 'Có cuộc gọi đến...', // Kích hoạt cơ chế đẩy ra ngoài
-        actions: [
-          const AndroidNotificationAction(
-            'decline_call',
-            'Từ chối',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-          const AndroidNotificationAction(
-            'accept_call',
-            'Trả lời',
-            showsUserInterface: true,
-          ),
-        ],
+  try {
+    await plugin.show(
+      message.hashCode,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          callChannel.id,
+          callChannel.name,
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: '@mipmap/ic_launcher',
+          fullScreenIntent: true, // HIỂN THỊ TRÊN MÀN HÌNH KHÓA
+          category: AndroidNotificationCategory.call,
+          ongoing: true,
+          autoCancel: false,
+          visibility: NotificationVisibility.public,
+          ticker: 'Có cuộc gọi đến...', // Kích hoạt cơ chế đẩy ra ngoài
+          actions: [
+            const AndroidNotificationAction(
+              'decline_call',
+              'Từ chối',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+            const AndroidNotificationAction(
+              'accept_call',
+              'Trả lời',
+              showsUserInterface: true,
+            ),
+          ],
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true, 
+          presentBadge: true, 
+          presentSound: true, 
+          categoryIdentifier: 'call_category'
+        ),
       ),
-      iOS: const DarwinNotificationDetails(
-        presentAlert: true, 
-        presentBadge: true, 
-        presentSound: true, 
-        categoryIdentifier: 'call_category'
-      ),
-    ),
-    payload: jsonEncode(data),
-  );
+      payload: jsonEncode(data),
+    );
+  } catch (e) {
+    debugPrint('Background call notification fullScreenIntent failed: $e, falling back...');
+    try {
+      await plugin.show(
+        message.hashCode,
+        title,
+        body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            callChannel.id,
+            callChannel.name,
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: '@mipmap/ic_launcher',
+            fullScreenIntent: false, // Fallback
+            category: AndroidNotificationCategory.call,
+            ongoing: true,
+            autoCancel: false,
+            visibility: NotificationVisibility.public,
+            ticker: 'Có cuộc gọi đến...',
+          ),
+          iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+        ),
+        payload: jsonEncode(data),
+      );
+    } catch (_) {}
+  }
 }

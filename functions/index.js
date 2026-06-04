@@ -115,6 +115,9 @@ async function sendPushToUser(userId, payload) {
     Object.assign(dataPayload, stringifyData(payload.data));
   }
 
+  const isCall = payload.type === 'call' || dataPayload.type === 'call';
+  const channelId = isCall ? 'viecnow_call' : 'viecnow_default';
+
   const message = {
     tokens,
     notification: { title, body },
@@ -122,14 +125,14 @@ async function sendPushToUser(userId, payload) {
     android: {
       priority: 'high',
       notification: {
-        channelId: 'viecnow_default',
+        channelId: channelId,
         priority: 'high',
       },
     },
     apns: {
       payload: {
         aps: {
-          sound: 'default',
+          sound: isCall ? 'ringtone.wav' : 'default',
           badge: 1,
         },
       },

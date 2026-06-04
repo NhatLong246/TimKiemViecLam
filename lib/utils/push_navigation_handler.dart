@@ -81,12 +81,31 @@ class PushNavigationHandler {
         } else {
           MessagingBootstrap.ensureController().openChatByGroupId(groupId);
         }
+
+        // Lấy tên nhóm/job thực tế từ Firestore
+        String groupName = data['title']?.toString() ?? 'Cuộc gọi';
+        try {
+          final groupSnap = await FirebaseFirestore.instance
+              .collection('groupChats')
+              .doc(groupId)
+              .get();
+          if (groupSnap.exists) {
+            final gData = groupSnap.data() ?? {};
+            final jobTitle = (gData['jobTitle'] ?? '').toString();
+            final chatType = (gData['chatType'] ?? '').toString();
+            if (chatType == 'group' && jobTitle.isNotEmpty) {
+              groupName = 'Nhóm $jobTitle';
+            } else if (jobTitle.isNotEmpty) {
+              groupName = jobTitle;
+            }
+          }
+        } catch (_) {}
         
         final user = Get.find<AuthController>().currentUser;
         if (user != null) {
           await Get.to(() => CallScreen(
             isVideo: isVideo,
-            groupName: 'Cuộc gọi nhóm',
+            groupName: groupName,
             userId: user.id,
             callId: roomUrl,
             userName: user.fullName,

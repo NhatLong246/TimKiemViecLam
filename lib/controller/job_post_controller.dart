@@ -29,13 +29,7 @@ class JobPostController extends GetxController {
   List<JobPostModel> get publishedPosts => allPosts.where((p) {
     if (pendingDisbursementJobIds.contains(p.jobId)) return false;
     final isPublished = p.status == 'approved' || p.status == 'active';
-    final isExpired =
-        p.endDate != null &&
-        DateTime(
-          p.endDate!.year,
-          p.endDate!.month,
-          p.endDate!.day,
-        ).isBefore(_today);
+    final isExpired = p.exactEndTime.isBefore(DateTime.now());
     return isPublished && !isExpired;
   }).toList();
 
@@ -51,12 +45,7 @@ class JobPostController extends GetxController {
         (p) =>
             (!pendingDisbursementJobIds.contains(p.jobId) || p.filledSlots == 0) &&
             (p.status == 'rejected' ||
-            (p.endDate != null &&
-                DateTime(
-                  p.endDate!.year,
-                  p.endDate!.month,
-                  p.endDate!.day,
-                ).isBefore(_today) &&
+            (p.exactEndTime.isBefore(DateTime.now()) &&
                 (p.status == 'approved' || p.status == 'active'))),
       )
       .toList();
@@ -115,7 +104,7 @@ class JobPostController extends GetxController {
       final newSet = snap.docs
           .where((d) {
             final s = d.data()['status'] as String? ?? '';
-            return s == 'pending_admin' || s == 'approved';
+            return ['approved', 'complaints_pending', 'complaints_reviewed'].contains(s);
           })
           .map((d) => d.data()['jobId'] as String)
           .toSet();

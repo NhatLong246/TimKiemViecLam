@@ -9,12 +9,13 @@ import '../../utils/push_navigation_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/personal_alarm_model.dart';
 import 'package:flutter/material.dart';
+import 'push_notification_service.dart';
 
 class AlarmManagerService {
   static final AlarmManagerService instance = AlarmManagerService._();
   AlarmManagerService._();
 
-  late final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin get _local => PushNotificationService.instance.localPlugin;
   late final FirebaseFirestore _db = FirebaseFirestore.instance;
   late final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -28,15 +29,13 @@ class AlarmManagerService {
     if (scheduledDate.isBefore(DateTime.now())) return;
 
     final androidDetails = AndroidNotificationDetails(
-      'alarm_channel',
+      'alarm_channel_v2',
       'Báo thức & Nhắc nhở',
       channelDescription: 'Báo động đỏ khi có ca làm việc sắp diễn ra',
       importance: Importance.max,
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
-      fullScreenIntent: true,
-      additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
     );
 
     final details = NotificationDetails(android: androidDetails);
@@ -44,7 +43,8 @@ class AlarmManagerService {
     // Add type 'alarm' to payload
     payloadData['type'] = 'alarm';
 
-    await _local.zonedSchedule(
+    try {
+      await _local.zonedSchedule(
       id,
       title,
       body,
@@ -53,6 +53,34 @@ class AlarmManagerService {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: jsonEncode(payloadData),
+    );
+    } catch (e) {
+      debugPrint('Exact alarm failed: $e, falling back to inexact');
+      await _local.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(scheduledDate, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: jsonEncode(payloadData),
+      );
+    }
+  }
+
+  Future<void> testNotification() async {
+    final androidDetails = AndroidNotificationDetails(
+      'test_channel_v1',
+      'Test Thông báo',
+      importance: Importance.max,
+      priority: Priority.max,
+    );
+    await _local.show(
+      99999,
+      '🔔 Đã gọi được thông báo!',
+      'Hệ thống thông báo hoạt động bình thường.',
+      NotificationDetails(android: androidDetails),
     );
   }
 

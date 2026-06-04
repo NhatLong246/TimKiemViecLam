@@ -19,6 +19,35 @@ class WorkDayHelper {
     return list;
   }
 
+  /// Lấy ngày làm việc "logic" hiện tại dựa trên giờ bắt đầu ca làm.
+  /// Trả về đối tượng DateTime đại diện cho ngày logic.
+  static DateTime getCurrentLogicalDateTime(JobPostModel? job) {
+    final now = DateTime.now();
+    if (job == null || job.startTime == null || job.startTime!.isEmpty || job.workHoursPerDay == null) {
+      return now;
+    }
+    
+    final parts = job.startTime!.split(':');
+    if (parts.length >= 2) {
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      
+      final yesterdayStart = DateTime(now.year, now.month, now.day - 1, h, m);
+      final minutesToAdd = (job.workHoursPerDay! * 60).toInt();
+      final yesterdayEnd = yesterdayStart.add(Duration(minutes: minutesToAdd));
+      
+      if (now.isBefore(yesterdayEnd)) {
+        return DateTime(now.year, now.month, now.day - 1);
+      }
+    }
+    return now;
+  }
+
+  /// Phiên bản trả về chuỗi định dạng yyyy-MM-dd
+  static String getCurrentLogicalDate(JobPostModel? job) {
+    return formatDate(getCurrentLogicalDateTime(job));
+  }
+
   /// Số ngày bắt buộc đi làm (ví dụ 8 ngày → 8 lần điểm danh).
   static int requiredWorkDayCount(JobPostModel job, {List<String>? scheduledDates}) {
     if (scheduledDates != null && scheduledDates.isNotEmpty) {
@@ -64,6 +93,10 @@ class WorkDayHelper {
         }
       }
       if (found == null) return false;
+      
+      // Nếu đã đánh dấu vắng mặt thì coi như đã hoàn tất cho người này
+      if (found.status == 'absent') continue;
+      
       if ((found.checkInTime ?? '').isEmpty) return false;
       if ((found.checkOutTime ?? '').isEmpty) return false;
     }

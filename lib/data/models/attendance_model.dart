@@ -110,6 +110,7 @@ class AttendanceModel {
   final String employerId;
   final String date; // "YYYY-MM-DD"
   final String expectedStartTime; // "HH:mm"
+  final String expectedEndTime; // "HH:mm"
   final List<AttendanceRecord> records;
   final DateTime createdAt;
 
@@ -120,6 +121,7 @@ class AttendanceModel {
     required this.employerId,
     required this.date,
     required this.expectedStartTime,
+    this.expectedEndTime = '',
     required this.records,
     required this.createdAt,
   });
@@ -133,6 +135,7 @@ class AttendanceModel {
       employerId: map['employerId'] as String? ?? '',
       date: map['date'] as String? ?? '',
       expectedStartTime: map['expectedStartTime'] as String? ?? '08:00',
+      expectedEndTime: map['expectedEndTime'] as String? ?? '',
       records: rawRecords
           .map((r) => AttendanceRecord.fromMap(r as Map<String, dynamic>))
           .toList(),
@@ -146,6 +149,7 @@ class AttendanceModel {
         'employerId': employerId,
         'date': date,
         'expectedStartTime': expectedStartTime,
+        'expectedEndTime': expectedEndTime,
         'records': records.map((r) => r.toMap()).toList(),
         'createdAt': FieldValue.serverTimestamp(),
       };

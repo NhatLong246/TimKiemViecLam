@@ -109,7 +109,7 @@ class JobAttendanceCompletionService {
 
     final n = mandatory.length;
     final can = completed == n;
-    final canRequest = can || workPeriodEnded;
+    final canRequest = can; // Yêu cầu phải điểm danh xong mới được giải ngân
 
     return JobDisbursementReadiness(
       canDisburse: can,
@@ -143,14 +143,10 @@ class JobAttendanceCompletionService {
     }
     if (workPeriodEnded) {
       if (n == 1) {
-        return completed >= 1
-            ? 'Công việc đã kết thúc. Đủ điểm danh trong ngày làm.'
-            : 'Công việc đã kết thúc. Không có điểm danh trong ngày làm. '
-                'Bạn có thể gửi yêu cầu giải ngân để Admin xem xét.';
+        return 'Công việc đã kết thúc. Vui lòng hoàn tất điểm danh ca làm việc để giải ngân.';
       }
-      return 'Công việc đã kết thúc. Trong thời hạn điểm danh đủ $completed/$n ngày '
-          '(thiếu $incompleteCount ngày). '
-          'Không cần điểm danh thêm — gửi yêu cầu giải ngân để Admin xem xét.';
+      return 'Công việc đã kết thúc. Đã điểm danh $completed/$n ngày (thiếu $incompleteCount ngày). '
+          'Vui lòng hoàn tất điểm danh trước khi giải ngân.';
     }
     if (n == 1) {
       return 'Đang trong thời gian làm việc. Cần hoàn tất điểm danh đầu ca và cuối ca.';

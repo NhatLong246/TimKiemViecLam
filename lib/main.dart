@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'app/app.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'controller/login_controller.dart';
@@ -33,6 +34,7 @@ Future<void> _bootstrap() async {
       persistenceEnabled: true,
     );
   }
+
 
   await initializeDateFormatting('vi', null);
 

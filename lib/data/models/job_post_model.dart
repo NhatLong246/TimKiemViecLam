@@ -66,6 +66,23 @@ class JobPostModel {
   bool get isPartTimeManaged => jobType == 'part_time';
   bool get isFullTimeReferral => jobType == 'full_time';
 
+  /// Tính thời gian kết thúc chính xác của ca làm cuối cùng (hỗ trợ ca qua đêm)
+  DateTime get exactEndTime {
+    if (endDate == null) return DateTime(2099);
+    var end = DateTime(endDate!.year, endDate!.month, endDate!.day, 23, 59, 59);
+    if (startTime != null && startTime!.isNotEmpty && workHoursPerDay != null) {
+      final parts = startTime!.split(':');
+      if (parts.length >= 2) {
+        final h = int.tryParse(parts[0]) ?? 0;
+        final m = int.tryParse(parts[1]) ?? 0;
+        final startDt = DateTime(endDate!.year, endDate!.month, endDate!.day, h, m);
+        final minutesToAdd = (workHoursPerDay! * 60).toInt();
+        end = startDt.add(Duration(minutes: minutesToAdd));
+      }
+    }
+    return end;
+  }
+
   String get locationDisplay {
     final district = location['district'] as String? ?? '';
     final city = location['city'] as String? ?? '';

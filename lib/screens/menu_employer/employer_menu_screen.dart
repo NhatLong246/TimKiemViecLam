@@ -37,7 +37,6 @@ class _EmployerMenuScreenState extends State<EmployerMenuScreen> {
   @override
   void initState() {
     super.initState();
-    JobWorkflowService().autoRequestPendingDisbursements();
   }
 
   @override

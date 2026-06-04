@@ -73,18 +73,18 @@
 | E6 | Quản lý nhân viên đang làm | `screens/employer/employer_candidates_screen.dart` | 🔄 | Gộp với duyệt ứng viên; chưa tách màn riêng lương |
 | E7 | Điểm danh | `screens/employer/attendance_screen.dart` | ✅ | Cuối ngày → giải ngân & đánh giá; bảng tổng hợp |
 | E7b | Bảng điểm danh tổng hợp | `screens/employer/job_attendance_summary_screen.dart` | ✅ | Menu nhóm NTD |
-| E7c | Kết thúc ngày / giải ngân | `screens/employer/job_day_end_flow_screen.dart` | ✅ | Chỉ khi đủ N ngày điểm danh (N=1 → 1 ngày xong là giải ngân) |
+| E7c | Kết thúc ngày / giải ngân | `screens/employer/job_day_end_flow_screen.dart` | ✅ | Tự động chia lương → Hỏi khiếu nại → Đóng nhóm & bài đăng |
 | E7d | Nhắc giải ngân tự động (hết endDate) | `job_disbursement_reminder_service.dart` | ✅ | Poll mỗi phút khi NTD đăng nhập; log `workflowReminders/disbursement` |
 | E8 | Lịch làm việc | `screens/chat/work_schedule_screen.dart`, `schedule_tool_screen.dart` | ✅ | Gửi lịch vào chat qua `MessagingService` |
 | E9 | Thống kê chi tiêu | `screens/stats/employer_stats_screen.dart` | ✅ | fl_chart, filter Ngày/Tuần/Tháng/Năm |
-| E10 | Xác nhận hoàn thành job | `job_day_end_flow_screen.dart` | 🔄 | Gắn cuối ca; chưa tự đóng job |
-| E11 | Thanh toán lương (giải ngân) | `job_workflow_service.dart` | 🔄 | NTD gửi yêu cầu → Admin duyệt → NTD xác nhận GN |
-| E12 | Xử lý tranh chấp | `screens/chat/complaint_screen.dart` | ✅ | Khiếu nại NV; luồng cuối ngày tích hợp |
+| E10 | Xác nhận hoàn thành job | `job_workflow_service.dart` | ✅ | Tự đóng job và xóa nhóm chat sau khi giải ngân |
+| E11 | Thanh toán lương (giải ngân) | `job_workflow_service.dart` | ✅ | Hỗ trợ đền bù chênh lệch, nợ âm tiền ví (tự xử lý) |
+| E12 | Xử lý tranh chấp | `job_day_end_flow_screen.dart` | ✅ | NTD khiếu nại → chờ Admin web duyệt → Giải ngân |
 | E13 | Nạp tiền vào ví | `screens/menu_employer/employer_wallet_screen.dart` | 🔄 | UI ví; logic nạp thật chưa đủ |
 | E14 | Lịch sử giao dịch | `screens/menu_employer/employer_wallet_screen.dart` | 🔄 | |
 | E15 | Rút tiền | — | ❌ | |
 | E16 | Tham khảo giá thị trường | `screens/reference/employer_market_rate_screen.dart` | ✅ | Route `/employer-reference` |
-| E17 | Đánh giá Candidate | `job_day_end_flow_screen.dart`, `reviews` | 🔄 | Sau giải ngân trong luồng cuối ngày |
+| E17 | Đánh giá Candidate | `job_day_end_flow_screen.dart` | ✅ | Bật dialog hỏi đánh giá sau giải ngân xong |
 | E18 | Menu NTD | `screens/menu_employer/employer_menu_screen.dart` | ✅ | |
 | E19 | Tin nhắn hub NTD | `screens/menu_employer/employer_messages_screen.dart` | ✅ | Tab Nhóm chat / Chat cá nhân |
 | E20 | Danh sách nhóm (tab Nhóm) | `screens/chat/employer_groups_screen.dart` | ✅ | |

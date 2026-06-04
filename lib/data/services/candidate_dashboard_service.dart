@@ -286,16 +286,26 @@ class CandidateDashboardService {
 
   Future<List<ReviewableJob>> fetchReviewableJobs() async {
     final rows = await _fetchAcceptedRows();
-    return rows
-        .map(
-          (r) => ReviewableJob(
-            jobId: r.job.jobId,
-            employerId: r.application.employerId,
-            jobTitle: r.job.title,
-            employerName: r.employerName,
-          ),
-        )
-        .toList();
+    final now = DateTime.now();
+    
+    return rows.where((r) {
+      final job = r.job;
+      if (job.status == 'closed') return true;
+      
+      final end = job.endDate ?? job.startDate;
+      // Xem như kết thúc nếu đã sang ngày hôm sau của endDate
+      final endOfDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      if (now.isAfter(endOfDay)) return true;
+      
+      return false;
+    }).map(
+      (r) => ReviewableJob(
+        jobId: r.job.jobId,
+        employerId: r.application.employerId,
+        jobTitle: r.job.title,
+        employerName: r.employerName,
+      ),
+    ).toList();
   }
 
   Future<List<CandidateReviewGiven>> fetchReviewsGiven() async {

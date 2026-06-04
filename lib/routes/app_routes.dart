@@ -31,6 +31,7 @@ import 'package:viecnow/screens/shared/post_dissolution_complaint_screen.dart';
 import 'package:viecnow/screens/shared/complaints_catalog_screen.dart';
 import 'package:viecnow/screens/admin/admin_home_screen.dart';
 import 'package:viecnow/screens/admin/admin_disbursement_screen.dart';
+import 'package:viecnow/screens/candidate/candidate_earnings_screen.dart';
 import 'package:viecnow/screens/menu_employer/employer_wallet_screen.dart';
 import 'package:viecnow/screens/reference/employer_market_rate_screen.dart';
 import 'package:viecnow/screens/stats/employer_stats_screen.dart';
@@ -130,6 +131,7 @@ class AppRoutes {
   static const String employerNotifications = '/employer-notifications';
   static const String employerSearch = '/employer-search';
   static const String jobCriteria = '/job-criteria';
+  static const String candidateEarnings = '/candidate-earnings';
   static Map<String, WidgetBuilder> routes = {
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
@@ -201,6 +203,7 @@ class AppRoutes {
     AppRoutes.adminHome: (context) => const AdminHomeScreen(),
     AppRoutes.adminDisbursements: (context) => const AdminDisbursementScreen(),
     AppRoutes.searchMessages: (context) => const SearchMessagesScreen(),
+    AppRoutes.candidateEarnings: (context) => const CandidateEarningsScreen(),
     AppRoutes.employerNotifications: (context) =>
         const EmployerNotificationsScreen(),
     AppRoutes.employerSearch: (context) => const EmployerSearchScreen(),

@@ -68,10 +68,8 @@ class UpdateAccountController extends GetxController {
     );
   }
 
-  Stream? _userDataStream;
   Stream getUserData() {
-    _userDataStream ??= _service.getUserData();
-    return _userDataStream!;
+    return _service.getUserData();
   }
 
   Future<void> refreshProfile() async {
