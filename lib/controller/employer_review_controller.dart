@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../data/models/employer_review_model.dart';
 import '../data/services/employer_review_service.dart';
 
@@ -10,9 +11,20 @@ class EmployerReviewController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
+  late String targetUid;
+  late String title;
+
   @override
   void onInit() {
     super.onInit();
+    final args = Get.arguments as Map<String, dynamic>?;
+    if (args != null && args['uid'] != null) {
+      targetUid = args['uid'];
+      title = args['title'] ?? 'Đánh giá';
+    } else {
+      targetUid = FirebaseAuth.instance.currentUser!.uid;
+      title = 'Đánh giá từ ứng viên';
+    }
     loadReviews();
   }
 
@@ -20,7 +32,7 @@ class EmployerReviewController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final data = await _service.fetchReviews();
+      final data = await _service.fetchReviews(targetUid: targetUid);
       reviews.assignAll(data);
       summary.value = EmployerReviewSummary.fromList(data);
     } catch (e) {

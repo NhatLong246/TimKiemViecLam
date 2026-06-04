@@ -13,7 +13,9 @@ import '../../data/models/job_post_model.dart';
 import '../../data/services/candidates_service.dart';
 import '../../data/services/messaging_service.dart';
 import '../messaging/chat_room_screen.dart';
-import 'job_directions_map_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import '../../utils/location_helper.dart';
+import '../../utils/maps_directions_url.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -1010,11 +1012,26 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
-  void _openDirectionsMap(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => JobDirectionsMapScreen(job: job)),
-    );
+  Future<void> _openDirectionsMap(BuildContext context) async {
+    // Thử mở bằng geo intent (mở app bản đồ native)
+    final label = Uri.encodeComponent(job.mapsDestinationQuery);
+    String geoUrl = 'geo:0,0?q=$label';
+    
+    if (job.hasMapCoordinates) {
+      geoUrl = 'geo:${job.locationLat},${job.locationLng}?q=$label';
+    }
+
+    final geoUri = Uri.parse(geoUrl);
+    
+    if (await canLaunchUrl(geoUri)) {
+      await launchUrl(geoUri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không tìm thấy ứng dụng bản đồ trên máy. Vui lòng cài đặt Google Maps!')),
+        );
+      }
+    }
   }
 
   Future<void> _openMessages(BuildContext context) async {

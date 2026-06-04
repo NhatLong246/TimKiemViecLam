@@ -9,15 +9,15 @@ class EmployerReviewService {
 
   String get _uid => _auth.currentUser!.uid;
 
-  /// Lấy danh sách đánh giá của employer hiện tại
+  /// Lấy danh sách đánh giá
   /// Ưu tiên Firestore, fallback SQLite khi offline
-  Future<List<EmployerReviewItem>> fetchReviews() async {
+  Future<List<EmployerReviewItem>> fetchReviews({String? targetUid}) async {
+    final uidToFetch = targetUid ?? _uid;
     try {
-      // Query reviews collection: revieweeId == employer uid
+      // Query reviews collection: revieweeId == targetUid
       final snap = await _firestore
           .collection('reviews')
-          .where('revieweeId', isEqualTo: _uid)
-          .orderBy('createdAt', descending: true)
+          .where('revieweeId', isEqualTo: uidToFetch)
           .get();
 
       if (snap.docs.isEmpty) return [];
@@ -41,12 +41,19 @@ class EmployerReviewService {
         );
       }).toList();
 
+      // Sort client-side to avoid Firestore composite index requirement
+      items.sort((a, b) {
+        final dateA = a.createdAt ?? DateTime(0);
+        final dateB = b.createdAt ?? DateTime(0);
+        return dateB.compareTo(dateA);
+      });
+
       // Cache xuống SQLite
-      await _cacheReviews(items);
+      await _cacheReviews(items, uidToFetch);
       return items;
     } catch (e) {
       // Fallback: đọc từ SQLite
-      final cached = await SqliteCacheService.getCachedEmployerReviews(_uid);
+      final cached = await SqliteCacheService.getCachedEmployerReviews(uidToFetch);
       if (cached.isNotEmpty) {
         return cached.map(EmployerReviewItem.fromSQLite).toList();
       }
@@ -93,12 +100,12 @@ class EmployerReviewService {
   }
 
   /// Cache danh sách review vào SQLite
-  Future<void> _cacheReviews(List<EmployerReviewItem> items) async {
+  Future<void> _cacheReviews(List<EmployerReviewItem> items, String uidToFetch) async {
     try {
       // Xóa cache cũ trước khi ghi mới
-      await SqliteCacheService.clearEmployerReviews(_uid);
+      await SqliteCacheService.clearEmployerReviews(uidToFetch);
       for (final item in items) {
-        await SqliteCacheService.upsertEmployerReview(item.toSQLiteMap(_uid));
+        await SqliteCacheService.upsertEmployerReview(item.toSQLiteMap(uidToFetch));
       }
     } catch (_) {
       // Cache lỗi không critical

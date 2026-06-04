@@ -10,7 +10,10 @@ class EmployerReviewsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(EmployerReviewController());
+    // Dùng tag để tách biệt controller cho mỗi candidate
+    final args = Get.arguments as Map<String, dynamic>?;
+    final tag = args?['uid'] as String?;
+    final ctrl = Get.put(EmployerReviewController(), tag: tag);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -23,8 +26,8 @@ class EmployerReviewsScreen extends StatelessWidget {
               expandedHeight: 220,
               pinned: true,
               leading: const BackButton(color: Colors.white),
-              title: const Text(
-                'Đánh giá từ ứng viên',
+              title: Text(
+                ctrl.title,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 20,

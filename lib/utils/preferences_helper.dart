@@ -138,15 +138,15 @@ class PreferencesHelper {
     return prefs.getBool(onboardingCompletedKey) ?? false;
   }
 
-  static const String currentSessionIdKey = 'current_session_id';
+  static const String deviceIdKey = 'persistent_device_id';
 
-  static Future<void> saveCurrentSessionId(String sessionId) async {
+  static Future<String> getOrCreateDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(currentSessionIdKey, sessionId);
-  }
-
-  static Future<String?> getCurrentSessionId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(currentSessionIdKey);
+    String? id = prefs.getString(deviceIdKey);
+    if (id == null || id.isEmpty) {
+      id = 'device_${DateTime.now().millisecondsSinceEpoch}';
+      await prefs.setString(deviceIdKey, id);
+    }
+    return id;
   }
 }

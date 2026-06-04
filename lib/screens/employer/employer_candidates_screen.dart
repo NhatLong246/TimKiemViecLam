@@ -9,6 +9,7 @@ import '../../data/models/application_model.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'employer_reviews_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerCandidatesScreen
@@ -1099,6 +1100,35 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
                 _fullUser!.dateOfBirth != null
                     ? DateFormat('dd/MM/yyyy').format(_fullUser!.dateOfBirth!)
                     : 'Chưa cập nhật',
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context); // Đóng bottom sheet
+                    Get.to(
+                      () => const EmployerReviewsScreen(),
+                      arguments: {
+                        'uid': widget.candidateSnap.uid,
+                        'title': 'Đánh giá về ${widget.candidateSnap.fullName.isNotEmpty ? widget.candidateSnap.fullName : 'ứng viên'}'
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.rate_review_outlined),
+                  label: const Text(
+                    'Xem đánh giá về ứng viên',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.employerPrimary,
+                    side: const BorderSide(color: AppColors.employerPrimary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
               ),
             ] else
               Text(

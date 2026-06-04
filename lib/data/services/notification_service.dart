@@ -529,6 +529,7 @@ class NotificationService {
     );
   }
 
+
   static Future<void> notifyApplicationWithdrawn({
     required String employerId,
     required String jobTitle,
@@ -630,6 +631,28 @@ class NotificationService {
         'employerId': employerId,
         if (jobId != null && jobId.isNotEmpty) 'jobId': jobId,
         'compensationAmount': compensationAmount,
+      },
+    );
+  }
+  static Future<void> notifyInterestRejected({
+    required String employerId,
+    required String jobTitle,
+    required String candidateName,
+    required String candidateId,
+    required String jobId,
+  }) async {
+    final svc = NotificationService();
+    await svc.notifyEmployer(
+      employerId: employerId,
+      type: 'interest_rejected',
+      title: '❌ Lời mời bị từ chối',
+      body: '$candidateName đã từ chối lời mời thuê lại cho "$jobTitle".',
+      category: NotificationCategory.job,
+      data: {
+        'type': 'interest_rejected',
+        'jobId': jobId,
+        'candidateId': candidateId,
+
       },
     );
   }

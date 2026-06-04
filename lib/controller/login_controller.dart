@@ -44,17 +44,40 @@ class AuthController extends GetxController {
 
     final user = await _authService.restoreSessionFromFirebase();
     if (user != null) {
+      final docSnap = await FirebaseFirestore.instance.collection('users').doc(user.id).get();
+      final remoteSessionId = docSnap.data()?['currentSessionId'] as String?;
+      final localSessionId = await PreferencesHelper.getOrCreateDeviceId();
+
+      if (remoteSessionId != null && remoteSessionId.isNotEmpty && remoteSessionId != localSessionId) {
+        // Session bị lấy bởi thiết bị khác khi app tắt
+        await _authService.logout();
+        currentUser = null;
+        update();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.snackbar(
+            'Cảnh báo bảo mật',
+            'Tài khoản của bạn đã được đăng nhập ở thiết bị khác.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 5),
+          );
+        });
+        return;
+      }
+      
+      if (remoteSessionId != localSessionId) {
+        await FirebaseFirestore.instance.collection('users').doc(user.id).update({
+          'currentSessionId': localSessionId,
+        });
+      }
+
       currentUser = user;
       update();
       MessagingBootstrap.startIfLoggedIn();
       _startAttendanceAutoIfEmployer();
       await PushNotificationService.instance.bindToUser(user.id);
       await PushNavigationHandler.processPendingIfAny();
-      final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-      await PreferencesHelper.saveCurrentSessionId(sessionId);
-      await FirebaseFirestore.instance.collection('users').doc(user.id).update({
-        'currentSessionId': sessionId,
-      });
       _listenToSession(user.id);
     }
   }
@@ -86,7 +109,7 @@ class AuthController extends GetxController {
     final docSnap = await FirebaseFirestore.instance.collection('users').doc(user.id).get();
     final data = docSnap.data();
     final remoteSessionId = data?['currentSessionId'] as String?;
-    final localSessionId = await PreferencesHelper.getCurrentSessionId();
+    final localSessionId = await PreferencesHelper.getOrCreateDeviceId();
 
     if (remoteSessionId != null && remoteSessionId.isNotEmpty && remoteSessionId != localSessionId) {
       await FirebaseFirestore.instance.collection('users').doc(user.id).update({
@@ -123,11 +146,8 @@ class AuthController extends GetxController {
     _startAttendanceAutoIfEmployer();
     await PushNotificationService.instance.bindToUser(user.id);
     await PushNavigationHandler.processPendingIfAny();
-    
-    final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    await PreferencesHelper.saveCurrentSessionId(sessionId);
     await FirebaseFirestore.instance.collection('users').doc(user.id).update({
-      'currentSessionId': sessionId,
+      'currentSessionId': localSessionId,
     });
     _listenToSession(user.id);
     
@@ -151,7 +171,6 @@ class AuthController extends GetxController {
     AttendanceAutoNotifyService.instance.stopEmployerPolling();
     _userSubscription?.cancel();
     _userSubscription = null;
-    await PreferencesHelper.saveCurrentSessionId('');
     update();
   }
 
@@ -167,6 +186,32 @@ class AuthController extends GetxController {
       if (snapshot.exists) {
         final data = snapshot.data();
         if (data != null) {
+          final remoteSessionId = data['currentSessionId'] as String?;
+          final localSessionId = await PreferencesHelper.getOrCreateDeviceId();
+          
+          if (remoteSessionId != null && 
+              remoteSessionId.isNotEmpty && 
+              remoteSessionId != localSessionId) {
+            // Phiên đã bị thiết bị khác chiếm
+            _userSubscription?.cancel();
+            await _authService.logout();
+            currentUser = null;
+            MessagingBootstrap.stop();
+            AttendanceAutoNotifyService.instance.stopEmployerPolling();
+            update();
+            
+            Get.offAllNamed(AppRoutes.onboarding);
+            Get.snackbar(
+              'Cảnh báo bảo mật',
+              'Tài khoản của bạn đã được đăng nhập ở thiết bị khác.',
+              snackPosition: SnackPosition.TOP,
+              backgroundColor: Colors.red,
+              colorText: Colors.white,
+              duration: const Duration(seconds: 5),
+            );
+            return;
+          }
+
           final attempt = data['lastLoginAttempt'] as int?;
           if (attempt != null) {
             if (_lastSeenAttempt != null && attempt > _lastSeenAttempt!) {

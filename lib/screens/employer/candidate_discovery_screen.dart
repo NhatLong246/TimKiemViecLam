@@ -417,6 +417,7 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
   List<JobPostModel>? _jobs;
   bool _isLoading = true;
   String? _sendingJobId;
+  Set<String> _sentJobIds = {};
 
   @override
   void initState() {
@@ -450,6 +451,17 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
           .where((id) => id != null)
           .toSet();
 
+      final interestsSnap = await _db
+          .collection('employerInterests')
+          .where('candidateId', isEqualTo: widget.candidate.id)
+          .where('employerId', isEqualTo: uid)
+          .get();
+      final sentJobIds = interestsSnap.docs
+          .map((d) => (d.data())['jobId'] as String?)
+          .where((id) => id != null)
+          .cast<String>()
+          .toSet();
+
       final list = snap.docs.map((d) {
         final data = d.data();
         data['jobId'] = d.id;
@@ -459,6 +471,7 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
       if (mounted) {
         setState(() {
           _jobs = list;
+          _sentJobIds = sentJobIds;
           _isLoading = false;
         });
       }
@@ -489,6 +502,11 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
       Get.back(); // Đóng sheet
 
       if (success) {
+        if (mounted) {
+          setState(() {
+            _sentJobIds.add(job.jobId);
+          });
+        }
         Get.snackbar(
           'Thành công',
           'Đã gửi thông báo quan tâm đến ứng viên',
@@ -613,10 +631,19 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2),
                                     )
-                                  : TextButton(
-                                      onPressed: _sendingJobId != null ? null : () => _sendInterest(job),
-                                      child: const Text('Gửi'),
-                                    ),
+                                  : _sentJobIds.contains(job.jobId)
+                                      ? const Text(
+                                          'Đã gửi',
+                                          style: TextStyle(
+                                              color: Colors.grey,
+                                              fontWeight: FontWeight.w600),
+                                        )
+                                      : TextButton(
+                                          onPressed: _sendingJobId != null
+                                              ? null
+                                              : () => _sendInterest(job),
+                                          child: const Text('Gửi'),
+                                        ),
                             );
                           },
                         ),

@@ -134,6 +134,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 colorText: Colors.white,
               );
             }
+
+            // Gửi thông báo cho nhà tuyển dụng
+            try {
+              final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+              final d = userDoc.data() ?? {};
+              final candidateName = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+              final finalName = candidateName.isNotEmpty ? candidateName : 'Ứng viên';
+              await NotificationService.notifyNewApplication(
+                employerId: employerId,
+                jobTitle: jobModel.title,
+                candidateName: finalName,
+                jobId: jobId,
+                appId: docRef.id,
+                candidateId: uid,
+              );
+            } catch (_) {}
           } else {
             if (mounted) {
               Get.snackbar('Thông báo', 'Bạn đã ứng tuyển công việc này rồi!');
@@ -157,6 +173,48 @@ class _NotificationScreenState extends State<NotificationScreen> {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
+        if (!accepted) {
+          final employerId = item.data['employerId']?.toString();
+          final jobId = item.interestJobId;
+          if (employerId != null && jobId != null) {
+            final jobDoc = await FirebaseFirestore.instance.collection('jobPosts').doc(jobId).get();
+            final jobTitle = jobDoc.data()?['title'] ?? 'Công việc';
+            
+            final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+            final d = userDoc.data() ?? {};
+            final candidateName = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+            final finalName = candidateName.isNotEmpty ? candidateName : 'Ứng viên';
+            
+            await NotificationService.notifyInterestRejected(
+              employerId: employerId,
+              jobTitle: jobTitle.toString(),
+              candidateName: finalName,
+              candidateId: uid,
+              jobId: jobId,
+            );
+            
+            // Xóa record trong employerInterests để NTD có thể mời lại sau này nếu cần
+            final snapInterests = await FirebaseFirestore.instance
+                .collection('employerInterests')
+                .where('employerId', isEqualTo: employerId)
+                .where('candidateId', isEqualTo: uid)
+                .where('jobId', isEqualTo: jobId)
+                .get();
+            for (var doc in snapInterests.docs) {
+              await doc.reference.delete();
+            }
+            
+            if (mounted) {
+              Get.snackbar(
+                'Thành công',
+                'Đã từ chối lời mời thuê lại.',
+                backgroundColor: Colors.grey.shade700,
+                colorText: Colors.white,
+              );
+            }
+          }
+        }
+        
         await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)

@@ -264,6 +264,20 @@ class EmployerNotificationController extends GetxController {
       final jobId = (n.data['jobId'] ?? '').toString();
       if (jobId.isNotEmpty) return 'disburse_job_$jobId';
     }
+    if (n.type == 'interest_rejected') {
+      final jobId = (n.data['jobId'] ?? '').toString();
+      final candidateId = (n.data['candidateId'] ?? '').toString();
+      if (jobId.isNotEmpty && candidateId.isNotEmpty) return 'interest_rejected_${jobId}_$candidateId';
+    }
+    if (n.type == 'application') {
+      final jobId = (n.data['jobId'] ?? '').toString();
+      final candidateId = (n.data['candidateId'] ?? '').toString();
+      if (jobId.isNotEmpty && candidateId.isNotEmpty) return 'application_${jobId}_$candidateId';
+    }
+    if (n.type == 'review') {
+      final jobId = (n.data['jobId'] ?? '').toString();
+      if (jobId.isNotEmpty) return 'review_$jobId';
+    }
     return '${n.type}_${n.notifId}';
   }
 

@@ -65,21 +65,31 @@ class JobPostService {
       if (jobs.isNotEmpty) {
         await _cacheJobs(jobs);
       }
-      return jobs;
+      return _filterExpiredJobs(jobs);
     } on TimeoutException {
       final cached = await _fetchLatestFromSqlite();
-      if (cached.isNotEmpty) return cached;
+      if (cached.isNotEmpty) return _filterExpiredJobs(cached);
       throw Exception(
         'Không kết nối được máy chủ (quá 10 giây). '
         'Kiểm tra mạng trên emulator rồi kéo xuống để tải lại.',
       );
     } catch (_) {
       final cached = await _fetchLatestFromSqlite();
-      if (cached.isNotEmpty) return cached;
+      if (cached.isNotEmpty) return _filterExpiredJobs(cached);
       throw Exception(
         'Không tải được danh sách việc làm. Kiểm tra kết nối mạng và thử lại.',
       );
     }
+  }
+
+  List<JobPostModel> _filterExpiredJobs(List<JobPostModel> jobs) {
+    final now = DateTime.now();
+    return jobs.where((job) {
+      if (job.applicationDeadline != null && job.applicationDeadline!.isBefore(now)) {
+        return false;
+      }
+      return true;
+    }).toList();
   }
 
   Future<List<JobPostModel>> _fetchLatestFromFirestore() async {
