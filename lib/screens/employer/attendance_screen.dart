@@ -669,6 +669,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       groupId: _groupId,
       workers: workers,
       expectedStartTime: _timeCtrl.text,
+      date: _targetDate ?? WorkDayHelper.getCurrentLogicalDate(_job),
     );
 
     final session = _ctrl.currentSession.value;

@@ -22,6 +22,7 @@ class ComplaintCatalogItem {
   final String? appealStatus;
   final String? appealText;
   final String? adminResponse;
+  final Map<String, dynamic>? extraData;
 
   const ComplaintCatalogItem({
     required this.id,
@@ -39,6 +40,7 @@ class ComplaintCatalogItem {
     this.appealStatus,
     this.appealText,
     this.adminResponse,
+    this.extraData,
   });
 
   String get typeLabel {
@@ -167,6 +169,38 @@ class ComplaintCatalogItem {
       appealStatus: map['appealStatus'] as String?,
       appealText: map['appealText'] as String?,
       adminResponse: map['adminResponse'] as String?,
+    );
+  }
+
+  factory ComplaintCatalogItem.fromDisbursementComplaint(
+    Map<String, dynamic> noticeData,
+    String noticeId,
+    String candidateId,
+  ) {
+    final status = noticeData['status'] as String? ?? '';
+    final complaintsPending = status == 'complaints_pending';
+    // Mượn adminResponse để hiển thị ghi chú admin nếu đã duyệt
+    final adminNote = noticeData['adminNote'] as String? ?? '';
+    
+    return ComplaintCatalogItem(
+      id: 'disb_${noticeId}_$candidateId',
+      type: ComplaintCatalogType.worker,
+      direction: ComplaintDirection.sent,
+      jobId: noticeData['jobId'] as String? ?? '',
+      groupId: noticeData['groupId'] as String? ?? '',
+      jobTitle: noticeData['jobTitle'] as String? ?? 'Ca làm việc',
+      reporterId: noticeData['employerId'] as String? ?? '',
+      targetUserId: candidateId,
+      summary: (noticeData['complaintReasons'] as Map?)?[candidateId] as String? ?? 'Khiếu nại trong quá trình giải ngân',
+      status: complaintsPending ? 'pending' : 'resolved',
+      postDissolution: false,
+      createdAt: (noticeData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      adminResponse: adminNote.isNotEmpty ? adminNote : null,
+      extraData: {
+        'noticeId': noticeId,
+        'workDate': noticeData['workDate'],
+        'disbursementStatus': status,
+      },
     );
   }
 }

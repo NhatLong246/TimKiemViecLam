@@ -17,6 +17,7 @@ import '../../data/services/attendance_service.dart';
 import '../../data/services/job_post_service.dart';
 import '../../data/services/messaging_service.dart';
 import '../../data/services/work_schedule_service.dart';
+import '../../data/models/job_post_model.dart';
 import '../../utils/work_day_helper.dart';
 import '../../utils/attendance_capture_helper.dart';
 import '../../widgets/attendance_photo_info.dart';
@@ -51,7 +52,7 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
   AttendanceRecord? _myRecord;
 
   String get _uid => _auth.currentUser?.id ?? '';
-  String get _today => DateFormat('yyyy-MM-dd').format(DateTime.now());
+  String? _targetDate;
 
   @override
   void initState() {
@@ -105,9 +106,13 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
     try {
       final name = _displayName();
 
+      JobPostModel? job;
       final jobDoc = await FirebaseFirestore.instance.collection('jobPosts').doc(_group!.jobId).get();
       if (jobDoc.exists) {
         final jobData = jobDoc.data()!;
+        jobData['jobId'] = jobDoc.id;
+        job = JobPostModel.fromMap(jobData);
+        
         final endDateTs = jobData['endDate'] as Timestamp?;
         if (endDateTs != null) {
           final endDate = endDateTs.toDate();
@@ -121,7 +126,22 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
             return;
           }
         }
+        
+        final startDate = job.startDate;
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final jobStart = DateTime(startDate.year, startDate.month, startDate.day);
+        if (todayStart.isBefore(jobStart)) {
+          if (!mounted) return;
+          setState(() {
+            _error = 'Công việc này chưa bắt đầu. Bạn chỉ có thể điểm danh từ ngày ${DateFormat('dd/MM/yyyy').format(jobStart)}.';
+            _loading = false;
+          });
+          return;
+        }
       }
+
+      _targetDate = WorkDayHelper.getCurrentLogicalDate(job);
 
       final attendanceId = await _attendanceSvc.ensureCandidateRecord(
         jobId: _group!.jobId,
@@ -130,7 +150,7 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
         candidateId: _uid,
         candidateName: name,
       );
-      final session = await _attendanceSvc.getSessionByDate(_group!.jobId, _today);
+      final session = await _attendanceSvc.getSessionByDate(_group!.jobId, _targetDate!);
       if (!mounted) return;
       setState(() {
         _session = session ??
@@ -139,7 +159,7 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
               jobId: _group!.jobId,
               groupId: _group!.groupId,
               employerId: _group!.employerId,
-              date: _today,
+              date: _targetDate!,
               expectedStartTime: '08:00',
               records: const [],
               createdAt: DateTime.now(),
@@ -329,8 +349,9 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
   Widget _buildContent() {
     final session = _session!;
     final record = _myRecord;
-    final dateLabel =
-        DateFormat('EEEE, dd/MM/yyyy', 'vi').format(DateTime.now());
+    
+    final dt = _targetDate != null ? DateTime.parse(_targetDate!) : DateTime.now();
+    final dateLabel = DateFormat('EEEE, dd/MM/yyyy', 'vi').format(dt);
 
     return RefreshIndicator(
       color: _primary,

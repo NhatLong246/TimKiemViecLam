@@ -36,8 +36,8 @@ class AttendanceController extends GetxController {
     required String groupId,
     required List<AttendanceRecord> workers,
     required String expectedStartTime,
+    required String date,
   }) async {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final employerId = _auth.currentUser?.id ?? '';
 
     String expectedEnd = '';
@@ -64,7 +64,7 @@ class AttendanceController extends GetxController {
       jobId: jobId,
       groupId: groupId,
       employerId: employerId,
-      date: today,
+      date: date,
       expectedStartTime: expectedStartTime,
       expectedEndTime: expectedEnd,
       records: workers,

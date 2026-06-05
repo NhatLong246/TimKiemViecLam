@@ -55,6 +55,21 @@ class ComplaintsCatalogService {
           direction: ComplaintDirection.received,
         ));
       }
+      
+      // NTD gửi: khiếu nại lúc giải ngân
+      final pendingNotices = await _db
+          .collection('disbursementNotices')
+          .where('employerId', isEqualTo: uid)
+          .where('status', whereIn: ['complaints_pending', 'complaints_reviewed', 'completed'])
+          .limit(50)
+          .get();
+      for (final d in pendingNotices.docs) {
+        final notice = d.data();
+        final complained = List<String>.from(notice['complainedCandidates'] ?? []);
+        for (final cid in complained) {
+          items.add(ComplaintCatalogItem.fromDisbursementComplaint(notice, d.id, cid));
+        }
+      }
       // NTD nhận cảnh báo từ Admin
       final adminWarnings = await _db
           .collection('adminWarnings')
@@ -93,6 +108,17 @@ class ComplaintsCatalogService {
           d.id,
           direction: ComplaintDirection.received,
         ));
+      }
+      
+      // UV nhận: NTD khiếu nại lúc giải ngân
+      final pendingNotices = await _db
+          .collection('disbursementNotices')
+          .where('complainedCandidates', arrayContains: uid)
+          .where('status', whereIn: ['complaints_pending', 'complaints_reviewed', 'completed'])
+          .limit(50)
+          .get();
+      for (final d in pendingNotices.docs) {
+        items.add(ComplaintCatalogItem.fromDisbursementComplaint(d.data(), d.id, uid));
       }
     }
 

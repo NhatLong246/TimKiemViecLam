@@ -38,6 +38,7 @@ class JobPostModel {
   final bool underfilledAccepted;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final DateTime? closedAt;
 
   JobPostModel({
     required this.jobId,
@@ -73,6 +74,7 @@ class JobPostModel {
     this.underfilledAccepted = false,
     this.createdAt,
     this.updatedAt,
+    this.closedAt,
   });
 
   int get remainingSlots => (slots - filledSlots).clamp(0, slots);
@@ -225,6 +227,7 @@ class JobPostModel {
       underfilledAccepted: map['underfilledAccepted'] == true,
       createdAt: map['createdAt'] != null ? toDateTime(map['createdAt']) : null,
       updatedAt: map['updatedAt'] != null ? toDateTime(map['updatedAt']) : null,
+      closedAt: map['closedAt'] != null ? toDateTime(map['closedAt']) : null,
     );
   }
 

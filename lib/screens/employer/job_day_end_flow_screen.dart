@@ -74,15 +74,9 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
       );
       _totalEarned = _calculatedSalaries.values.fold(0.0, (a, b) => a + b);
 
-      // Lấy tổng ngân sách từ bài đăng để tự động điền vào ô Giải ngân
-      final jobDoc = await FirebaseFirestore.instance
-          .collection('jobPosts')
-          .doc(_group.jobId)
-          .get();
-      final totalBudget =
-          (jobDoc.data()?['totalBudget'] as num?)?.toDouble() ?? _totalEarned;
-
-      _amountCtrl.text = totalBudget.toStringAsFixed(0);
+      // Mặc định điền vào ô Giải ngân là tổng lương thực tế ứng viên nhận được
+      // Số tiền chênh lệch (nếu dư) sẽ tự động được hoàn lại vào ví NTD
+      _amountCtrl.text = _totalEarned.toStringAsFixed(0);
 
       _candidates = await _groupChatSvc.getGroupMembers(candidateIds);
 
@@ -357,7 +351,8 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Hệ thống sẽ tự động giải ngân đúng toàn bộ số tiền đã tạm giữ cho ca làm này.',
+          'Hệ thống sẽ tự động tính toán lương dựa trên thời gian làm việc thực tế. '
+          'Nếu số tiền giải ngân ít hơn số tiền tạm giữ, phần dư sẽ được hoàn lại vào ví của bạn.',
           style: TextStyle(fontSize: 14),
         ),
         const SizedBox(height: 16),
