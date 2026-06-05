@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'file_upload_service.dart';
+import 'account_uniqueness_service.dart';
 import '../models/job_criteria_model.dart';
 import '../models/user_model.dart';
 import '../models/work_experience_model.dart';
@@ -11,6 +11,7 @@ import '../models/work_experience_model.dart';
 class UpdateAccountService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AccountUniquenessService _uniqueness = AccountUniquenessService();
 
   Future<void> updateName({
     required String userId,
@@ -32,7 +33,12 @@ class UpdateAccountService {
 
   Future<void> updatePhone(String phone) async {
     final uid = _auth.currentUser!.uid;
-    await _firestore.collection('users').doc(uid).update({'phone': phone});
+    final normalizedPhone = _uniqueness.normalizePhone(phone);
+    await _uniqueness.ensurePhoneAvailable(normalizedPhone, excludeUid: uid);
+    await _firestore.collection('users').doc(uid).update({
+      'phone': normalizedPhone,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> updateGender(String gender) async {
@@ -50,21 +56,16 @@ class UpdateAccountService {
   Future<void> updateEmail(String newEmail) async {
     final user = _auth.currentUser!;
     final uid = user.uid;
-    if (user.email == newEmail) {
+    final normalizedEmail = _uniqueness.normalizeEmail(newEmail);
+    if (_uniqueness.normalizeEmail(user.email ?? '') == normalizedEmail) {
       throw Exception("Email mới trùng với email hiện tại");
     }
 
     /// CHECK TRÙNG FIRESTORE
-    final existingEmail = await _firestore
-        .collection('users')
-        .where('email', isEqualTo: newEmail)
-        .get();
-    if (existingEmail.docs.isNotEmpty) {
-      throw Exception("Email đã tồn tại trong hệ thống");
-    }
+    await _uniqueness.ensureEmailAvailable(normalizedEmail, excludeUid: uid);
     try {
       /// Gửi email xác minh trước khi đổi
-      await user.verifyBeforeUpdateEmail(newEmail);
+      await user.verifyBeforeUpdateEmail(normalizedEmail);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         throw Exception("Vui lòng đăng nhập lại để đổi email");
@@ -92,8 +93,9 @@ class UpdateAccountService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('Chưa đăng nhập');
 
-    final hasPassword =
-        user.providerData.any((p) => p.providerId == 'password');
+    final hasPassword = user.providerData.any(
+      (p) => p.providerId == 'password',
+    );
     if (!hasPassword) {
       throw Exception(
         'Tài khoản đăng nhập bằng Google/Facebook không đổi mật khẩu tại đây.',
@@ -137,9 +139,10 @@ class UpdateAccountService {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
 
-    final doc = await _firestore.collection('users').doc(uid).get(
-      const GetOptions(source: Source.server),
-    );
+    final doc = await _firestore
+        .collection('users')
+        .doc(uid)
+        .get(const GetOptions(source: Source.server));
     if (!doc.exists) return null;
     return UserModel.fromMap(doc.data() as Map<String, dynamic>);
   }
@@ -158,15 +161,10 @@ class UpdateAccountService {
     final doc = await _firestore.collection('users').doc(uid).get();
     final raw = doc.data()?['workExperiences'];
     final list = raw is List
-        ? raw
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList()
+        ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
         : <Map<String, dynamic>>[];
 
-    final index = list.indexWhere(
-      (e) => e['id']?.toString() == experience.id,
-    );
+    final index = list.indexWhere((e) => e['id']?.toString() == experience.id);
     if (index >= 0) {
       list[index] = experience.toMap();
     }
@@ -239,10 +237,10 @@ class UpdateAccountService {
     final raw = doc.data()?['workExperiences'];
     final list = raw is List
         ? raw
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .where((e) => e['id']?.toString() != experienceId)
-            .toList()
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .where((e) => e['id']?.toString() != experienceId)
+              .toList()
         : <Map<String, dynamic>>[];
 
     final updates = <String, dynamic>{

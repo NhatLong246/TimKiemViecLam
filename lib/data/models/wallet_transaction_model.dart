@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class WalletTransactionModel {
   final String id;
   final String userId;
-  final String type; // deposit | payment | withdrawal | refund
+  final String
+  type; // deposit | payment | withdrawal | refund | job_deposit_hold | compensation
   final double amount;
   final String description;
   final String status; // pending | completed | failed
@@ -40,9 +41,14 @@ class WalletTransactionModel {
   bool get isCompleted => status == 'completed';
   bool get isFailed => status == 'failed';
   bool get isCredit =>
-      (type == 'deposit' || type == 'refund') && isCompleted;
+      (type == 'deposit' || type == 'refund' || type == 'compensation') &&
+      isCompleted;
   bool get isDebit =>
-      (type == 'payment' || type == 'withdrawal') && isCompleted;
+      (type == 'payment' ||
+          type == 'withdrawal' ||
+          type == 'hold' ||
+          type == 'job_deposit_hold') &&
+      isCompleted;
 
   factory WalletTransactionModel.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
@@ -75,16 +81,16 @@ class WalletTransactionModel {
   }
 
   Map<String, dynamic> toMap() => {
-        'userId': userId,
-        'type': type,
-        'amount': amount,
-        'description': description,
-        'status': status,
-        if (paymentMethod != null) 'paymentMethod': paymentMethod,
-        if (orderId != null) 'orderId': orderId,
-        if (requestId != null) 'requestId': requestId,
-        if (payUrl != null) 'payUrl': payUrl,
-        if (momoTransId != null) 'momoTransId': momoTransId,
-        if (jobId != null) 'jobId': jobId,
-      };
+    'userId': userId,
+    'type': type,
+    'amount': amount,
+    'description': description,
+    'status': status,
+    if (paymentMethod != null) 'paymentMethod': paymentMethod,
+    if (orderId != null) 'orderId': orderId,
+    if (requestId != null) 'requestId': requestId,
+    if (payUrl != null) 'payUrl': payUrl,
+    if (momoTransId != null) 'momoTransId': momoTransId,
+    if (jobId != null) 'jobId': jobId,
+  };
 }

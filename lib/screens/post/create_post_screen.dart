@@ -11,6 +11,7 @@ import '../../data/constants/job_categories.dart';
 import '../../controller/job_post_controller.dart';
 import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
+import '../../data/services/job_pricing_service.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme_colors.dart';
 
@@ -69,12 +70,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool get _isEdit => _editing != null;
   bool get _isFullTimeScreen => widget.initialJobType == 'full_time';
 
+  DateTime _dateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
   List<Map<String, String>> get _categories =>
       categoryOptionsFor(isFullTime: _isFullTimeScreen, selected: _category);
 
   @override
   void initState() {
     super.initState();
+    _startDate = _dateOnly(_startDate);
+    _applicationDeadline = _dateOnly(_applicationDeadline);
     final args = Get.arguments;
     if (args is JobPostModel) {
       _editing = args;
@@ -153,18 +160,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         _salaryType != 'per_hour') {
       _salaryType = 'per_month';
     }
-    _startDate = p.startDate;
-    _endDate = p.endDate;
+    _startDate = _dateOnly(p.startDate);
+    _endDate = p.endDate == null ? null : _dateOnly(p.endDate!);
     if (p.applicationDeadline != null) {
-      _applicationDeadline = p.applicationDeadline!;
+      _applicationDeadline = _dateOnly(p.applicationDeadline!);
       _deadlineHourCtrl.text = DateFormat('HH').format(p.applicationDeadline!);
       _deadlineMinCtrl.text = DateFormat('mm').format(p.applicationDeadline!);
     } else {
-      _applicationDeadline = p.startDate;
+      _applicationDeadline = _dateOnly(p.startDate);
       _deadlineHourCtrl.text = '23';
       _deadlineMinCtrl.text = '59';
     }
-    _endDate = p.endDate;
+    _endDate = p.endDate == null ? null : _dateOnly(p.endDate!);
     _imageBase64s
       ..clear()
       ..addAll(p.imageUrls);
@@ -207,11 +214,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _pickDate({required bool isStart}) async {
-    final now = DateTime.now();
+    final now = _dateOnly(DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? _startDate : (_endDate ?? _startDate),
-      firstDate: isStart ? now : _startDate,
+      initialDate: isStart ? _dateOnly(_startDate) : (_endDate ?? _startDate),
+      firstDate: isStart ? now : _dateOnly(_startDate),
       lastDate: DateTime(now.year + 2),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
@@ -223,24 +230,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       ),
     );
     if (picked != null) {
+      final pickedDay = _dateOnly(picked);
       setState(() {
         if (isStart) {
-          _startDate = picked;
-          if (_endDate != null && _endDate!.isBefore(_startDate)) {
+          _startDate = pickedDay;
+          if (_endDate != null &&
+              _dateOnly(_endDate!).isBefore(_dateOnly(_startDate))) {
             _endDate = null;
           }
         } else {
-          _endDate = picked;
+          _endDate = pickedDay;
         }
       });
     }
   }
 
   Future<void> _pickDeadlineDate() async {
-    final now = DateTime.now();
+    final now = _dateOnly(DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: _applicationDeadline,
+      initialDate: _dateOnly(_applicationDeadline),
       firstDate: now,
       lastDate: DateTime(now.year + 2),
       builder: (ctx, child) => Theme(
@@ -254,7 +263,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
     if (picked != null) {
       setState(() {
-        _applicationDeadline = picked;
+        _applicationDeadline = _dateOnly(picked);
       });
     }
   }
@@ -356,8 +365,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (_jobType == 'part_time' && _endDate == null) {
       return 'Part-time cần chọn ngày kết thúc (số ngày làm việc)';
     }
-    if (_endDate != null && _endDate!.isBefore(_startDate)) {
-      return 'Ngày kết thúc phải sau ngày bắt đầu';
+    if (_endDate != null &&
+        _dateOnly(_endDate!).isBefore(_dateOnly(_startDate))) {
+      return 'Ngày kết thúc không được trước ngày bắt đầu';
     }
     if (_cityCtrl.text.trim().isEmpty) {
       return 'Vui lòng nhập Tỉnh/Thành phố';
@@ -371,6 +381,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       }
     }
     final wh = _workHoursCtrl.text.trim();
+    if (_jobType == 'part_time' && _salaryType == 'per_hour' && wh.isEmpty) {
+      return 'Việc trả theo giờ cần nhập số giờ làm mỗi ngày';
+    }
     if (wh.isNotEmpty) {
       final h = double.tryParse(wh.replaceAll(',', '.'));
       if (h == null || h <= 0 || h > 24) {
@@ -387,6 +400,101 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return null;
   }
 
+  String _money(double value) {
+    return '${NumberFormat('#,###', 'vi_VN').format(value.ceil())}đ';
+  }
+
+  String _number(double value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toStringAsFixed(1).replaceAll('.', ',');
+  }
+
+  String _depositFormula(JobPostModel post, JobDepositQuote quote) {
+    final salary = _money(post.salary);
+    final slots = post.slots;
+    final days = quote.workDays;
+    return switch (post.salaryType) {
+      'per_hour' =>
+        '$salary/giờ x ${_number(post.workHoursPerDay ?? 0)} giờ/ngày x $days ngày x $slots người = ${_money(quote.depositAmount)}',
+      'per_day' =>
+        '$salary/ngày x $days ngày x $slots người = ${_money(quote.depositAmount)}',
+      'per_month' =>
+        '$salary/tháng / 30 ngày x $days ngày x $slots người = ${_money(quote.depositAmount)}',
+      'fixed' =>
+        '$salary/người x $slots người = ${_money(quote.depositAmount)}',
+      _ => _money(quote.depositAmount),
+    };
+  }
+
+  Future<bool> _confirmDepositBeforeSubmit(JobPostModel post) async {
+    if (!post.isPartTimeManaged) return true;
+
+    late final JobDepositQuote quote;
+    try {
+      quote = JobPricingService.quote(post);
+    } catch (e) {
+      _showFormNotice(
+        'Thiếu thông tin',
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+    if (!quote.requiresDeposit) return true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Xác nhận tiền ứng'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Số tiền cần ứng trước cho bài đăng này:'),
+                const SizedBox(height: 10),
+                Text(
+                  _money(quote.depositAmount),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF7B1FA2),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Công thức tính:',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(_depositFormula(post, quote)),
+                const SizedBox(height: 12),
+                Text(
+                  'Tiền sẽ được trừ từ tiền app và tạm giữ khi bạn gửi duyệt.',
+                  style: TextStyle(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Gửi duyệt'),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
+  }
+
   Future<void> _submit({required bool isDraft}) async {
     if (!_formKey.currentState!.validate()) return;
     final extraErr = _validateBeforeSubmit();
@@ -394,7 +502,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _showFormNotice('Thiếu thông tin', extraErr);
       return;
     }
-    setState(() => _isSubmitting = true);
 
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final salary =
@@ -439,8 +546,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           dm,
         );
       }(),
-      startDate: _startDate,
-      endDate: _isFullTimeScreen ? null : _endDate,
+      startDate: _dateOnly(_startDate),
+      endDate: _isFullTimeScreen || _endDate == null
+          ? null
+          : _dateOnly(_endDate!),
       workHoursPerDay: double.tryParse(
         _workHoursCtrl.text.trim().replaceAll(',', '.'),
       ),
@@ -459,6 +568,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       groupChatId: _editing?.groupChatId,
       createdAt: _editing?.createdAt,
     );
+
+    if (!isDraft) {
+      final confirmed = await _confirmDepositBeforeSubmit(post);
+      if (!confirmed || !mounted) return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     final controller = Get.isRegistered<JobPostController>()
         ? Get.find<JobPostController>()

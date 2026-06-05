@@ -4,6 +4,7 @@ import 'package:viecnow/data/models/wallet_summary_model.dart';
 import 'package:viecnow/data/models/wallet_transaction_model.dart';
 import 'package:viecnow/data/services/wallet_deposit_service.dart';
 import 'package:viecnow/data/services/wallet_withdraw_service.dart';
+import 'package:viecnow/utils/job_time_helper.dart';
 
 /// Backend ví employer: số dư, lịch sử, hạn mức, sao kê.
 class WalletService {
@@ -69,14 +70,10 @@ class WalletService {
 
     final data = userSnap.data()!;
     final balance = (data['walletBalance'] as num?)?.toDouble() ?? 0;
-    final limit = (data['walletSpendingLimit'] as num?)?.toDouble();
     if (balance < amount) {
       throw Exception(
         'Số dư không đủ (${_vnd(balance)}). Vui lòng nạp thêm tiền.',
       );
-    }
-    if (limit != null && limit > 0 && amount > limit) {
-      throw Exception('Vượt hạn mức chi tiêu ${_vnd(limit)}/giao dịch');
     }
 
     if (idempotencyKey.isNotEmpty) {
@@ -145,37 +142,64 @@ class WalletService {
         .get();
     if (existingRefund.docs.isNotEmpty) return;
 
+    final jobRef = _firestore.collection('jobPosts').doc(jobId);
+    final jobSnap = await jobRef.get();
+    if (!jobSnap.exists) return;
+    final jobData = jobSnap.data() ?? {};
+    if ((jobData['employerId'] ?? '').toString() != employerId) {
+      throw Exception('Bạn không có quyền hủy bài đăng này.');
+    }
+    if (JobTimeHelper.hasStartedFromMap(jobData)) {
+      throw Exception('Công việc đã bắt đầu, không thể hủy.');
+    }
+    if ((jobData['depositStatus'] ?? 'none').toString() != 'held') {
+      return;
+    }
+
+    final heldBudget =
+        (jobData['totalBudget'] as num?)?.toDouble() ?? totalBudget;
+    if (heldBudget <= 0) return;
+
     final batch = _firestore.batch();
-    final uniqueCandidateIds = candidateIds.toSet().toList();
+    final uniqueCandidateIds = candidateIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    final shouldCompensate =
+        compensateCandidates && uniqueCandidateIds.isNotEmpty;
+    final compensationTotal = shouldCompensate ? heldBudget * 0.1 : 0.0;
+    final compensationPerUser = shouldCompensate
+        ? compensationTotal / uniqueCandidateIds.length
+        : 0.0;
+    final refundAmount = shouldCompensate
+        ? heldBudget - compensationTotal
+        : heldBudget;
 
-    // Chỉ đền bù khi nghiệp vụ yêu cầu (job đã đủ người) và có ứng viên hợp lệ.
-    if (compensateCandidates && uniqueCandidateIds.isNotEmpty) {
-      final compensationTotal = totalBudget * 0.1;
-      final compensationPerUser = compensationTotal / uniqueCandidateIds.length;
-      final refundAmount = totalBudget * 0.9;
+    final employerRef = _firestore.collection('users').doc(employerId);
+    batch.set(employerRef, {
+      'walletBalance': FieldValue.increment(refundAmount),
+      'walletHeldBalance': FieldValue.increment(-heldBudget),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-      // Hoàn tiền 90% cho employer
-      final employerRef = _firestore.collection('users').doc(employerId);
-      batch.set(employerRef, {
-        'walletBalance': FieldValue.increment(refundAmount),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+    final empTxRef = _firestore.collection('walletTransactions').doc();
+    batch.set(empTxRef, {
+      'userId': employerId,
+      'type': 'refund',
+      'amount': refundAmount,
+      'description': shouldCompensate
+          ? 'Hoàn 90% tiền ứng do hủy công việc đã đủ người'
+          : 'Hoàn 100% tiền ứng do hủy công việc',
+      'status': 'completed',
+      'paymentMethod': 'wallet',
+      'jobId': jobId,
+      'idempotencyKey': refundKey,
+      'createdAt': FieldValue.serverTimestamp(),
+      'completedAt': FieldValue.serverTimestamp(),
+    });
 
-      final empTxRef = _firestore.collection('walletTransactions').doc();
-      batch.set(empTxRef, {
-        'userId': employerId,
-        'type': 'refund',
-        'amount': refundAmount,
-        'description': 'Hoàn tiền 90% do hủy công việc đã có ứng viên',
-        'status': 'completed',
-        'paymentMethod': 'wallet',
-        'jobId': jobId,
-        'idempotencyKey': refundKey,
-        'createdAt': FieldValue.serverTimestamp(),
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Cộng tiền cho mỗi ứng viên
+    if (shouldCompensate) {
       for (final candidateId in uniqueCandidateIds) {
         final candidateRef = _firestore.collection('users').doc(candidateId);
         batch.set(candidateRef, {
@@ -197,29 +221,15 @@ class WalletService {
           'completedAt': FieldValue.serverTimestamp(),
         });
       }
-    } else {
-      // Job chưa đủ điều kiện đền bù -> hoàn tiền 100%.
-      final refundAmount = totalBudget;
-      final employerRef = _firestore.collection('users').doc(employerId);
-      batch.set(employerRef, {
-        'walletBalance': FieldValue.increment(refundAmount),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      final empTxRef = _firestore.collection('walletTransactions').doc();
-      batch.set(empTxRef, {
-        'userId': employerId,
-        'type': 'refund',
-        'amount': refundAmount,
-        'description': 'Hoàn tiền 100% do hủy công việc',
-        'status': 'completed',
-        'paymentMethod': 'wallet',
-        'jobId': jobId,
-        'idempotencyKey': refundKey,
-        'createdAt': FieldValue.serverTimestamp(),
-        'completedAt': FieldValue.serverTimestamp(),
-      });
     }
+
+    batch.update(jobRef, {
+      'depositStatus': 'refunded',
+      'depositRefundAmount': refundAmount,
+      'depositCompensationAmount': compensationTotal,
+      'depositRefundedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
 
     await batch.commit();
   }
@@ -258,6 +268,9 @@ class WalletService {
       ..writeln('In lúc: ${df.format(now)}')
       ..writeln('')
       ..writeln('Số dư khả dụng: ${fmt.format(summary.walletBalance.toInt())}đ')
+      ..writeln(
+        'Đang tạm giữ: ${fmt.format(summary.walletHeldBalance.toInt())}đ',
+      )
       ..writeln('Tổng đã nạp: ${fmt.format(summary.totalDeposited.toInt())}đ')
       ..writeln('Tổng đã chi: ${fmt.format(summary.totalSpent.toInt())}đ');
     if (summary.hasSpendingLimit) {

@@ -12,6 +12,7 @@ import '../../data/models/full_time_job_details.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/services/candidates_service.dart';
 import '../../data/services/messaging_service.dart';
+import '../../utils/job_time_helper.dart';
 import '../messaging/chat_room_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../utils/location_helper.dart';
@@ -159,49 +160,51 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 250,
-                  child: Builder(builder: (context) {
-                    if (job.imageUrls.isEmpty) {
-                      return Image.asset(
-                        'assets/images/banners/default_image.png',
-                        fit: BoxFit.cover,
-                      );
-                    }
-                    final img = job.imageUrls.first;
-                    if (img.startsWith('http')) {
-                      return Image.network(
-                        img,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Image.asset(
+                  child: Builder(
+                    builder: (context) {
+                      if (job.imageUrls.isEmpty) {
+                        return Image.asset(
                           'assets/images/banners/default_image.png',
                           fit: BoxFit.cover,
-                        ),
-                      );
-                    }
-                    try {
-                      var b64 = img;
-                      if (b64.contains(',')) {
-                        b64 = b64.split(',').last;
+                        );
                       }
-                      final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
-                      final padded = sanitized.padRight(
-                        sanitized.length + (4 - sanitized.length % 4) % 4,
-                        '=',
-                      );
-                      return Image.memory(
-                        base64Decode(padded),
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Image.asset(
+                      final img = job.imageUrls.first;
+                      if (img.startsWith('http')) {
+                        return Image.network(
+                          img,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Image.asset(
+                            'assets/images/banners/default_image.png',
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      }
+                      try {
+                        var b64 = img;
+                        if (b64.contains(',')) {
+                          b64 = b64.split(',').last;
+                        }
+                        final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+                        final padded = sanitized.padRight(
+                          sanitized.length + (4 - sanitized.length % 4) % 4,
+                          '=',
+                        );
+                        return Image.memory(
+                          base64Decode(padded),
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Image.asset(
+                            'assets/images/banners/default_image.png',
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      } catch (_) {
+                        return Image.asset(
                           'assets/images/banners/default_image.png',
                           fit: BoxFit.cover,
-                        ),
-                      );
-                    } catch (_) {
-                      return Image.asset(
-                        'assets/images/banners/default_image.png',
-                        fit: BoxFit.cover,
-                      );
-                    }
-                  }),
+                        );
+                      }
+                    },
+                  ),
                 ),
                 // 2. Header thông tin cơ bản
                 Padding(
@@ -530,15 +533,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       'cancelled',
                       'rejected',
                     ].contains(status);
-                    final now = DateTime.now();
-                    final today = DateTime(now.year, now.month, now.day);
-                    final startDay = DateTime(
-                      job.startDate.year,
-                      job.startDate.month,
-                      job.startDate.day,
-                    );
                     final jobStarted =
-                        (isPending || isAccepted) && !today.isBefore(startDay);
+                        (isPending || isAccepted) &&
+                        JobTimeHelper.hasStarted(job);
 
                     Color btnColor;
                     if (!_controller.canApply.value ||

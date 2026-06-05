@@ -24,7 +24,13 @@ class JobWorkflowService {
     final snap = await _notices.where('jobId', isEqualTo: jobId).limit(10).get();
     for (final doc in snap.docs) {
       final s = doc.data()['status'] as String? ?? '';
-      if (['approved', 'complaints_pending', 'complaints_reviewed'].contains(s)) {
+      if ([
+        'pending_admin',
+        'approved',
+        'pending_ack',
+        'complaints_pending',
+        'complaints_reviewed',
+      ].contains(s)) {
         return true;
       }
     }
@@ -185,7 +191,7 @@ class JobWorkflowService {
     await _deleteGroup(notice.groupId);
 
     // Đóng bài đăng
-    await _closeJobPost(notice.jobId);
+    await _closeJobPost(notice.jobId, employerId: notice.employerId);
   }
 
   // ═══════════════════════════════════════════════════════
@@ -228,6 +234,109 @@ class JobWorkflowService {
   // ═══════════════════════════════════════════════════════
 
   /// Admin duyệt khiếu nại 1 ứng viên
+  Future<void> approveDisbursementRequest(String noticeId) async {
+    final snap = await _notices.doc(noticeId).get();
+    if (!snap.exists) return;
+    final data = snap.data()!;
+    final status = data['status'] as String? ?? '';
+    if (status != 'pending_admin' && status != 'approved') {
+      throw Exception('Yeu cau khong con o trang thai cho duyet.');
+    }
+
+    await _notices.doc(noticeId).update({
+      'status': 'approved',
+      'adminAck': true,
+      'approvedAt': FieldValue.serverTimestamp(),
+    });
+
+    final employerId = data['employerId'] as String? ?? '';
+    final amount = (data['amount'] as num?)?.toDouble() ?? 0;
+    final jobTitle = data['jobTitle'] as String? ?? '';
+
+    if (employerId.isNotEmpty) {
+      await _notif.create(
+        recipientId: employerId,
+        type: 'disbursement_approved',
+        title: 'Admin da cho phep giai ngan',
+        body:
+            'Ban co the giai ngan ${amount.toStringAsFixed(0)}d cho "$jobTitle".',
+        data: {
+          'noticeId': noticeId,
+          'jobId': data['jobId'],
+          'groupId': data['groupId'],
+        },
+      );
+    }
+  }
+
+  Future<void> executeDisbursement(String noticeId) => disburseDirectly(noticeId);
+
+  Future<void> rejectDisbursementRequest(
+    String noticeId, {
+    String? reason,
+  }) async {
+    final snap = await _notices.doc(noticeId).get();
+    if (!snap.exists) return;
+    final data = snap.data()!;
+
+    await _notices.doc(noticeId).update({
+      'status': 'rejected',
+      'rejectReason': reason ?? '',
+      'rejectedAt': FieldValue.serverTimestamp(),
+    });
+
+    final employerId = data['employerId'] as String? ?? '';
+    if (employerId.isNotEmpty) {
+      await _notif.create(
+        recipientId: employerId,
+        type: 'disbursement_rejected',
+        title: 'Admin tu choi giai ngan',
+        body: reason?.isNotEmpty == true
+            ? reason!
+            : 'Lien he Admin hoac gui lai yeu cau.',
+        data: {'noticeId': noticeId},
+      );
+    }
+  }
+
+  Future<void> adminCloseGroup({
+    required String noticeId,
+    required String groupId,
+    required String jobId,
+  }) async {
+    final adminId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    if (groupId.isNotEmpty) {
+      await _groups.doc(groupId).update({
+        'status': 'closed',
+        'closedBy': adminId,
+        'closedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await _closeJobPost(jobId);
+
+    if (noticeId.isNotEmpty) {
+      await _notices.doc(noticeId).update({
+        'status': 'group_closed',
+        'adminAck': true,
+        'closedAt': FieldValue.serverTimestamp(),
+      });
+
+      final snap = await _notices.doc(noticeId).get();
+      final employerId = snap.data()?['employerId'] as String? ?? '';
+      if (employerId.isNotEmpty) {
+        await _notif.create(
+          recipientId: employerId,
+          type: 'group_closed_by_admin',
+          title: 'Admin da dong nhom',
+          body: 'Nhom cong viec da duoc Admin dong. Khong can giai ngan qua app.',
+          data: {'groupId': groupId, 'jobId': jobId},
+        );
+      }
+    }
+  }
+
   Future<void> adminApproveComplaint({
     required String noticeId,
     required String candidateId,
@@ -438,7 +547,7 @@ class JobWorkflowService {
     await _deleteGroup(notice.groupId);
 
     // Đóng bài đăng
-    await _closeJobPost(notice.jobId);
+    await _closeJobPost(notice.jobId, employerId: notice.employerId);
   }
 
   // ═══════════════════════════════════════════════════════
@@ -496,12 +605,28 @@ class JobWorkflowService {
     }
   }
 
-  Future<void> _closeJobPost(String jobId) async {
+  Future<void> _closeJobPost(String jobId, {String? employerId}) async {
     if (jobId.isEmpty) return;
-    await _db.collection('jobPosts').doc(jobId).update({
+    final jobRef = _db.collection('jobPosts').doc(jobId);
+    final jobSnap = await jobRef.get();
+    final jobData = jobSnap.data();
+    final depositHeld = (jobData?['depositStatus'] ?? '').toString() == 'held';
+    final heldAmount = (jobData?['totalBudget'] as num?)?.toDouble() ?? 0;
+
+    await jobRef.update({
       'status': 'closed',
+      if (depositHeld) 'depositStatus': 'released',
+      if (depositHeld) 'depositReleasedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    if (depositHeld && heldAmount > 0 && employerId != null && employerId.isNotEmpty) {
+      await _db.collection('users').doc(employerId).set({
+        'walletHeldBalance': FieldValue.increment(-heldAmount),
+        'totalSpent': FieldValue.increment(heldAmount),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
   }
 
   Future<void> _notifyAdmins({
@@ -532,7 +657,7 @@ class JobWorkflowService {
 
   Future<List<DisbursementNoticeModel>> listPendingForAdmin() async {
     final snap = await _notices
-        .where('status', isEqualTo: 'complaints_pending')
+        .where('status', whereIn: ['pending_admin', 'complaints_pending'])
         .limit(50)
         .get();
     return snap.docs

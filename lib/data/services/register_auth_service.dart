@@ -1,21 +1,26 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
+import 'account_uniqueness_service.dart';
 import 'sqlite_cache_service.dart';
 
 class RegisterAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final AccountUniquenessService _uniqueness = AccountUniquenessService();
 
   Future<User?> registerUser({
     required UserModel userModel,
     required String password,
   }) async {
+    final email = _uniqueness.normalizeEmail(userModel.email);
+    final phone = _uniqueness.normalizePhone(userModel.phone);
+    await _uniqueness.ensureEmailAvailable(email);
+    await _uniqueness.ensurePhoneAvailable(phone);
+
     // 1. Tạo Firebase Auth user
-    final UserCredential credential = await _auth.createUserWithEmailAndPassword(
-      email: userModel.email,
-      password: password,
-    );
+    final UserCredential credential = await _auth
+        .createUserWithEmailAndPassword(email: email, password: password);
     final User? firebaseUser = credential.user;
     if (firebaseUser == null) throw Exception('Không thể tạo tài khoản');
 
@@ -31,7 +36,11 @@ class RegisterAuthService {
     await firebaseUser.sendEmailVerification();
 
     // 4. Lưu vào Firestore với đầy đủ fields theo schema
-    final UserModel savedModel = userModel.copyWith(id: uid);
+    final UserModel savedModel = userModel.copyWith(
+      id: uid,
+      email: email,
+      phone: phone,
+    );
     await _firestore.collection('users').doc(uid).set(savedModel.toMap());
 
     // 5. Cache vào SQLite (cached_profile)

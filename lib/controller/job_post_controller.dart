@@ -7,6 +7,8 @@ import '../data/services/job_post_service.dart';
 import '../data/services/wallet_service.dart';
 import '../data/services/group_chat_service.dart';
 import '../data/services/notification_service.dart';
+import '../routes/app_routes.dart';
+import '../utils/job_time_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class JobPostController extends GetxController {
@@ -123,9 +125,33 @@ class JobPostController extends GetxController {
       return true;
     } catch (e) {
       errorMessage.value = e.toString();
-      Get.snackbar('Lỗi', e.toString(), snackPosition: SnackPosition.BOTTOM);
+      _showJobPostError('Lỗi', e);
       return false;
     }
+  }
+
+  void _showJobPostError(String title, Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '');
+    final needsTopUp = message.contains('Số dư tiền app không đủ');
+    Get.snackbar(
+      needsTopUp ? 'Cần nạp tiền app' : title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: needsTopUp ? Colors.orange : null,
+      colorText: needsTopUp ? Colors.white : null,
+      mainButton: needsTopUp
+          ? TextButton(
+              onPressed: () => Get.toNamed(AppRoutes.employerWallet),
+              child: const Text(
+                'Nạp tiền',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          : null,
+    );
   }
 
   // ── Gửi duyệt (draft → pending) ───────────────────────────────────────────
@@ -138,11 +164,7 @@ class JobPostController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
-      Get.snackbar(
-        'Không thể gửi duyệt',
-        e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showJobPostError('Không thể gửi duyệt', e);
     }
   }
 
@@ -169,12 +191,12 @@ class JobPostController extends GetxController {
   // ── Hủy bài đăng (Doanh nghiệp) ───────────────────────────────────────────
   Future<void> cancelPost(JobPostModel post) async {
     try {
-      if (!post.startDate.isAfter(DateTime.now())) {
+      if (JobTimeHelper.hasStarted(post)) {
         throw Exception('Công việc đã bắt đầu, không thể hủy.');
       }
 
       final db = FirebaseFirestore.instance;
-      // Lấy danh sách ứng viên đã ứng tuyển (trừ withdrawn)
+      // Lấy danh sách ứng viên hợp lệ để tính đền bù.
       final appsSnap = await db
           .collection('applications')
           .where('jobId', isEqualTo: post.jobId)
@@ -184,13 +206,16 @@ class JobPostController extends GetxController {
           .map((d) => d.data())
           .where(
             (data) =>
-                data['status'] != 'withdrawn' && data['status'] != 'rejected',
+                data['status'] != 'withdrawn' &&
+                data['status'] != 'rejected' &&
+                data['status'] != 'cancelled',
           )
           .map((data) => (data['candidateId'] ?? '').toString())
           .where((id) => id.isNotEmpty)
           .toSet()
           .toList();
-      final shouldCompensate = post.filledSlots >= post.slots;
+      final shouldCompensate =
+          post.depositStatus == 'held' && post.filledSlots >= post.slots;
       final compensationPerUser = shouldCompensate && candidateIds.isNotEmpty
           ? (post.totalBudget * 0.1) / candidateIds.length
           : 0.0;
@@ -280,7 +305,7 @@ class JobPostController extends GetxController {
       await _service.updateJobPost(post);
       return true;
     } catch (e) {
-      Get.snackbar('Lỗi', e.toString());
+      _showJobPostError('Lỗi', e);
       return false;
     }
   }
@@ -384,11 +409,7 @@ class JobPostController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
-      Get.snackbar(
-        'Không thể gia hạn',
-        e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showJobPostError('Không thể gia hạn', e);
     }
   }
 
@@ -408,11 +429,7 @@ class JobPostController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
-      Get.snackbar(
-        'Không thể mở lại',
-        e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showJobPostError('Không thể mở lại', e);
     }
   }
 }

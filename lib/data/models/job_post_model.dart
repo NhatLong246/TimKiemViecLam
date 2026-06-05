@@ -23,6 +23,14 @@ class JobPostModel {
   final String
   status; // "draft"|"pending"|"approved"|"active"|"closed"|"rejected"|"cancelled"|"deleted"
   final double totalBudget;
+  final String depositStatus; // "none"|"held"|"refunded"|"released"
+  final String? depositTransactionId;
+  final DateTime? depositHeldAt;
+  final DateTime? depositRefundedAt;
+  final DateTime? depositReleasedAt;
+  final double? depositRefundAmount;
+  final double? depositCompensationAmount;
+  final Map<String, dynamic>? depositCalculation;
   final String? groupChatId;
   final List<String> imageUrls;
   final FullTimeJobDetails? fullTimeDetails;
@@ -50,6 +58,14 @@ class JobPostModel {
     this.requirements,
     required this.status,
     required this.totalBudget,
+    this.depositStatus = 'none',
+    this.depositTransactionId,
+    this.depositHeldAt,
+    this.depositRefundedAt,
+    this.depositReleasedAt,
+    this.depositRefundAmount,
+    this.depositCompensationAmount,
+    this.depositCalculation,
     this.groupChatId,
     this.imageUrls = const [],
     this.fullTimeDetails,
@@ -143,6 +159,8 @@ class JobPostModel {
       return DateTime.now();
     }
 
+    final rawDepositCalculation = map['depositCalculation'];
+
     return JobPostModel(
       jobId: map['jobId'] as String? ?? '',
       employerId: map['employerId'] as String? ?? '',
@@ -162,6 +180,23 @@ class JobPostModel {
       requirements: map['requirements'] as String?,
       status: map['status'] as String? ?? 'draft',
       totalBudget: (map['totalBudget'] as num?)?.toDouble() ?? 0,
+      depositStatus: map['depositStatus'] as String? ?? 'none',
+      depositTransactionId: map['depositTransactionId'] as String?,
+      depositHeldAt: map['depositHeldAt'] != null
+          ? toDateTime(map['depositHeldAt'])
+          : null,
+      depositRefundedAt: map['depositRefundedAt'] != null
+          ? toDateTime(map['depositRefundedAt'])
+          : null,
+      depositReleasedAt: map['depositReleasedAt'] != null
+          ? toDateTime(map['depositReleasedAt'])
+          : null,
+      depositRefundAmount: (map['depositRefundAmount'] as num?)?.toDouble(),
+      depositCompensationAmount: (map['depositCompensationAmount'] as num?)
+          ?.toDouble(),
+      depositCalculation: rawDepositCalculation is Map
+          ? Map<String, dynamic>.from(rawDepositCalculation)
+          : null,
       groupChatId: map['groupChatId'] as String?,
       imageUrls:
           (map['imageUrls'] as List?)
@@ -203,6 +238,20 @@ class JobPostModel {
       if (requirements != null) 'requirements': requirements,
       'status': status,
       'totalBudget': totalBudget,
+      'depositStatus': depositStatus,
+      if (depositTransactionId != null)
+        'depositTransactionId': depositTransactionId,
+      if (depositHeldAt != null)
+        'depositHeldAt': Timestamp.fromDate(depositHeldAt!),
+      if (depositRefundedAt != null)
+        'depositRefundedAt': Timestamp.fromDate(depositRefundedAt!),
+      if (depositReleasedAt != null)
+        'depositReleasedAt': Timestamp.fromDate(depositReleasedAt!),
+      if (depositRefundAmount != null)
+        'depositRefundAmount': depositRefundAmount,
+      if (depositCompensationAmount != null)
+        'depositCompensationAmount': depositCompensationAmount,
+      if (depositCalculation != null) 'depositCalculation': depositCalculation,
       if (groupChatId != null) 'groupChatId': groupChatId,
       if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
       if (fullTimeDetails != null) 'fullTimeDetails': fullTimeDetails!.toMap(),
@@ -233,6 +282,14 @@ class JobPostModel {
     String? requirements,
     String? status,
     double? totalBudget,
+    String? depositStatus,
+    String? depositTransactionId,
+    DateTime? depositHeldAt,
+    DateTime? depositRefundedAt,
+    DateTime? depositReleasedAt,
+    double? depositRefundAmount,
+    double? depositCompensationAmount,
+    Map<String, dynamic>? depositCalculation,
     String? groupChatId,
     List<String>? imageUrls,
     FullTimeJobDetails? fullTimeDetails,
@@ -260,6 +317,15 @@ class JobPostModel {
       requirements: requirements ?? this.requirements,
       status: status ?? this.status,
       totalBudget: totalBudget ?? this.totalBudget,
+      depositStatus: depositStatus ?? this.depositStatus,
+      depositTransactionId: depositTransactionId ?? this.depositTransactionId,
+      depositHeldAt: depositHeldAt ?? this.depositHeldAt,
+      depositRefundedAt: depositRefundedAt ?? this.depositRefundedAt,
+      depositReleasedAt: depositReleasedAt ?? this.depositReleasedAt,
+      depositRefundAmount: depositRefundAmount ?? this.depositRefundAmount,
+      depositCompensationAmount:
+          depositCompensationAmount ?? this.depositCompensationAmount,
+      depositCalculation: depositCalculation ?? this.depositCalculation,
       groupChatId: groupChatId ?? this.groupChatId,
       imageUrls: imageUrls ?? this.imageUrls,
       fullTimeDetails: fullTimeDetails ?? this.fullTimeDetails,
