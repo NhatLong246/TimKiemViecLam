@@ -141,6 +141,7 @@ class HomeController extends GetxController {
             if (jobId == null || status == null) continue;
             if (status == 'pending' ||
                 status == 'accepted' ||
+                status == 'rejected' ||
                 status == 'withdrawn') {
               map[jobId] = status;
             }
@@ -193,16 +194,16 @@ class HomeController extends GetxController {
         .where('candidateId', isEqualTo: uid)
         .snapshots()
         .listen((snap) {
-      final uniqueEmployers = <String>{};
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final empId = data['employerId'] as String?;
-        if (empId != null && empId.isNotEmpty) {
-          uniqueEmployers.add(empId);
-        }
-      }
-      interestCount.value = uniqueEmployers.length;
-    });
+          final uniqueEmployers = <String>{};
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final empId = data['employerId'] as String?;
+            if (empId != null && empId.isNotEmpty) {
+              uniqueEmployers.add(empId);
+            }
+          }
+          interestCount.value = uniqueEmployers.length;
+        });
   }
 
   Future<void> fetchLatestJobs() async {
@@ -338,6 +339,7 @@ class HomeController extends GetxController {
         if (jobId == null || status == null) continue;
         if (status == 'pending' ||
             status == 'accepted' ||
+            status == 'rejected' ||
             status == 'withdrawn') {
           map[jobId] = status;
         }
