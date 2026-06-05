@@ -75,9 +75,31 @@ class AttendanceAutoNotifyService {
     await runScheduledForGroup(group);
   }
 
-  /// Kiểm tra giờ ca từ phân công hôm nay; tự gửi nếu đến giờ mà NTD chưa bấm bắt đầu.
   Future<void> runScheduledForGroup(GroupChatModel group) async {
     if (group.jobId.isEmpty) return;
+
+    final jobSnap = await _db.collection('jobPosts').doc(group.jobId).get();
+    if (!jobSnap.exists) return;
+    final jobData = jobSnap.data();
+    if (jobData == null) return;
+    
+    final status = jobData['status'] as String? ?? '';
+    if (['closed', 'completed', 'cancelled', 'deleted', 'rejected', 'draft'].contains(status)) return;
+
+    final startDateTs = jobData['startDate'] as Timestamp?;
+    if (startDateTs == null) return;
+    final startDate = startDateTs.toDate();
+    final todayDt = DateTime.now();
+    final todayStart = DateTime(todayDt.year, todayDt.month, todayDt.day);
+    final jobStart = DateTime(startDate.year, startDate.month, startDate.day);
+    if (todayStart.isBefore(jobStart)) return;
+
+    final endDateTs = jobData['endDate'] as Timestamp?;
+    if (endDateTs != null) {
+      final endDate = endDateTs.toDate();
+      final jobEnd = DateTime(endDate.year, endDate.month, endDate.day);
+      if (todayStart.isAfter(jobEnd)) return;
+    }
 
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final shift = await _resolveShift(group.groupId, today);

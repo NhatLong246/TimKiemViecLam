@@ -9,6 +9,7 @@ import '../data/models/job_post_model.dart';
 import '../routes/app_routes.dart';
 import '../screens/attendance/candidate_attendance_screen.dart';
 import '../screens/attendance/candidate_work_assignment_screen.dart';
+import '../screens/menu_candidate/candidate_reviews_screen.dart';
 
 /// Điều hướng khi người dùng nhấn một mục trong danh sách thông báo.
 class NotificationNavigation {
@@ -90,6 +91,16 @@ class NotificationNavigation {
 
     if (item.isWorkAssignment) {
       await openWorkAssignment(item);
+      return;
+    }
+
+    if (type == 'new_review') {
+      Get.to(() => const CandidateReviewsScreen());
+      return;
+    }
+    
+    if (type == 'disbursement_received') {
+      Get.toNamed(AppRoutes.candidateEarnings);
       return;
     }
   }

@@ -247,6 +247,26 @@ class GroupChatService {
     return GroupChatModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
   }
 
+  // ─── Đóng nhóm chat khi công việc kết thúc ───────────────────────────────
+  Future<void> closeGroupsForJob(String jobId) async {
+    if (jobId.isEmpty) return;
+    final snap = await _groups.where('jobId', isEqualTo: jobId).get();
+    if (snap.docs.isEmpty) return;
+
+    WriteBatch batch = _db.batch();
+    var opCount = 0;
+    for (final doc in snap.docs) {
+      batch.update(doc.reference, {'status': 'closed'});
+      opCount++;
+      if (opCount >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) await batch.commit();
+  }
+
   // ─── Cập nhật trạng thái cuộc gọi ───────────────────────────────────────
   Future<void> updateCallStatus(
     String groupId,

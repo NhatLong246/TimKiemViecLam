@@ -24,6 +24,9 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
 
   double get _myRating =>
       Get.find<AuthController>().currentUser?.averageRating ?? 0;
+  
+  int get _myJobsDone =>
+      _ctrl.reviewableJobs.length + _ctrl.reviews.length;
 
   @override
   Widget build(BuildContext context) {
@@ -182,6 +185,21 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.work_outline, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_myJobsDone công việc đã làm',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(
                   'NTD xem điểm này khi duyệt hồ sơ của bạn.',
                   style: TextStyle(

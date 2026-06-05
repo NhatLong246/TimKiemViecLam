@@ -220,6 +220,15 @@ class WalletService {
           'createdAt': FieldValue.serverTimestamp(),
           'completedAt': FieldValue.serverTimestamp(),
         });
+
+        final candEarningRef = _firestore.collection('candidateEarnings').doc();
+        batch.set(candEarningRef, {
+          'candidateId': candidateId,
+          'jobId': jobId,
+          'amount': compensationPerUser,
+          'details': 'Đền bù do doanh nghiệp hủy công việc',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
     }
 

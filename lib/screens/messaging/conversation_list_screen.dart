@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -30,7 +31,7 @@ class ConversationListScreen extends StatefulWidget {
 class _ConversationListScreenState extends State<ConversationListScreen> {
   late final MessagingController _ctrl;
   final _searchCtrl = TextEditingController();
-  int _candidateTabIndex = 1; // 0: nhóm chat, 1: chat cá nhân
+  int _candidateTabIndex = 0; // 0: nhóm chat, 1: chat cá nhân
 
   Color get _primary =>
       widget.isEmployer ? const Color(0xFF7B1FA2) : const Color(0xFF2E7D32);
@@ -44,6 +45,35 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     MessagingBootstrap.startIfLoggedIn();
     _ctrl = MessagingBootstrap.ensureController();
     _ctrl.loadInbox();
+    _cleanupStaleGroups();
+  }
+
+  Future<void> _cleanupStaleGroups() async {
+    try {
+      final auth = Get.find<AuthController>();
+      final uid = auth.currentUser?.id;
+      if (uid == null) return;
+      
+      final db = FirebaseFirestore.instance;
+      final snap = await db.collection('groupChats').where('memberIds', arrayContains: uid).get();
+      
+      for (final doc in snap.docs) {
+        final jobId = doc.data()['jobId']?.toString();
+        final currentStatus = doc.data()['status']?.toString();
+        
+        if (jobId != null && jobId.isNotEmpty && currentStatus != 'closed') {
+          final jobSnap = await db.collection('jobPosts').doc(jobId).get();
+          if (jobSnap.exists) {
+            final jobStatus = jobSnap.data()?['status']?.toString();
+            if (['closed', 'completed', 'cancelled', 'deleted'].contains(jobStatus)) {
+              await doc.reference.update({'status': 'closed'});
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Cleanup error: $e');
+    }
   }
 
   @override

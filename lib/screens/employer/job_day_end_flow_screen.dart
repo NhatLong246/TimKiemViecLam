@@ -1128,10 +1128,9 @@ class _RatingScreenState extends State<_RatingScreen> {
         colorText: Colors.white,
       );
 
-      // Nếu đánh giá hết → quay về
+      // Xóa logic tự động back để user tự bấm nút Hoàn thành
       if (_ratedIds.length >= widget.candidates.length) {
-        Get.back();
-        Get.snackbar('Hoàn tất', 'Đã đánh giá tất cả ứng viên');
+        Get.snackbar('Tuyệt vời', 'Đã đánh giá tất cả ứng viên');
       }
     } catch (e) {
       Get.snackbar('Lỗi', e.toString());
@@ -1235,6 +1234,35 @@ class _RatingScreenState extends State<_RatingScreen> {
             ),
           );
         },
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              backgroundColor: const Color(0xFF00B2FF), // AppColors.employerPrimary
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () {
+              Get.back();
+              Get.snackbar(
+                'Hoàn tất',
+                'Quá trình giải ngân đã hoàn thành',
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            },
+            child: const Text(
+              'Hoàn thành giải ngân',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
       ),
     );
   }

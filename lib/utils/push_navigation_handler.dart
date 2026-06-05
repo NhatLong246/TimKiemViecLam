@@ -11,6 +11,7 @@ import '../screens/chat/call_screen.dart';
 import '../screens/messaging/chat_room_screen.dart';
 import '../screens/notification/notification_screen.dart';
 import '../screens/alarm/alarm_alert_screen.dart';
+import '../screens/menu_candidate/candidate_reviews_screen.dart';
 import 'messaging_bootstrap.dart';
 import 'notification_navigation.dart';
 
@@ -211,6 +212,17 @@ class PushNavigationHandler {
       }
       await Get.toNamed(AppRoutes.adminHome);
       return;
+    }
+
+    if (role == 'candidate') {
+      if (type == 'new_review') {
+        await Get.to(() => const CandidateReviewsScreen());
+        return;
+      }
+      if (type == 'disbursement_received') {
+        await Get.toNamed(AppRoutes.candidateEarnings);
+        return;
+      }
     }
 
     _openNotificationHub(role);

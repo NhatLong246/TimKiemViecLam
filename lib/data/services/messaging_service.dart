@@ -305,8 +305,8 @@ class MessagingService {
       // Xác định có phải nhóm việc không: chỉ 'direct' và 'peer' mới là chat cá nhân
       final isGroup = chatType != 'direct' && chatType != 'peer';
 
-      // NTD luôn thấy tất cả; Ứng viên không thấy nhóm việc đã đóng
-      if (!isEmployer && status == 'closed' && isGroup) continue;
+      // Ẩn nhóm việc đã đóng với TẤT CẢ mọi người (chỉ ẩn group chat)
+      if (status == 'closed' && isGroup) continue;
 
       final peerId = _resolvePeerId(
         members: members,
@@ -331,8 +331,8 @@ class MessagingService {
 
       final isGroup = chatType != 'direct' && chatType != 'peer';
 
-      // NTD luôn thấy tất cả; Ứng viên không thấy nhóm việc đã đóng
-      if (!isEmployer && status == 'closed' && isGroup) continue;
+      // Ẩn nhóm việc đã đóng với TẤT CẢ mọi người (chỉ ẩn group chat)
+      if (status == 'closed' && isGroup) continue;
 
       final peerId = _resolvePeerId(
         members: members,

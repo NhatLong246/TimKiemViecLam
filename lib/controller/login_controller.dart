@@ -16,22 +16,24 @@ import '../data/services/alarm_manager_service.dart';
 class AuthController extends GetxController {
   final LoginAuthService _authService = LoginAuthService();
   UserModel? currentUser;
-  bool _isPreparingSession = false;
+  Future<void>? _prepareSessionFuture;
   StreamSubscription<DocumentSnapshot>? _userSubscription;
 
   /// Mở app: chỉ giữ đăng nhập nếu đã tick **Ghi nhớ đăng nhập** lần trước.
-  Future<void> prepareSessionOnStartup() async {
-    if (_isPreparingSession) return;
-    _isPreparingSession = true;
-    try {
-      await _prepareSessionOnStartupImpl().timeout(const Duration(seconds: 12));
-    } catch (e) {
-      Get.snackbar('Lỗi session', e.toString());
-      currentUser = null;
-      update();
-    } finally {
-      _isPreparingSession = false;
-    }
+  Future<void> prepareSessionOnStartup() {
+    if (_prepareSessionFuture != null) return _prepareSessionFuture!;
+    
+    _prepareSessionFuture = () async {
+      try {
+        await _prepareSessionOnStartupImpl().timeout(const Duration(seconds: 12));
+      } catch (e) {
+        Get.snackbar('Lỗi session', e.toString());
+        currentUser = null;
+        update();
+      }
+    }();
+    
+    return _prepareSessionFuture!;
   }
 
   Future<void> _prepareSessionOnStartupImpl() async {
