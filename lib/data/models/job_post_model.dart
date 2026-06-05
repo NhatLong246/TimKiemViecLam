@@ -106,6 +106,16 @@ class JobPostModel {
     return city.isNotEmpty ? city : (location['address'] as String? ?? '');
   }
 
+  String get fullLocationDisplay {
+    final address = (location['address'] as String?)?.trim() ?? '';
+    final district = (location['district'] as String?)?.trim() ?? '';
+    final city = (location['city'] as String?)?.trim() ?? '';
+    
+    final parts = [address, district, city].where((s) => s.isNotEmpty).toList();
+    if (parts.isEmpty) return 'Chưa có địa điểm';
+    return parts.join(', ');
+  }
+
   double? get locationLat => (location['lat'] as num?)?.toDouble();
 
   double? get locationLng => (location['lng'] as num?)?.toDouble();

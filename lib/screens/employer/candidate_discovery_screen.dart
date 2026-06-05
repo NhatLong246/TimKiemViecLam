@@ -469,11 +469,21 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
           .cast<String>()
           .toSet();
 
+      final now = DateTime.now();
       final list = snap.docs.map((d) {
         final data = d.data();
         data['jobId'] = d.id;
         return JobPostModel.fromMap(data);
-      }).where((job) => !doneJobIds.contains(job.jobId)).toList();
+      }).where((job) {
+        if (doneJobIds.contains(job.jobId)) return false;
+        // Bỏ qua việc đã quá hạn ứng tuyển
+        if (job.applicationDeadline != null && job.applicationDeadline!.isBefore(now)) return false;
+        // Bỏ qua việc đã qua ngày kết thúc
+        if (job.endDate != null && job.endDate!.isBefore(now)) return false;
+        // Bỏ qua việc làm 1 ngày nhưng ngày bắt đầu đã qua (hôm qua trở về trước)
+        if (job.endDate == null && job.startDate.add(const Duration(days: 1)).isBefore(now)) return false;
+        return true;
+      }).toList();
 
       if (mounted) {
         setState(() {

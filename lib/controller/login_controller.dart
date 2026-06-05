@@ -24,7 +24,8 @@ class AuthController extends GetxController {
     _isPreparingSession = true;
     try {
       await _prepareSessionOnStartupImpl().timeout(const Duration(seconds: 12));
-    } catch (_) {
+    } catch (e) {
+      Get.snackbar('Lỗi session', e.toString());
       currentUser = null;
       update();
     } finally {
@@ -33,15 +34,6 @@ class AuthController extends GetxController {
   }
 
   Future<void> _prepareSessionOnStartupImpl() async {
-    final rememberMe = await PreferencesHelper.getRememberMe();
-    if (!rememberMe) {
-      if (FirebaseAuth.instance.currentUser != null) {
-        await _authService.logout();
-      }
-      currentUser = null;
-      update();
-      return;
-    }
 
     final user = await _authService.restoreSessionFromFirebase();
     if (user != null) {
@@ -57,11 +49,11 @@ class AuthController extends GetxController {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Get.snackbar(
             'Cảnh báo bảo mật',
-            'Tài khoản của bạn đã được đăng nhập ở thiết bị khác.',
+            'Đăng nhập ở máy khác. Remote: $remoteSessionId, Local: $localSessionId',
             snackPosition: SnackPosition.TOP,
             backgroundColor: Colors.red,
             colorText: Colors.white,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 10),
           );
         });
         return;
@@ -160,35 +152,10 @@ class AuthController extends GetxController {
     if (remoteSessionId != null &&
         remoteSessionId.isNotEmpty &&
         remoteSessionId != localSessionId) {
+      // Báo hiệu thiết bị cũ rằng có thiết bị mới đăng nhập
       await FirebaseFirestore.instance.collection('users').doc(user.id).update({
         'lastLoginAttempt': DateTime.now().millisecondsSinceEpoch,
       });
-
-      final completer = Completer<bool>();
-      Get.defaultDialog(
-        title: 'Tài khoản đang đăng nhập',
-        middleText:
-            'Tài khoản này đang được sử dụng ở thiết bị khác (hoặc bạn chưa đăng xuất trước khi xoá app). Bạn có muốn ép đăng nhập để gỡ kẹt không?',
-        textConfirm: 'Ép đăng nhập',
-        textCancel: 'Huỷ',
-        confirmTextColor: Colors.white,
-        barrierDismissible: false,
-        onConfirm: () {
-          Get.back();
-          if (!completer.isCompleted) completer.complete(true);
-        },
-        onCancel: () {
-          if (!completer.isCompleted) completer.complete(false);
-        },
-      );
-
-      final force = await completer.future;
-      if (!force) {
-        await _authService.logout();
-        throw Exception(
-          'Tài khoản đang được đăng nhập trên một thiết bị khác. Không thể đăng nhập.',
-        );
-      }
     }
 
     currentUser = user;

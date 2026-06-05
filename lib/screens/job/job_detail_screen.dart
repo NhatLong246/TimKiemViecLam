@@ -110,7 +110,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
     final title = job.title;
     final salary = job.salaryDisplay;
-    final location = job.locationDisplay;
+    final location = job.fullLocationDisplay;
     final type = job.jobType == 'part_time' ? 'Part-time' : 'Full-time';
     final description = job.description;
     final requirements = job.requirements;
