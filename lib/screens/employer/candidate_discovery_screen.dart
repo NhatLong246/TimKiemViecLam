@@ -368,7 +368,14 @@ class _CandidateCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  final employerId = FirebaseAuth.instance.currentUser?.uid;
+                  if (employerId != null && employerId.isNotEmpty) {
+                    await CandidateDiscoveryService().recordProfileView(
+                      candidateId: user.id,
+                      employerId: employerId,
+                    );
+                  }
                   Get.bottomSheet(
                     SendInterestSheet(candidate: user),
                     isScrollControlled: true,

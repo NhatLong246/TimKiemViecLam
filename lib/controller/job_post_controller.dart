@@ -21,18 +21,15 @@ class JobPostController extends GetxController {
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
 
+  final RxSet<String> pendingDisbursementJobIds = <String>{}.obs;
+  StreamSubscription<QuerySnapshot>? _noticesSubscription;
   StreamSubscription<List<JobPostModel>>? _subscription;
 
-  // ── Tabs: Đã đăng | Chờ duyệt | Bản nháp | Quá hạn ──────────────────────
+  // ── Tabs: Đã đăng | Chờ duyệt | Bản nháp | Quá hạn | Chờ GN | Đã HT ─────
   List<JobPostModel> get publishedPosts => allPosts.where((p) {
+    if (pendingDisbursementJobIds.contains(p.jobId)) return false;
     final isPublished = p.status == 'approved' || p.status == 'active';
-    final isExpired =
-        p.endDate != null &&
-        DateTime(
-          p.endDate!.year,
-          p.endDate!.month,
-          p.endDate!.day,
-        ).isBefore(_today);
+    final isExpired = p.exactEndTime.isBefore(DateTime.now());
     return isPublished && !isExpired;
   }).toList();
 
@@ -42,22 +39,25 @@ class JobPostController extends GetxController {
   List<JobPostModel> get draftPosts =>
       allPosts.where((p) => p.status == 'draft').toList();
 
-  // Quá hạn: có endDate đã qua và status đang approved/active,
-  // hoặc đã đóng (closed) hoặc bị từ chối (rejected)
+  // Quá hạn: có endDate đã qua và status đang approved/active, hoặc bị từ chối (rejected)
   List<JobPostModel> get expiredPosts => allPosts
       .where(
         (p) =>
-            p.status == 'closed' ||
-            p.status == 'rejected' ||
-            (p.endDate != null &&
-                DateTime(
-                  p.endDate!.year,
-                  p.endDate!.month,
-                  p.endDate!.day,
-                ).isBefore(_today) &&
-                (p.status == 'approved' || p.status == 'active')),
+            (!pendingDisbursementJobIds.contains(p.jobId) || p.filledSlots == 0) &&
+            (p.status == 'rejected' ||
+            (p.exactEndTime.isBefore(DateTime.now()) &&
+                (p.status == 'approved' || p.status == 'active'))),
       )
       .toList();
+
+  // Chờ giải ngân (đang có yêu cầu giải ngân pending_admin hoặc approved và phải có nhân viên)
+  List<JobPostModel> get pendingDisbursementPosts => allPosts
+      .where((p) => pendingDisbursementJobIds.contains(p.jobId) && p.filledSlots > 0)
+      .toList();
+
+  // Đã hoàn thành (đã giải ngân xong)
+  List<JobPostModel> get completedPosts =>
+      allPosts.where((p) => p.status == 'closed').toList();
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   @override
@@ -69,6 +69,7 @@ class JobPostController extends GetxController {
   @override
   void onClose() {
     _subscription?.cancel();
+    _noticesSubscription?.cancel();
     super.onClose();
   }
 
@@ -79,6 +80,7 @@ class JobPostController extends GetxController {
       return;
     }
     isLoading.value = true;
+    _listenToDisbursementNotices(uid);
     _subscription = _service
         .getJobPostsByEmployer(uid)
         .listen(
@@ -91,6 +93,27 @@ class JobPostController extends GetxController {
             isLoading.value = false;
           },
         );
+  }
+
+  void _listenToDisbursementNotices(String uid) {
+    _noticesSubscription = FirebaseFirestore.instance
+        .collection('disbursementNotices')
+        .where('employerId', isEqualTo: uid)
+        .snapshots()
+        .listen((snap) {
+      final newSet = snap.docs
+          .where((d) {
+            final s = d.data()['status'] as String? ?? '';
+            return ['approved', 'complaints_pending', 'complaints_reviewed'].contains(s);
+          })
+          .map((d) => d.data()['jobId'] as String)
+          .toSet();
+          
+      pendingDisbursementJobIds.assignAll(newSet);
+      allPosts.refresh(); // Ép giao diện vẽ lại
+    }, onError: (e) {
+      debugPrint('Error _listenToDisbursementNotices: $e');
+    });
   }
 
   // ── Tạo bài đăng ──────────────────────────────────────────────────────────

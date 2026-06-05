@@ -34,7 +34,13 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     _controller = Get.isRegistered<JobPostController>()
         ? Get.find<JobPostController>()
         : Get.put(JobPostController());
-    _tabController = TabController(length: 4, vsync: this);
+    
+    int initialIndex = 0;
+    if (Get.arguments is Map) {
+      initialIndex = Get.arguments['initialTab'] ?? 0;
+    }
+    
+    _tabController = TabController(length: 6, vsync: this, initialIndex: initialIndex);
     _tabController.addListener(_syncSortWithActiveTab);
   }
 
@@ -190,6 +196,14 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                   _buildPostList(
                       _sorted(_filter(_controller.expiredPosts)),
                       'expired',
+                      _controller),
+                  _buildPostList(
+                      _sorted(_filter(_controller.pendingDisbursementPosts)),
+                      'pendingDisbursement',
+                      _controller),
+                  _buildPostList(
+                      _sorted(_filter(_controller.completedPosts)),
+                      'completed',
                       _controller),
                 ],
               );
@@ -493,6 +507,8 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         ),
         child: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelColor: Colors.white,
           unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
           labelStyle:
@@ -508,7 +524,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
             borderRadius: BorderRadius.circular(10),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
-          labelPadding: EdgeInsets.zero,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
           padding: const EdgeInsets.all(4),
           dividerColor: Colors.transparent,
           tabs: [
@@ -516,6 +532,8 @@ class _PostManagementScreenState extends State<PostManagementScreen>
             Tab(text: 'Chờ duyệt (${_controller.pendingPosts.length})'),
             Tab(text: 'Bản nháp (${_controller.draftPosts.length})'),
             Tab(text: 'Quá hạn (${_controller.expiredPosts.length})'),
+            Tab(text: 'Chờ GN (${_controller.pendingDisbursementPosts.length})'),
+            Tab(text: 'Đã HT (${_controller.completedPosts.length})'),
           ],
         ),
       ),
@@ -544,7 +562,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       'published': 'Chưa có bài đăng nào được duyệt',
       'pending': 'Không có bài đăng chờ duyệt',
       'draft': 'Chưa có bản nháp nào',
-      'expired': 'Không có bài đăng quá hạn / đã đóng',
+      'expired': 'Không có bài đăng quá hạn',
+      'pendingDisbursement': 'Chưa có công việc nào đang chờ giải ngân',
+      'completed': 'Chưa có công việc nào hoàn thành',
     };
     return Center(
       child: Column(
@@ -759,10 +779,34 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       icon = Icons.send_rounded;
       label = 'Ưu tiên: Gửi duyệt';
       onTap = () => controller.submitForReview(post.jobId);
+    } else if (tabType == 'pendingDisbursement') {
+      icon = Icons.hourglass_top_rounded;
+      label = 'Ưu tiên: Xem yêu cầu';
+      onTap = () => PostManagementActions.openAttendance(post);
+    } else if (tabType == 'completed') {
+      icon = Icons.history_rounded;
+      label = 'Ưu tiên: Xem lịch sử';
+      onTap = () => PostManagementActions.viewDetail(post);
     } else if (post.status == 'rejected') {
       icon = Icons.refresh_rounded;
       label = 'Ưu tiên: Sửa và gửi lại';
       onTap = () => PostManagementActions.editPost(post);
+    } else if (tabType == 'expired') {
+      if (post.isPartTimeManaged && post.groupChatId != null && post.groupChatId!.isNotEmpty) {
+        icon = Icons.payment_rounded;
+        label = 'Ưu tiên: Xem & Giải ngân';
+        onTap = () => PostManagementActions.openAttendance(post);
+      } else {
+        icon = Icons.delete_outline_rounded;
+        label = 'Ưu tiên: Xóa bài đăng';
+        destructive = true;
+        onTap = () async {
+          final ok = await PostManagementActions.confirmDelete(context);
+          if (ok) {
+            await controller.deletePost(post.jobId);
+          }
+        };
+      }
     } else {
       icon = Icons.delete_outline_rounded;
       label = 'Ưu tiên: Xóa bài đăng';

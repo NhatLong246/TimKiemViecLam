@@ -55,6 +55,18 @@ class ComplaintsCatalogService {
           direction: ComplaintDirection.received,
         ));
       }
+      // NTD nhận cảnh báo từ Admin
+      final adminWarnings = await _db
+          .collection('adminWarnings')
+          .where('targetUserId', isEqualTo: uid)
+          .limit(50)
+          .get();
+      for (final d in adminWarnings.docs) {
+        items.add(ComplaintCatalogItem.fromAdminWarning(
+          d.data(),
+          d.id,
+        ));
+      }
     } else {
       // UV gửi: khiếu nại công việc
       final sentJob = await _db

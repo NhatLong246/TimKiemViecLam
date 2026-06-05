@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../data/services/alarm_manager_service.dart';
+import '../../data/models/personal_alarm_model.dart';
 
 class AlarmSetupScreen extends StatefulWidget {
   const AlarmSetupScreen({super.key});
@@ -12,6 +13,70 @@ class AlarmSetupScreen extends StatefulWidget {
 
 class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
   bool _isSyncing = false;
+  List<PersonalAlarmModel> _personalAlarms = [];
+  bool _isLoadingAlarms = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersonalAlarms();
+  }
+
+  Future<void> _loadPersonalAlarms() async {
+    final alarms = await AlarmManagerService.instance.getPersonalAlarms();
+    if (mounted) {
+      setState(() {
+        _personalAlarms = alarms;
+        _isLoadingAlarms = false;
+      });
+    }
+  }
+
+  Future<void> _addPersonalAlarm() async {
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (pickedTime == null || !mounted) return;
+
+    final TextEditingController titleController = TextEditingController();
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Nhập tiêu đề báo thức'),
+          content: TextField(
+            controller: titleController,
+            decoration: const InputDecoration(
+              hintText: 'Ví dụ: Dậy chuẩn bị đi làm',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Huỷ'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Lưu'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && titleController.text.trim().isNotEmpty) {
+      final alarm = PersonalAlarmModel(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title: titleController.text.trim(),
+        time: pickedTime,
+        isActive: true,
+      );
+      await AlarmManagerService.instance.addPersonalAlarm(alarm);
+      _loadPersonalAlarms();
+    }
+  }
 
   Future<void> _syncAlarms() async {
     setState(() => _isSyncing = true);
@@ -108,11 +173,58 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
           ),
           const SizedBox(height: 30),
           const Divider(),
-          const ListTile(
-            title: Text('Thêm báo thức cá nhân', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Tính năng sắp ra mắt...'),
-            trailing: Icon(Icons.add_alert),
-          )
+          const Divider(),
+          ListTile(
+            title: const Text('Danh sách Báo thức cá nhân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            trailing: IconButton(
+              icon: const Icon(Icons.add_alert, color: Colors.blue),
+              onPressed: _addPersonalAlarm,
+            ),
+          ),
+          if (_isLoadingAlarms)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(),
+            ))
+          else if (_personalAlarms.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Chưa có báo thức cá nhân nào. Nhấn biểu tượng 🔔 để thêm.', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center,),
+            )
+          else
+            ..._personalAlarms.map((alarm) => Dismissible(
+              key: Key(alarm.id.toString()),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                color: Colors.red,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              onDismissed: (_) async {
+                await AlarmManagerService.instance.deletePersonalAlarm(alarm.id);
+                _loadPersonalAlarms();
+              },
+              child: Card(
+                elevation: 0.5,
+                child: ListTile(
+                  title: Text(
+                    '${alarm.time.hour.toString().padLeft(2, '0')}:${alarm.time.minute.toString().padLeft(2, '0')}',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(alarm.title),
+                  trailing: Switch(
+                    value: alarm.isActive,
+                    activeColor: Colors.blue,
+                    onChanged: (val) async {
+                      await AlarmManagerService.instance.togglePersonalAlarm(alarm.id, val);
+                      _loadPersonalAlarms();
+                    },
+                  ),
+                ),
+              ),
+            )),
+          const SizedBox(height: 20),
         ],
       ),
     );

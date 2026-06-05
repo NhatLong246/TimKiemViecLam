@@ -17,6 +17,41 @@ class DiscoverableCandidate {
 class CandidateDiscoveryService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  Future<void> recordProfileView({
+    required String candidateId,
+    required String employerId,
+    String employerName = '',
+  }) async {
+    if (candidateId.isEmpty || employerId.isEmpty || candidateId == employerId) {
+      return;
+    }
+
+    final ref = _db.collection('users').doc(candidateId);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data() ?? <String, dynamic>{};
+      final rawViewers = data['profileViewers'];
+      final viewers = rawViewers is Map
+          ? Map<String, dynamic>.from(rawViewers)
+          : <String, dynamic>{};
+
+      if (viewers.containsKey(employerId)) return;
+
+      viewers[employerId] = {
+        'employerId': employerId,
+        if (employerName.trim().isNotEmpty) 'employerName': employerName.trim(),
+        'viewedAt': FieldValue.serverTimestamp(),
+      };
+
+      tx.set(ref, {
+        'profileViewers': viewers,
+        'profileViewCount': viewers.length,
+      }, SetOptions(merge: true));
+    });
+  }
+
   /// Lấy danh sách ứng viên đang tìm việc Full-time.
   /// Chỉ trả về user có `allowEmployerDiscovery: true`,
   /// role = candidate, isActive = true,

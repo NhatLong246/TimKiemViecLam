@@ -1,8 +1,12 @@
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'app/app.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'controller/login_controller.dart';
@@ -31,7 +35,14 @@ Future<void> _bootstrap() async {
     );
   }
 
+
   await initializeDateFormatting('vi', null);
+
+  // Khởi tạo timezone cho AlarmManager
+  tz_data.initializeTimeZones();
+  final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+  tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
+
   await PushNotificationService.instance.initialize();
 
   if (!Get.isRegistered<AuthController>()) {

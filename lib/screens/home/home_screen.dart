@@ -174,25 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: const [
-                          Icon(
-                            Icons.location_on,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Quận 1, TP.HCM',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
                       GetBuilder<AuthController>(
                         init: _authController,
                         builder: (controller) {
@@ -210,6 +191,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
                         },
+                      ),
+                      const SizedBox(height: 3),
+                      const Icon(
+                        Icons.visibility_outlined,
+                        color: Colors.white,
+                        size: 15,
                       ),
                     ],
                   ),

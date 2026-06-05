@@ -8,6 +8,7 @@ import '../../controller/candidates_controller.dart';
 import '../../data/models/application_model.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
+import '../../data/services/candidate_discovery_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'employer_reviews_screen.dart';
 
@@ -998,7 +999,15 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
   @override
   void initState() {
     super.initState();
+    _recordProfileView();
     _fetchFullUser();
+  }
+
+  Future<void> _recordProfileView() async {
+    await CandidateDiscoveryService().recordProfileView(
+      candidateId: widget.candidateSnap.uid,
+      employerId: widget.app.employerId,
+    );
   }
 
   Future<void> _fetchFullUser() async {

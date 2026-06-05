@@ -673,28 +673,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 jobSearchStatus: jobSearchStatus,
               ),
               Expanded(
-                child: RefreshIndicator(
-                  color: _primary,
-                  onRefresh: () => _onProfileRefresh(context, updateController),
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: BouncingScrollPhysics(),
-                    ),
-                    padding: EdgeInsets.fromLTRB(
-                      20,
-                      26,
-                      20,
-                      20 + bottomNavPadding + bottomInset,
-                    ),
-                    children: [
-                      _buildOverviewCard(),
-                      _buildVisibilityCard(),
-                      const SizedBox(height: 22),
-                      _buildAlarmCard(context),
-                      const SizedBox(height: 22),
-                      _buildJobCriteriaCard(),
-                    ],
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
                   ),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    26,
+                    20,
+                    20 + bottomNavPadding + bottomInset,
+                  ),
+                  children: [
+                    _buildOverviewCard(),
+                    _buildVisibilityCard(),
+                    const SizedBox(height: 22),
+                    _buildAlarmCard(context),
+                    const SizedBox(height: 22),
+                    _buildEarningsCard(context),
+                    const SizedBox(height: 22),
+                    _buildJobCriteriaCard(),
+                  ],
                 ),
               ),
             ],
@@ -738,6 +736,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     SizedBox(height: 4),
                     Text(
                       'Cài đặt chuông báo lịch làm việc',
+                      style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEarningsCard(BuildContext context) {
+    return _ProfileCard(
+      child: InkWell(
+        onTap: () {
+          Get.toNamed(AppRoutes.candidateEarnings);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.account_balance_wallet_rounded, color: Colors.green.shade800, size: 28),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ví thu nhập',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF262626),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Xem lịch sử nhận lương từ các ca làm',
                       style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
                     ),
                   ],

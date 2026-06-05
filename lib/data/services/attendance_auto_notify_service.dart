@@ -84,7 +84,7 @@ class AttendanceAutoNotifyService {
     final log = await _readLog(group.jobId, today);
     final now = DateTime.now();
 
-    if (!(log['checkInSent'] == true) && !_isBeforeTime(now, shift.start)) {
+    if (!(log['checkInSent'] == true) && _isAfterOrEqual(now, shift.start)) {
       final session = await _ensureTodaySession(
         group: group,
         expectedStart: shift.start,
@@ -99,7 +99,7 @@ class AttendanceAutoNotifyService {
       }
     }
 
-    if (!(log['checkOutSent'] == true) && !_isBeforeTime(now, shift.end)) {
+    if (!(log['checkOutSent'] == true) && _isAfterOrEqual(now, shift.end, startHHmm: shift.start)) {
       final session = await _attendance.getSessionByDate(group.jobId, today);
       if (session != null) {
         await _writeLog(group.jobId, today, checkOutSent: true);
@@ -251,16 +251,27 @@ class AttendanceAutoNotifyService {
     }
   }
 
-  bool _isBeforeTime(DateTime now, String hhmm) {
-    final t = _parseToday(hhmm);
-    return now.isBefore(t);
+  bool _isAfterOrEqual(DateTime now, String timeHHmm, {String? startHHmm}) {
+    final t = _parseToday(timeHHmm, startHHmm: startHHmm);
+    return !now.isBefore(t);
   }
 
-  DateTime _parseToday(String hhmm) {
+  DateTime _parseToday(String hhmm, {String? startHHmm}) {
     final parts = hhmm.split(':');
     final h = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 0 : 0;
     final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
     final n = DateTime.now();
-    return DateTime(n.year, n.month, n.day, h, m);
+    var dt = DateTime(n.year, n.month, n.day, h, m);
+    
+    // Xử lý ca qua đêm
+    if (startHHmm != null && startHHmm.isNotEmpty) {
+      final sParts = startHHmm.split(':');
+      final sh = sParts.isNotEmpty ? int.tryParse(sParts[0]) ?? 0 : 0;
+      final sm = sParts.length > 1 ? int.tryParse(sParts[1]) ?? 0 : 0;
+      if (h < sh || (h == sh && m < sm)) {
+        dt = dt.add(const Duration(days: 1));
+      }
+    }
+    return dt;
   }
 }

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/models/attendance_model.dart';
 import '../data/services/attendance_service.dart';
 import '../controller/login_controller.dart';
@@ -39,6 +40,25 @@ class AttendanceController extends GetxController {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final employerId = _auth.currentUser?.id ?? '';
 
+    String expectedEnd = '';
+    try {
+      final jobDoc = await FirebaseFirestore.instance.collection('jobPosts').doc(jobId).get();
+      if (jobDoc.exists) {
+        final data = jobDoc.data();
+        final double? hours = (data?['workHoursPerDay'] as num?)?.toDouble();
+        if (hours != null && expectedStartTime.contains(':')) {
+          final parts = expectedStartTime.split(':');
+          if (parts.length >= 2) {
+            final h = int.tryParse(parts[0]) ?? 0;
+            final m = int.tryParse(parts[1]) ?? 0;
+            final dt = DateTime(2000, 1, 1, h, m)
+                .add(Duration(minutes: (hours * 60).toInt()));
+            expectedEnd = DateFormat('HH:mm').format(dt);
+          }
+        }
+      }
+    } catch (_) {}
+
     final session = AttendanceModel(
       attendanceId: '',
       jobId: jobId,
@@ -46,6 +66,7 @@ class AttendanceController extends GetxController {
       employerId: employerId,
       date: today,
       expectedStartTime: expectedStartTime,
+      expectedEndTime: expectedEnd,
       records: workers,
       createdAt: DateTime.now(),
     );
@@ -58,6 +79,7 @@ class AttendanceController extends GetxController {
       employerId: session.employerId,
       date: session.date,
       expectedStartTime: session.expectedStartTime,
+      expectedEndTime: session.expectedEndTime,
       records: session.records,
       createdAt: session.createdAt,
     );

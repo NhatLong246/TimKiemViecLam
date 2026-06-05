@@ -168,6 +168,27 @@ class AttendanceService {
     var session = await getSessionByDate(jobId, today);
 
     if (session == null) {
+      String expectedStart = '08:00';
+      String expectedEnd = '';
+      try {
+        final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
+        if (jobDoc.exists) {
+          final data = jobDoc.data();
+          expectedStart = data?['startTime'] as String? ?? '08:00';
+          final double? hours = (data?['workHoursPerDay'] as num?)?.toDouble();
+          if (hours != null && expectedStart.contains(':')) {
+            final parts = expectedStart.split(':');
+            if (parts.length >= 2) {
+              final h = int.tryParse(parts[0]) ?? 0;
+              final m = int.tryParse(parts[1]) ?? 0;
+              final dt = DateTime(2000, 1, 1, h, m)
+                  .add(Duration(minutes: (hours * 60).toInt()));
+              expectedEnd = DateFormat('HH:mm').format(dt);
+            }
+          }
+        }
+      } catch (_) {}
+
       return createSession(
         AttendanceModel(
           attendanceId: '',
@@ -175,7 +196,8 @@ class AttendanceService {
           groupId: groupId,
           employerId: employerId,
           date: today,
-          expectedStartTime: DateFormat('HH:mm').format(DateTime.now()),
+          expectedStartTime: expectedStart,
+          expectedEndTime: expectedEnd,
           records: [
             AttendanceRecord(
               candidateId: candidateId,
@@ -207,11 +229,62 @@ class AttendanceService {
 
   Future<List<AttendanceModel>> fetchAllByJob(String jobId) async {
     final snap = await _col.where('jobId', isEqualTo: jobId).get();
-    final list = snap.docs
-        .map((d) =>
-            AttendanceModel.fromMap(d.data() as Map<String, dynamic>, d.id))
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final list = <AttendanceModel>[];
+    
+    // Fetch job doc once for self-healing
+    DocumentSnapshot<Map<String, dynamic>>? jobDoc;
+    bool triedFetchJob = false;
+    
+    for (var d in snap.docs) {
+      var model = AttendanceModel.fromMap(d.data() as Map<String, dynamic>, d.id);
+      
+      // Self-healing for legacy sessions
+      if (model.expectedEndTime.isEmpty || model.expectedStartTime == '08:00') {
+        try {
+          if (!triedFetchJob) {
+             jobDoc = await _db.collection('jobPosts').doc(jobId).get();
+             triedFetchJob = true;
+          }
+          if (jobDoc != null && jobDoc.exists) {
+            final jobData = jobDoc.data();
+            final String newStart = jobData?['startTime'] as String? ?? '08:00';
+            String newEnd = '';
+            final double? hours = (jobData?['workHoursPerDay'] as num?)?.toDouble();
+            if (hours != null && newStart.contains(':')) {
+              final parts = newStart.split(':');
+              if (parts.length >= 2) {
+                final h = int.tryParse(parts[0]) ?? 0;
+                final m = int.tryParse(parts[1]) ?? 0;
+                final dt = DateTime(2000, 1, 1, h, m)
+                    .add(Duration(minutes: (hours * 60).toInt()));
+                newEnd = DateFormat('HH:mm').format(dt);
+              }
+            }
+            
+            if (model.expectedStartTime != newStart || model.expectedEndTime != newEnd) {
+               await _col.doc(d.id).update({
+                  'expectedStartTime': newStart,
+                  'expectedEndTime': newEnd,
+               });
+               model = AttendanceModel(
+                  attendanceId: model.attendanceId,
+                  jobId: model.jobId,
+                  groupId: model.groupId,
+                  employerId: model.employerId,
+                  date: model.date,
+                  expectedStartTime: newStart,
+                  expectedEndTime: newEnd,
+                  records: model.records,
+                  createdAt: model.createdAt,
+               );
+            }
+          }
+        } catch (_) {}
+      }
+      list.add(model);
+    }
+
+    list.sort((a, b) => b.date.compareTo(a.date));
     return list;
   }
 
@@ -223,9 +296,52 @@ class AttendanceService {
         .get();
 
     if (snap.docs.isEmpty) return null;
-    return AttendanceModel.fromMap(
-      snap.docs.first.data() as Map<String, dynamic>,
-      snap.docs.first.id,
-    );
+
+    final docId = snap.docs.first.id;
+    final data = snap.docs.first.data() as Map<String, dynamic>;
+    var model = AttendanceModel.fromMap(data, docId);
+
+    // Self-healing for legacy sessions
+    if (model.expectedEndTime.isEmpty || model.expectedStartTime == '08:00') {
+      try {
+        final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
+        if (jobDoc.exists) {
+          final jobData = jobDoc.data();
+          final String newStart = jobData?['startTime'] as String? ?? '08:00';
+          String newEnd = '';
+          final double? hours = (jobData?['workHoursPerDay'] as num?)?.toDouble();
+          if (hours != null && newStart.contains(':')) {
+            final parts = newStart.split(':');
+            if (parts.length >= 2) {
+              final h = int.tryParse(parts[0]) ?? 0;
+              final m = int.tryParse(parts[1]) ?? 0;
+              final dt = DateTime(2000, 1, 1, h, m)
+                  .add(Duration(minutes: (hours * 60).toInt()));
+              newEnd = DateFormat('HH:mm').format(dt);
+            }
+          }
+          
+          if (model.expectedStartTime != newStart || model.expectedEndTime != newEnd) {
+             await _col.doc(docId).update({
+                'expectedStartTime': newStart,
+                'expectedEndTime': newEnd,
+             });
+             model = AttendanceModel(
+                attendanceId: model.attendanceId,
+                jobId: model.jobId,
+                groupId: model.groupId,
+                employerId: model.employerId,
+                date: model.date,
+                expectedStartTime: newStart,
+                expectedEndTime: newEnd,
+                records: model.records,
+                createdAt: model.createdAt,
+             );
+          }
+        }
+      } catch (_) {}
+    }
+
+    return model;
   }
 }

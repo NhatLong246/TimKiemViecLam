@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'widgets/incoming_call_overlay.dart';
 
 /// Màn hình cuộc gọi dùng Agora RTC Engine
 /// Hỗ trợ cả gọi thoại và gọi video.
@@ -64,6 +65,8 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _speakerOn = widget.isVideo;
+    // Đóng overlay cuộc gọi đến khi đã vào màn hình gọi
+    IncomingCallOverlay.markInCall();
     _initAgora();
   }
 
@@ -72,6 +75,8 @@ class _CallScreenState extends State<CallScreen> {
     _stopTimer();
     _engine?.leaveChannel();
     _engine?.release();
+    // Cho phép hiện overlay cuộc gọi mới sau khi rời cuộc gọi
+    IncomingCallOverlay.markCallEnded();
     super.dispose();
   }
 

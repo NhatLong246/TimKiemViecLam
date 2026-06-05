@@ -227,10 +227,10 @@ class UpdateAccountService {
   /// Bật/tắt cho phép NTD tìm thấy hồ sơ ứng viên.
   Future<void> setAllowEmployerDiscovery(bool value) async {
     final uid = _auth.currentUser!.uid;
-    await _firestore.collection('users').doc(uid).update({
+    await _firestore.collection('users').doc(uid).set({
       'allowEmployerDiscovery': value,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
   Future<void> removeWorkExperience(String experienceId) async {

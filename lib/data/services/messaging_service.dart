@@ -477,7 +477,7 @@ class MessagingService {
       },
       'createdAt': FieldValue.serverTimestamp(),
     });
-    await _updatePreview(groupId, content, uid);
+    await _updatePreview(groupId, content, uid, skipNotification: true);
 
     try {
       final snap = await _db.collection(_groups).doc(groupId).get();
@@ -1024,8 +1024,9 @@ class MessagingService {
   Future<void> _updatePreview(
     String groupId,
     String preview,
-    String senderId,
-  ) async {
+    String senderId, {
+    bool skipNotification = false,
+  }) async {
     final ref = _db.collection(_groups).doc(groupId);
     final snap = await ref.get();
     if (!snap.exists) return;
@@ -1094,6 +1095,7 @@ class MessagingService {
 
     for (final recipientId in recipientIds) {
       if (muted.contains(recipientId)) continue;
+      if (skipNotification) continue; // Cuộc gọi đã có notifyIncomingCall riêng
 
       final prev = (rawUnread[recipientId] as num?)?.toInt() ?? 0;
       final newCount = prev + 1;

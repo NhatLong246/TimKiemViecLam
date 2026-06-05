@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../common/styles/app_colors.dart';
+import '../../controller/employer_evaluate_candidates_controller.dart';
 import '../../controller/employer_review_controller.dart';
 import '../../data/models/employer_review_model.dart';
 
@@ -10,51 +11,83 @@ class EmployerReviewsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dùng tag để tách biệt controller cho mỗi candidate
     final args = Get.arguments as Map<String, dynamic>?;
     final tag = args?['uid'] as String?;
-    final ctrl = Get.put(EmployerReviewController(), tag: tag);
+    Get.put(EmployerReviewController(), tag: tag);
+    Get.put(EmployerEvaluateCandidatesController());
 
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: AppColors.employerPrimary,
+          foregroundColor: Colors.white,
+          title: const Text(
+            'Quản lý đánh giá',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          bottom: const TabBar(
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            tabs: [
+              Tab(text: 'Nhận về'),
+              Tab(text: 'Cần đánh giá'),
+            ],
+          ),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.employerGradient,
+            ),
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _ReceivedReviewsTab(tag: tag),
+            const _EvaluateCandidatesTab(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── TAB 1: Received Reviews ──────────────────────────────────────────────────
+
+class _ReceivedReviewsTab extends StatelessWidget {
+  const _ReceivedReviewsTab({this.tag});
+
+  final String? tag;
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = Get.find<EmployerReviewController>(tag: tag);
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       body: Obx(() {
         final summary = ctrl.summary.value;
         return CustomScrollView(
           slivers: [
-            // ─── AppBar ───────────────────────────────────
-            SliverAppBar(
-              expandedHeight: 220,
-              pinned: true,
-              leading: const BackButton(color: Colors.white),
-              title: Text(
-                ctrl.title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: AppColors.employerGradient,
                 ),
+                child: Obx(() => _RatingSummaryHeader(
+                      summary: ctrl.summary.value,
+                      isLoading: ctrl.isLoading.value,
+                    )),
               ),
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.employerGradient,
-                  ),
-                  child: Obx(() => _RatingSummaryHeader(
-                        summary: ctrl.summary.value,
-                        isLoading: ctrl.isLoading.value,
-                      )),
-                ),
-                collapseMode: CollapseMode.parallax,
-              ),
-              backgroundColor: AppColors.employerPrimary,
             ),
-
-            // ─── Nội dung ─────────────────────────────────
             if (ctrl.isLoading.value)
               const SliverFillRemaining(
                 child: Center(
-                  child: CircularProgressIndicator(
-                      color: AppColors.employerPrimary),
+                  child: CircularProgressIndicator(color: AppColors.employerPrimary),
                 ),
               )
             else if (ctrl.errorMessage.value.isNotEmpty)
@@ -65,9 +98,12 @@ class EmployerReviewsScreen extends StatelessWidget {
                 ),
               )
             else if (ctrl.reviews.isEmpty)
-              const SliverFillRemaining(child: _EmptyState())
+              const SliverFillRemaining(child: _EmptyState(
+                icon: Icons.rate_review_outlined,
+                title: 'Chưa có đánh giá nào',
+                subtitle: 'Khi ứng viên hoàn thành công việc\nvà đánh giá, nó sẽ hiển thị ở đây.',
+              ))
             else ...[
-              // Tiêu đề danh sách
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -81,13 +117,11 @@ class EmployerReviewsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              // Danh sách review
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) =>
-                        _ReviewCard(review: ctrl.reviews[index]),
+                    (context, index) => _ReviewCard(review: ctrl.reviews[index]),
                     childCount: ctrl.reviews.length,
                   ),
                 ),
@@ -96,7 +130,6 @@ class EmployerReviewsScreen extends StatelessWidget {
           ],
         );
       }),
-      // Nút làm mới
       floatingActionButton: Obx(() => ctrl.isLoading.value
           ? const SizedBox.shrink()
           : FloatingActionButton.small(
@@ -105,6 +138,201 @@ class EmployerReviewsScreen extends StatelessWidget {
               tooltip: 'Làm mới',
               child: const Icon(Icons.refresh, color: Colors.white),
             )),
+    );
+  }
+}
+
+// ─── TAB 2: Evaluate Candidates ───────────────────────────────────────────────
+
+class _EvaluateCandidatesTab extends StatelessWidget {
+  const _EvaluateCandidatesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = Get.find<EmployerEvaluateCandidatesController>();
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Obx(() {
+        if (ctrl.isLoading.value && ctrl.candidates.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.employerPrimary),
+          );
+        }
+        if (ctrl.candidates.isEmpty) {
+          return const _EmptyState(
+            icon: Icons.people_outline,
+            title: 'Chưa có ứng viên',
+            subtitle: 'Bạn chưa có ca làm nào giải ngân thành công\nhoặc không có ứng viên để đánh giá.',
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: ctrl.loadCandidates,
+          color: AppColors.employerPrimary,
+          child: ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: ctrl.candidates.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final c = ctrl.candidates[index];
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.employerPrimary.withOpacity(0.12),
+                        backgroundImage: (c.candidateAvatarUrl?.isNotEmpty ?? false)
+                            ? NetworkImage(c.candidateAvatarUrl!)
+                            : null,
+                        child: (c.candidateAvatarUrl?.isEmpty ?? true)
+                            ? Text(
+                                _initials(c.candidateName),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.employerPrimary,
+                                  fontSize: 16,
+                                ),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c.candidateName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              c.jobTitle,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (c.isReviewed)
+                        const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green, size: 16),
+                            SizedBox(width: 4),
+                            Text('Đã xong', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500)),
+                          ],
+                        )
+                      else
+                        OutlinedButton(
+                          onPressed: () => _showRatingDialog(context, c),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.employerPrimary,
+                            side: const BorderSide(color: AppColors.employerPrimary),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                            minimumSize: const Size(0, 32),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Đánh giá'),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  void _showRatingDialog(BuildContext context, CandidateToEvaluate candidate) {
+    final ctrl = Get.find<EmployerEvaluateCandidatesController>();
+    double rating = 4;
+    final commentCtrl = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Đánh giá ứng viên', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${candidate.candidateName}\n(${candidate.jobTitle})',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final star = i + 1;
+                    return IconButton(
+                      icon: Icon(
+                        star <= rating.round()
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: Colors.amber.shade700,
+                        size: 32,
+                      ),
+                      onPressed: () => setState(() => rating = star.toDouble()),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: commentCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Nhận xét (tùy chọn)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Get.back();
+              ctrl.submitRating(candidate.jobId, candidate.candidateId, rating, commentCtrl.text.trim());
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.employerPrimary),
+            child: const Text('Gửi'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -124,7 +352,7 @@ class _RatingSummaryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isLoading) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 72, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -391,7 +619,15 @@ class _StarRow extends StatelessWidget {
 // ─── Empty & Error States ────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -399,21 +635,20 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.rate_review_outlined,
-              size: 72, color: Colors.grey.shade300),
+          Icon(icon, size: 72, color: Colors.grey.shade300),
           const SizedBox(height: 16),
-          const Text(
-            'Chưa có đánh giá nào',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF757575)),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Khi ứng viên hoàn thành công việc\nvà đánh giá, nó sẽ hiển thị ở đây.',
+          Text(
+            subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+            style: const TextStyle(fontSize: 13, color: Colors.grey),
           ),
         ],
       ),

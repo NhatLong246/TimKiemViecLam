@@ -6,14 +6,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/job_post_model.dart';
 import '../../utils/push_navigation_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/personal_alarm_model.dart';
+import 'package:flutter/material.dart';
+import 'push_notification_service.dart';
 
 class AlarmManagerService {
   static final AlarmManagerService instance = AlarmManagerService._();
   AlarmManagerService._();
 
-  final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FlutterLocalNotificationsPlugin get _local => PushNotificationService.instance.localPlugin;
+  late final FirebaseFirestore _db = FirebaseFirestore.instance;
+  late final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> scheduleAlarm({
     required int id,
@@ -25,15 +29,13 @@ class AlarmManagerService {
     if (scheduledDate.isBefore(DateTime.now())) return;
 
     final androidDetails = AndroidNotificationDetails(
-      'alarm_channel',
+      'alarm_channel_v2',
       'Báo thức & Nhắc nhở',
       channelDescription: 'Báo động đỏ khi có ca làm việc sắp diễn ra',
       importance: Importance.max,
       priority: Priority.max,
       playSound: true,
       enableVibration: true,
-      fullScreenIntent: true,
-      additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
     );
 
     final details = NotificationDetails(android: androidDetails);
@@ -41,7 +43,8 @@ class AlarmManagerService {
     // Add type 'alarm' to payload
     payloadData['type'] = 'alarm';
 
-    await _local.zonedSchedule(
+    try {
+      await _local.zonedSchedule(
       id,
       title,
       body,
@@ -50,6 +53,34 @@ class AlarmManagerService {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: jsonEncode(payloadData),
+    );
+    } catch (e) {
+      debugPrint('Exact alarm failed: $e, falling back to inexact');
+      await _local.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(scheduledDate, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: jsonEncode(payloadData),
+      );
+    }
+  }
+
+  Future<void> testNotification() async {
+    final androidDetails = AndroidNotificationDetails(
+      'test_channel_v1',
+      'Test Thông báo',
+      importance: Importance.max,
+      priority: Priority.max,
+    );
+    await _local.show(
+      99999,
+      '🔔 Đã gọi được thông báo!',
+      'Hệ thống thông báo hoạt động bình thường.',
+      NotificationDetails(android: androidDetails),
     );
   }
 
@@ -88,27 +119,127 @@ class AlarmManagerService {
       final startParts = job.startTime!.split(':');
       if (startParts.length != 2) continue;
 
-      // Hẹn giờ báo thức vào đầu mỗi ngày làm việc, trước 30 phút
-      DateTime currentDay = DateTime(job.startDate.year, job.startDate.month, job.startDate.day, int.parse(startParts[0]), int.parse(startParts[1]));
+      // Tính toán giờ làm việc mỗi ngày
+      final startHours = int.parse(startParts[0]);
+      final startMins = int.parse(startParts[1]);
+      final workHours = job.workHoursPerDay ?? 8.0;
+      
+      final endTotalMins = (startHours * 60 + startMins + (workHours * 60).toInt());
+      final endHours = (endTotalMins ~/ 60) % 24;
+      final endMins = endTotalMins % 60;
+
+      DateTime currentDay = DateTime(job.startDate.year, job.startDate.month, job.startDate.day);
       final endDay = job.endDate != null ? DateTime(job.endDate!.year, job.endDate!.month, job.endDate!.day) : currentDay;
 
       while (currentDay.compareTo(endDay.add(const Duration(days: 1))) < 0) {
-        final alarmTime = currentDay.subtract(const Duration(minutes: 30));
-        
-        if (alarmTime.isAfter(DateTime.now())) {
-          final alarmId = (jobId + currentDay.toIso8601String()).hashCode;
+        // Báo thức ĐẦU CA (đúng giờ bắt đầu)
+        final startAlarmTime = DateTime(currentDay.year, currentDay.month, currentDay.day, startHours, startMins);
+        if (startAlarmTime.isAfter(DateTime.now())) {
+          final alarmId = (jobId + startAlarmTime.toIso8601String() + "_start").hashCode;
           await scheduleAlarm(
             id: alarmId,
-            title: 'Khẩn cấp: Ca làm việc sắp bắt đầu!',
-            body: 'Bạn có ca làm việc "${job.title}" lúc ${job.startTime}. Hãy chuẩn bị điểm danh ngay!',
-            scheduledDate: alarmTime,
+            title: '⏰ Đến giờ làm việc!',
+            body: 'Ca làm việc "${job.title}" đã bắt đầu. Hãy vào ứng dụng chụp ảnh điểm danh ĐẦU CA ngay nhé!',
+            scheduledDate: startAlarmTime,
             payloadData: {
               'jobId': jobId,
             },
           );
         }
+
+        // Báo thức CUỐI CA (đúng giờ kết thúc)
+        final endAlarmTime = DateTime(currentDay.year, currentDay.month, currentDay.day, endHours, endMins);
+        // Chú ý ca qua đêm: nếu giờ kết thúc < giờ bắt đầu thì cộng thêm 1 ngày
+        final finalEndAlarmTime = endAlarmTime.isBefore(startAlarmTime) 
+            ? endAlarmTime.add(const Duration(days: 1)) 
+            : endAlarmTime;
+            
+        if (finalEndAlarmTime.isAfter(DateTime.now())) {
+          final alarmId = (jobId + finalEndAlarmTime.toIso8601String() + "_end").hashCode;
+          await scheduleAlarm(
+            id: alarmId,
+            title: '⏰ Đã hết ca làm việc!',
+            body: 'Ca làm "${job.title}" vừa kết thúc. Hãy vào ứng dụng chụp ảnh điểm danh CUỐI CA để được ghi nhận công!',
+            scheduledDate: finalEndAlarmTime,
+            payloadData: {
+              'jobId': jobId,
+            },
+          );
+        }
+
         currentDay = currentDay.add(const Duration(days: 1));
       }
     }
+  }
+
+  // --- PERSONAL ALARM IMPLEMENTATION ---
+
+  Future<List<PersonalAlarmModel>> getPersonalAlarms() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dataList = prefs.getStringList('personal_alarms') ?? [];
+    return dataList.map((e) => PersonalAlarmModel.fromJson(e)).toList();
+  }
+
+  Future<void> _saveAllPersonalAlarms(List<PersonalAlarmModel> alarms) async {
+    final prefs = await SharedPreferences.getInstance();
+    final dataList = alarms.map((e) => e.toJson()).toList();
+    await prefs.setStringList('personal_alarms', dataList);
+  }
+
+  Future<void> addPersonalAlarm(PersonalAlarmModel alarm) async {
+    final alarms = await getPersonalAlarms();
+    alarms.add(alarm);
+    await _saveAllPersonalAlarms(alarms);
+    if (alarm.isActive) {
+      await _schedulePersonalAlarm(alarm);
+    }
+  }
+
+  Future<void> togglePersonalAlarm(int id, bool isActive) async {
+    final alarms = await getPersonalAlarms();
+    final index = alarms.indexWhere((e) => e.id == id);
+    if (index != -1) {
+      final updated = alarms[index].copyWith(isActive: isActive);
+      alarms[index] = updated;
+      await _saveAllPersonalAlarms(alarms);
+      if (isActive) {
+        await _schedulePersonalAlarm(updated);
+      } else {
+        await cancelAlarm(id);
+      }
+    }
+  }
+
+  Future<void> deletePersonalAlarm(int id) async {
+    final alarms = await getPersonalAlarms();
+    alarms.removeWhere((e) => e.id == id);
+    await _saveAllPersonalAlarms(alarms);
+    await cancelAlarm(id);
+  }
+
+  Future<void> _schedulePersonalAlarm(PersonalAlarmModel alarm) async {
+    final now = DateTime.now();
+    DateTime scheduledDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      alarm.time.hour,
+      alarm.time.minute,
+    );
+
+    // Nếu giờ đã qua trong ngày, lên lịch vào ngày mai
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+
+    await scheduleAlarm(
+      id: alarm.id,
+      title: '⏰ Báo thức cá nhân',
+      body: alarm.title,
+      scheduledDate: scheduledDate,
+      payloadData: {
+        'isPersonal': true,
+      },
+    );
   }
 }

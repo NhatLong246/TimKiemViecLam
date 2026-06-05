@@ -189,7 +189,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 2.2,
+        childAspectRatio: 1.8,
         children: items.map(_buildDetailTile).toList(),
       ),
     );

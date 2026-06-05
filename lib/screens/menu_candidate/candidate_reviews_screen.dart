@@ -230,7 +230,7 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Chưa có công việc đã được nhận. Đánh giá sau khi NTD chấp nhận đơn ứng tuyển.',
+            'Chưa có công việc nào đã hoàn thành để đánh giá. Bạn chỉ có thể đánh giá NTD sau khi ca làm việc kết thúc.',
           ),
         ),
       );

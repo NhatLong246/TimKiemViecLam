@@ -4,8 +4,16 @@ import '../../controller/messaging_controller.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/messaging_bootstrap.dart';
 
-class EmployerMenuScreen extends StatelessWidget {
+import '../../data/services/job_workflow_service.dart';
+
+class EmployerMenuScreen extends StatefulWidget {
   const EmployerMenuScreen({super.key});
+
+  @override
+  State<EmployerMenuScreen> createState() => _EmployerMenuScreenState();
+}
+
+class _EmployerMenuScreenState extends State<EmployerMenuScreen> {
 
   static const _gradientColors = [Color(0xFF7B1FA2), Color(0xFF1565C0)];
 
@@ -25,6 +33,11 @@ class EmployerMenuScreen extends StatelessWidget {
       route: AppRoutes.employerWallet,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {

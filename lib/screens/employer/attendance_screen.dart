@@ -10,10 +10,12 @@ import '../../controller/attendance_controller.dart';
 import '../../data/models/attendance_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/group_chat_model.dart';
+import '../../data/models/job_post_model.dart';
 import '../../data/services/attendance_auto_notify_service.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../data/services/job_attendance_completion_service.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/work_day_helper.dart';
 import '../../widgets/attendance_photo_info.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,6 +42,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   final _completionSvc = JobAttendanceCompletionService();
   List<UserModel>? _members;
   GroupChatModel? _group;
+  JobPostModel? _job;
+  String? _targetDate;
   Timer? _autoTimer;
   JobDisbursementReadiness? _readiness;
 
@@ -58,8 +62,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _memberIds = List<String>.from(args['memberIds'] as List? ?? []);
     _employerId = (args['employerId'] ?? '').toString();
 
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _ctrl.loadSessionByDate(_jobId, today);
     _loadMembers();
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupAutoAttendance());
   }
@@ -68,23 +70,90 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _group = await _groupChatSvc.getGroup(_groupId);
     if (_group == null) return;
 
+    final jobSnap = await FirebaseFirestore.instance.collection('jobs').doc(_jobId).get();
+    if (jobSnap.exists && jobSnap.data() != null) {
+      final data = jobSnap.data()!;
+      data['jobId'] = jobSnap.id;
+      if (mounted) setState(() => _job = JobPostModel.fromMap(data));
+    }
+
     final shift = await _autoNotify.resolveShiftForDisplay(_groupId);
     if (mounted) _timeCtrl.text = shift.start;
 
     await _autoNotify.onEmployerOpensAttendance(_group!);
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    await _ctrl.loadSessionByDate(_jobId, today);
+    
     await _refreshDisbursementReadiness();
+    
+    String targetDate = WorkDayHelper.getCurrentLogicalDate(_job);
+    
+    // Giới hạn: không được vượt quá ngày làm việc cuối cùng
+    String? maxDateStr;
+    if (_readiness != null && _readiness!.mandatoryDates.isNotEmpty) {
+      maxDateStr = _readiness!.mandatoryDates.last;
+    } else if (_job != null) {
+      maxDateStr = WorkDayHelper.formatDate(_job!.endDate ?? _job!.startDate);
+    }
+    
+    if (maxDateStr != null && targetDate.compareTo(maxDateStr) > 0) {
+      targetDate = maxDateStr;
+      
+      // Tự động dọn dẹp các phiên dư thừa bị tạo nhầm (lớn hơn maxDateStr)
+      try {
+        final badSnaps = await FirebaseFirestore.instance
+            .collection('jobs')
+            .doc(_jobId)
+            .collection('attendance')
+            .where('date', isGreaterThan: maxDateStr)
+            .get();
+        for (var doc in badSnaps.docs) {
+          final badRecs = await doc.reference.collection('records').get();
+          for (var r in badRecs.docs) await r.reference.delete();
+          await doc.reference.delete();
+        }
+      } catch (e) {
+        debugPrint('Lỗi dọn dẹp: $e');
+      }
+    }
+    
+    // Ép buộc hoàn thành các ngày cũ: tìm ngày chưa hoàn thành sớm nhất
+    if (_readiness != null && _readiness!.incompleteDates.isNotEmpty) {
+      final earliestIncomplete = _readiness!.incompleteDates.first;
+      if (earliestIncomplete.compareTo(targetDate) <= 0) {
+        targetDate = earliestIncomplete;
+      }
+    }
+
+    if (mounted) setState(() => _targetDate = targetDate);
+    await _ctrl.loadSessionByDate(_jobId, targetDate);
 
     _autoTimer?.cancel();
     _autoTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
       if (_group == null) return;
       await _autoNotify.runScheduledForGroup(_group!);
+      if (mounted) await _refreshDisbursementReadiness();
       if (mounted && _ctrl.currentSession.value == null) {
-        final t = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        String t = WorkDayHelper.getCurrentLogicalDate(_job);
+        
+        // Giới hạn: không vượt quá ngày làm việc cuối cùng
+        String? maxD;
+        if (_readiness != null && _readiness!.mandatoryDates.isNotEmpty) {
+          maxD = _readiness!.mandatoryDates.last;
+        } else if (_job != null) {
+          maxD = WorkDayHelper.formatDate(_job!.endDate ?? _job!.startDate);
+        }
+        if (maxD != null && t.compareTo(maxD) > 0) {
+          t = maxD;
+        }
+        
+        if (_readiness != null && _readiness!.incompleteDates.isNotEmpty) {
+          final earliestIncomplete = _readiness!.incompleteDates.first;
+          if (earliestIncomplete.compareTo(t) <= 0) {
+            t = earliestIncomplete;
+          }
+        }
+        if (mounted) setState(() => _targetDate = t);
         await _ctrl.loadSessionByDate(_jobId, t);
       }
-      if (mounted) await _refreshDisbursementReadiness();
     });
   }
 
@@ -164,67 +233,119 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   // ── Chưa có phiên hôm nay ────────────────────────────────────────────────
   Widget _buildNoSession() {
-    final today = DateFormat('EEEE, dd/MM/yyyy', 'vi').format(DateTime.now());
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _DateHeader(date: today),
-          const SizedBox(height: 24),
-          const Text('Giờ bắt đầu ca',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-          const SizedBox(height: 8),
-          _TimePickerField(controller: _timeCtrl),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.employerPrimary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
+    final dt = _targetDate != null
+        ? DateTime.parse(_targetDate!)
+        : WorkDayHelper.getCurrentLogicalDateTime(_job);
+    final today = DateFormat('EEEE, dd/MM/yyyy', 'vi').format(dt);
+
+    // Kiểm tra công việc đã kết thúc chưa
+    final jobEnded = _job != null && _job!.exactEndTime.isBefore(DateTime.now());
+
+    return Column(
+      children: [
+        _buildDayEndBar(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline,
-                    color: AppColors.employerPrimary, size: 20),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Nhấn "Bắt đầu điểm danh" để tạo phiên và tự gửi thông báo '
-                    'cho nhân viên. Đến giờ ca (phân công công việc), hệ thống '
-                    'cũng tự gửi nếu bạn chưa bấm bắt đầu.',
-                    style: TextStyle(fontSize: 13),
+                _DateHeader(date: today),
+                const SizedBox(height: 24),
+                if (jobEnded) ...[
+                  // Công việc đã kết thúc → không cho tạo phiên mới
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.event_busy, color: Colors.orange.shade700, size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Công việc đã kết thúc',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: Colors.orange.shade800)),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Không thể tạo phiên điểm danh mới. '
+                                'Hãy sử dụng nút Giải ngân bên trên để hoàn tất.',
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ] else ...[
+                  // Công việc chưa kết thúc → cho tạo phiên điểm danh
+                  const Text('Giờ bắt đầu ca',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  _TimePickerField(controller: _timeCtrl),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.employerPrimary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            color: AppColors.employerPrimary, size: 20),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Nhấn "Bắt đầu điểm danh" để tạo phiên và tự gửi thông báo '
+                            'cho nhân viên. Đến giờ ca (phân công công việc), hệ thống '
+                            'cũng tự gửi nếu bạn chưa bấm bắt đầu.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.employerGradient,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
+                        onPressed: _startSession,
+                        child: const Text('Bắt đầu điểm danh',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16)),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppColors.employerGradient,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14))),
-                onPressed: _startSession,
-                child: const Text('Bắt đầu điểm danh',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16)),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -267,7 +388,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildDayEndBar() {
     final r = _readiness;
-    if (r == null || r.requiredDays == 0) return const SizedBox.shrink();
+    if (r == null) return const SizedBox.shrink();
+    if (!r.canRequestDisbursement && r.requiredDays == 0) return const SizedBox.shrink();
 
     return Container(
       color: Colors.white,
@@ -390,9 +512,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 14),
                 ),
-                Text('Bắt đầu: ${session.expectedStartTime}',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade600)),
+                Text(
+                  session.expectedEndTime.isNotEmpty
+                      ? 'Thời gian làm việc: ${session.expectedStartTime} - ${session.expectedEndTime}'
+                      : 'Bắt đầu: ${session.expectedStartTime}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
               ],
             ),
           ),
@@ -488,7 +613,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             : 'Nhân viên',
         isCheckIn: isCheckIn,
         expectedStartTime: session.expectedStartTime,
-        allowDuplicate: true,
       );
     }
 
@@ -541,6 +665,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _startSession() async {
+    final timeParts = _timeCtrl.text.split(':');
+    if (timeParts.length == 2) {
+      final now = DateTime.now();
+      
+      // Chúng ta sử dụng _targetDate (hoặc current logical date) làm cơ sở
+      final baseDate = _targetDate != null 
+          ? DateTime.parse(_targetDate!) 
+          : WorkDayHelper.getCurrentLogicalDateTime(_job);
+          
+      final expectedTime = DateTime(baseDate.year, baseDate.month, baseDate.day, int.parse(timeParts[0]), int.parse(timeParts[1]));
+      
+      // Nếu _targetDate là ngày hôm qua, thì 'now' chắc chắn sẽ sau 'expectedTime', cho phép bắt đầu.
+      // Do đó check dưới đây sẽ an toàn.
+      if (now.isBefore(expectedTime)) {
+        Get.snackbar(
+          'Chưa đến giờ',
+          'Bạn chỉ có thể bắt đầu điểm danh từ ${_timeCtrl.text} trở đi.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+    }
+
     final workers = (_members ?? [])
         .where((u) => u.id != _employerId)
         .map((u) => AttendanceRecord(

@@ -295,7 +295,7 @@ class NotificationService {
     if (col == null) return false;
 
     final since = DateTime.now().subtract(within);
-    final snap = await col.limit(60).get();
+    final snap = await col.orderBy('createdAt', descending: true).limit(60).get();
     for (final doc in snap.docs) {
       final item = AppNotificationItem.fromMap(doc.id, doc.data());
       if (item.createdAt.isBefore(since)) continue;

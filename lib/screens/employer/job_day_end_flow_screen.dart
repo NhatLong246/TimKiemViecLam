@@ -6,11 +6,11 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/disbursement_notice_model.dart';
 import '../../data/models/group_chat_model.dart';
+import '../../data/models/user_model.dart';
+import '../../data/services/group_chat_service.dart';
 import '../../data/services/job_attendance_completion_service.dart';
 import '../../data/services/job_workflow_service.dart';
-import '../../routes/app_routes.dart';
 
-/// Khiếu nại (danh mục) → yêu cầu giải ngân → Admin duyệt → NTD giải ngân → đánh giá.
 class JobDayEndFlowScreen extends StatefulWidget {
   const JobDayEndFlowScreen({super.key});
 
@@ -21,18 +21,21 @@ class JobDayEndFlowScreen extends StatefulWidget {
 class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
   final _workflow = JobWorkflowService();
   final _completionSvc = JobAttendanceCompletionService();
+  final _groupChatSvc = GroupChatService();
   final _auth = Get.find<AuthController>();
 
   late GroupChatModel _group;
   late String _workDate;
-  int _step = 0;
+
+  List<UserModel> _candidates = [];
+  bool _loading = true;
   bool _submitting = false;
+
   final _amountCtrl = TextEditingController();
-  String? _selectedCandidateId;
-  double _rating = 4;
-  final _commentCtrl = TextEditingController();
-  DisbursementNoticeModel? _activeRequest;
-  JobDisbursementReadiness? _readiness;
+
+  // Rating state
+  final Map<String, double> _ratings = {};
+  final Map<String, TextEditingController> _comments = {};
 
   @override
   void initState() {
@@ -41,58 +44,52 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
     _group = args['group'] as GroupChatModel;
     _workDate = args['workDate'] as String? ??
         DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _verifyThenStart();
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _amountCtrl.dispose();
-    _commentCtrl.dispose();
-    super.dispose();
-  }
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final candidateIds = _group.memberIds
+          .where((id) => id.isNotEmpty && id != _group.employerId)
+          .toList();
 
-  Future<void> _verifyThenStart() async {
-    final candidateIds = _group.memberIds
-        .where((id) => id.isNotEmpty && id != _group.employerId)
-        .toList();
-    final readiness = await _completionSvc.evaluate(
-      jobId: _group.jobId,
-      groupId: _group.groupId,
-      candidateIds: candidateIds,
-    );
-    if (!mounted) return;
-    if (!readiness.canRequestDisbursement) {
-      Get.back();
-      Get.snackbar(
-        'Chưa thể giải ngân',
-        readiness.message,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 4),
+      final readiness = await _completionSvc.evaluate(
+        jobId: _group.jobId,
+        groupId: _group.groupId,
+        candidateIds: candidateIds,
       );
-      return;
+
+      _candidates = await _groupChatSvc.getGroupMembers(candidateIds);
+
+      if (mounted) setState(() => _loading = false);
+
+      if (!readiness.canRequestDisbursement) {
+        Get.back();
+        Get.snackbar('Chưa thể giải ngân', readiness.message,
+            backgroundColor: Colors.orange, colorText: Colors.white,
+            duration: const Duration(seconds: 4));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
     }
-    _readiness = readiness;
-    _activeRequest = await _workflow.getActiveRequestForJob(_group.jobId);
-    if (_activeRequest != null) {
-      _amountCtrl.text = _activeRequest!.amount.toStringAsFixed(0);
-      setState(() => _step = 1);
-      return;
-    }
-    setState(() => _step = 1);
   }
+
+  // ═══════════════════════════════════════════════════════
+  // BƯỚC 1: NTD NHẬP SỐ TIỀN → TẠO YÊU CẦU
+  // ═══════════════════════════════════════════════════════
 
   Future<void> _submitRequest() async {
-    final amount =
-        double.tryParse(_amountCtrl.text.replaceAll('.', '').replaceAll(',', '')) ??
-            0;
+    final amount = double.tryParse(
+            _amountCtrl.text.replaceAll('.', '').replaceAll(',', '')) ??
+        0;
     if (amount <= 0) {
       Get.snackbar('Lỗi', 'Nhập số tiền giải ngân hợp lệ');
       return;
     }
     setState(() => _submitting = true);
     try {
-      final id = await _workflow.requestDisbursement(
+      await _workflow.requestDisbursement(
         jobId: _group.jobId,
         groupId: _group.groupId,
         employerId: _auth.currentUser?.id ?? _group.employerId,
@@ -100,18 +97,6 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
         amount: amount,
         jobTitle: _group.jobTitle,
       );
-      _activeRequest = await _workflow.getActiveRequestForJob(_group.jobId);
-      if (_activeRequest == null && id.isNotEmpty) {
-        final snap = await _workflow.getActiveRequestForJob(_group.jobId);
-        _activeRequest = snap;
-      }
-      Get.snackbar(
-        'Đã gửi yêu cầu',
-        'Admin sẽ duyệt trước khi bạn được giải ngân.',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      if (mounted) setState(() {});
     } catch (e) {
       Get.snackbar('Lỗi', e.toString());
     } finally {
@@ -119,117 +104,169 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
     }
   }
 
-  Future<void> _confirmDisbursement() async {
-    final req = _activeRequest;
-    if (req == null || !req.canEmployerDisburse) return;
-    setState(() => _submitting = true);
-    try {
-      await _workflow.executeDisbursement(req.noticeId);
-      Get.snackbar('Đã giải ngân', 'Hoàn tất thanh toán',
-          backgroundColor: Colors.green, colorText: Colors.white);
-      if (mounted) setState(() => _step = 2);
-    } catch (e) {
-      Get.snackbar('Lỗi', e.toString());
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
+  // ═══════════════════════════════════════════════════════
+  // BƯỚC 2: HIỆN DIALOG "CÓ MUỐN KHIẾU NẠI KHÔNG?"
+  // ═══════════════════════════════════════════════════════
 
-  Future<void> _submitRating() async {
-    final cid = _selectedCandidateId;
-    if (cid == null || cid.isEmpty) {
-      Get.snackbar('Lỗi', 'Chọn nhân viên để đánh giá');
-      return;
-    }
-    setState(() => _submitting = true);
-    try {
-      await _workflow.submitEmployerRating(
-        jobId: _group.jobId,
-        candidateId: cid,
-        rating: _rating,
-        comment: _commentCtrl.text.trim(),
-      );
-      Get.back(result: true);
-      Get.snackbar('Hoàn tất', 'Đã đánh giá nhân viên',
-          backgroundColor: Colors.green, colorText: Colors.white);
-    } catch (e) {
-      Get.snackbar('Lỗi', e.toString());
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  List<String> get _candidateIds =>
-      _group.memberIds.where((id) => id != _group.employerId).toList();
-
-  Widget _buildAttendanceWarning() {
-    final r = _readiness!;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFFB74D)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline, color: Color(0xFFE65100), size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              r.message,
-              style: const TextStyle(fontSize: 13, height: 1.35),
-            ),
+  Future<void> _showComplaintOrDisburseDialog(DisbursementNoticeModel req) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Giải ngân'),
+        content: const Text(
+          'Bạn có muốn khiếu nại ứng viên nào không?\n\n'
+          '• Nếu KHÔNG → Tiền sẽ được chia đều cho tất cả ứng viên ngay.\n'
+          '• Nếu CÓ → Chọn ứng viên để gửi khiếu nại tới Admin.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Không, giải ngân luôn'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Có, tôi muốn khiếu nại'),
           ),
         ],
       ),
     );
+
+    if (result == true) {
+      // Chuyển sang màn hình chọn user khiếu nại
+      if (mounted) {
+        _navigateToSelectComplaintUser(req);
+      }
+    } else if (result == false) {
+      // Giải ngân trực tiếp
+      await _directDisburse(req);
+    }
   }
 
-  Widget _buildDisbursementStep() {
-    return StreamBuilder<DisbursementNoticeModel?>(
-      stream: _workflow.streamActiveRequestForJob(_group.jobId),
-      builder: (context, snap) {
-        final req = snap.data ?? _activeRequest;
-        if (req == null) {
-          return _buildRequestForm();
-        }
-        if (req.isWaitingAdmin) {
-          return _buildWaitingAdmin(req);
-        }
-        if (req.canEmployerDisburse) {
-          return _buildExecuteDisbursement(req);
-        }
-        return _buildRequestForm();
-      },
+  Future<void> _directDisburse(DisbursementNoticeModel req) async {
+    setState(() => _submitting = true);
+    try {
+      await _workflow.disburseDirectly(req.noticeId);
+      Get.snackbar('Hoàn tất', 'Đã giải ngân chia tiền cho tất cả ứng viên!',
+          backgroundColor: Colors.green, colorText: Colors.white);
+      // Hỏi đánh giá
+      _showRatingDialog(req);
+    } catch (e) {
+      Get.snackbar('Lỗi', e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // MÀN HÌNH CHỌN USER ĐỂ KHIẾU NẠI
+  // ═══════════════════════════════════════════════════════
+
+  void _navigateToSelectComplaintUser(DisbursementNoticeModel req) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _SelectComplaintUserScreen(
+          candidates: _candidates,
+          req: req,
+          workflow: _workflow,
+          onDone: () {
+            // Sau khi gửi xong khiếu nại → quay lại để chờ admin duyệt
+            Navigator.pop(context);
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildRequestForm() {
+  // ═══════════════════════════════════════════════════════
+  // GIẢI NGÂN SAU KHIẾU NẠI (Admin đã duyệt)
+  // ═══════════════════════════════════════════════════════
+
+  Future<void> _disburseAfterComplaint(DisbursementNoticeModel req) async {
+    setState(() => _submitting = true);
+    try {
+      await _workflow.disburseAfterComplaint(req.noticeId);
+      Get.snackbar('Hoàn tất', 'Đã giải ngân sau khi xử lý khiếu nại!',
+          backgroundColor: Colors.green, colorText: Colors.white);
+      _showRatingDialog(req);
+    } catch (e) {
+      Get.snackbar('Lỗi', e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // DIALOG HỎI ĐÁNH GIÁ SAU KHI GIẢI NGÂN XONG
+  // ═══════════════════════════════════════════════════════
+
+  Future<void> _showRatingDialog(DisbursementNoticeModel req) async {
+    if (!mounted) return;
+    final wantRate = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Đánh giá ứng viên'),
+        content: const Text('Bạn có muốn đánh giá ứng viên trong ca làm này không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Có, đánh giá'),
+          ),
+        ],
+      ),
+    );
+
+    if (wantRate == true && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _RatingScreen(
+            candidates: _candidates,
+            jobId: req.jobId,
+            jobTitle: req.jobTitle,
+            workflow: _workflow,
+          ),
+        ),
+      );
+    } else {
+      // Quay về trang chủ
+      Get.back();
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // BUILD UI
+  // ═══════════════════════════════════════════════════════
+
+  Widget _buildStepRequestForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Yêu cầu giải ngân — ${_group.jobTitle}',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-        ),
+        const Text('Giải ngân',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
         const SizedBox(height: 8),
-        const Text(
-          'Admin phải duyệt trước. Sau khi được phép, bạn mới xác nhận đã giải ngân.',
-          style: TextStyle(fontSize: 13),
-        ),
+        const Text('Nhập tổng số tiền lương cho ca làm này. Hệ thống sẽ tự chia đều cho các nhân viên.',
+            style: TextStyle(fontSize: 14)),
         const SizedBox(height: 16),
         TextField(
           controller: _amountCtrl,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            labelText: 'Số tiền đề nghị giải ngân (VNĐ) *',
+            labelText: 'Tổng số tiền (VNĐ) *',
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.payments_outlined),
           ),
         ),
+        const SizedBox(height: 8),
+        Text('Số nhân viên: ${_candidates.length}',
+            style: TextStyle(color: Colors.grey.shade600)),
         const SizedBox(height: 24),
         FilledButton(
           onPressed: _submitting ? null : _submitRequest,
@@ -237,76 +274,162 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
             backgroundColor: AppColors.employerPrimary,
             minimumSize: const Size.fromHeight(48),
           ),
-          child: Text(_submitting ? 'Đang gửi...' : 'Gửi yêu cầu tới Admin'),
+          child: Text(_submitting ? 'Đang xử lý...' : 'Xác nhận số tiền'),
         ),
       ],
     );
   }
 
-  Widget _buildWaitingAdmin(DisbursementNoticeModel req) {
-    return Column(
-      children: [
-        const Icon(Icons.hourglass_top, size: 56, color: Color(0xFFEF6C00)),
-        const SizedBox(height: 16),
-        const Text(
-          'Đang chờ Admin duyệt',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Số tiền: ${req.amount.toStringAsFixed(0)}₫\n'
-          'Bạn sẽ nhận thông báo khi Admin cho phép giải ngân.',
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: () => Get.toNamed(AppRoutes.complaintsCatalog),
-          icon: const Icon(Icons.gavel_outlined),
-          label: const Text('Xem danh mục khiếu nại'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildExecuteDisbursement(DisbursementNoticeModel req) {
+  Widget _buildStepApproved(DisbursementNoticeModel req) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
-          color: const Color(0xFFE8F5E9),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                const Icon(Icons.verified_outlined,
-                    color: Color(0xFF2E7D32), size: 40),
-                const SizedBox(height: 8),
-                const Text(
-                  'Admin đã cho phép giải ngân',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-                Text(
-                  '${req.amount.toStringAsFixed(0)}₫ — ${_group.jobTitle}',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
+        const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+        const SizedBox(height: 16),
+        const Text('Đã xác nhận số tiền',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: Colors.green),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        Text(
+          'Tổng tiền: ${req.amount.toStringAsFixed(0)}₫\n'
+          'Mỗi nhân viên nhận: ${(req.amount / (req.totalCandidates == 0 ? 1 : req.totalCandidates)).toStringAsFixed(0)}₫',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 15, height: 1.5),
         ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: _submitting ? null : _confirmDisbursement,
+        const SizedBox(height: 32),
+        FilledButton.icon(
+          onPressed: _submitting ? null : () => _showComplaintOrDisburseDialog(req),
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.employerPrimary,
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size.fromHeight(52),
           ),
-          child: Text(
-            _submitting ? 'Đang xử lý...' : 'Xác nhận đã giải ngân',
-          ),
+          icon: const Icon(Icons.monetization_on_outlined),
+          label: const Text('Tiến hành giải ngân', style: TextStyle(fontSize: 16)),
         ),
+      ],
+    );
+  }
+
+  Widget _buildStepComplaintsPending(DisbursementNoticeModel req) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.gavel, size: 64, color: Colors.deepPurple),
+        const SizedBox(height: 16),
+        const Text('Đang chờ Admin xem xét khiếu nại',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        const Text(
+          'Khiếu nại của bạn đã được gửi tới Admin.\nVui lòng chờ Admin xem xét và phản hồi.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        // Hiện danh sách ai bị khiếu nại
+        ...req.complainedCandidates.map((cid) {
+          final user = _candidates.firstWhereOrNull((c) => c.id == cid);
+          final name = user != null ? '${user.firstName} ${user.lastName}' : cid.substring(0, 8);
+          final reason = req.complaintReasons[cid] ?? '';
+          final amount = req.deductions[cid] ?? 0;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.warning_amber, color: Colors.red),
+              title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Lý do: $reason\nĐề xuất đền bù: ${amount.toStringAsFixed(0)}₫'),
+              isThreeLine: true,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildStepComplaintsReviewed(DisbursementNoticeModel req) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.task_alt, size: 64, color: Colors.green),
+        const SizedBox(height: 16),
+        const Text('Admin đã xem xét khiếu nại',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: Colors.green),
+            textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        if (req.adminNote.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+            child: Text('Ghi chú Admin: ${req.adminNote}'),
+          ),
+          const SizedBox(height: 16),
+        ],
+        // Hiện kết quả từng khiếu nại
+        ...req.complainedCandidates.map((cid) {
+          final user = _candidates.firstWhereOrNull((c) => c.id == cid);
+          final name = user != null ? '${user.firstName} ${user.lastName}' : cid.substring(0, 8);
+          final result = req.complaintResults[cid] ?? 'pending';
+          final isApproved = result == 'approved';
+          final finalAmt = req.adminFinalDeductions[cid] ?? 0;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            color: isApproved ? Colors.red.shade50 : Colors.green.shade50,
+            child: ListTile(
+              leading: Icon(
+                isApproved ? Icons.check_circle : Icons.cancel,
+                color: isApproved ? Colors.red : Colors.green,
+              ),
+              title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(isApproved
+                  ? 'Duyệt — Đền bù: ${finalAmt.toStringAsFixed(0)}₫'
+                  : 'Từ chối — Không trừ tiền'),
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        // Bảng tóm tắt tiền từng người nhận
+        const Divider(),
+        const Text('Bảng lương sau xử lý:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        ..._candidates.map((c) {
+          final wage = req.candidateAmounts[c.id] ?? 0;
+          final deduction = req.adminFinalDeductions[c.id] ?? 0;
+          final received = (wage - deduction).clamp(0, double.infinity);
+          return Card(
+            child: ListTile(
+              title: Text('${c.firstName} ${c.lastName}'),
+              subtitle: Text('Lương: ${wage.toStringAsFixed(0)}₫ | Trừ: ${deduction.toStringAsFixed(0)}₫'),
+              trailing: Text('${received.toStringAsFixed(0)}₫',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16)),
+            ),
+          );
+        }),
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: _submitting ? null : () => _disburseAfterComplaint(req),
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.green,
+            minimumSize: const Size.fromHeight(52),
+          ),
+          icon: const Icon(Icons.check_circle_outline),
+          label: Text(_submitting ? 'Đang xử lý...' : 'Giải ngân ngay',
+              style: const TextStyle(fontSize: 16)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepCompleted() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: const [
+        Icon(Icons.check_circle, size: 80, color: Colors.green),
+        SizedBox(height: 16),
+        Text('Đã giải ngân hoàn tất',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
+        SizedBox(height: 12),
+        Text('Nhóm chat đã được xóa và tiền đã chia về ví ứng viên.',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.5)),
       ],
     );
   }
@@ -314,86 +437,426 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(gradient: AppColors.employerGradient),
-        ),
+        flexibleSpace: Container(decoration: const BoxDecoration(gradient: AppColors.employerGradient)),
         foregroundColor: Colors.white,
-        title: Text(
-          _step == 2
-              ? 'Đánh giá nhân viên'
-              : _step == 1
-                  ? 'Giải ngân'
-                  : 'Kết thúc ca',
+        title: const Text('Giải ngân & Kết thúc ca'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : StreamBuilder<DisbursementNoticeModel?>(
+              stream: _workflow.streamActiveRequestForJob(_group.jobId),
+              builder: (context, snap) {
+                final req = snap.data;
+
+                Widget content;
+                if (req == null) {
+                  // Kiểm tra đã giải ngân chưa
+                  return FutureBuilder<bool>(
+                    future: _workflow.hasCompletedDisbursement(_group.jobId),
+                    builder: (ctx, completedSnap) {
+                      if (completedSnap.data == true) {
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: _buildStepCompleted(),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _buildStepRequestForm(),
+                      );
+                    },
+                  );
+                } else if (req.status == 'approved') {
+                  content = _buildStepApproved(req);
+                } else if (req.isComplaintsPending) {
+                  content = _buildStepComplaintsPending(req);
+                } else if (req.isComplaintsReviewed) {
+                  content = _buildStepComplaintsReviewed(req);
+                } else {
+                  content = _buildStepCompleted();
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: content,
+                );
+              },
+            ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MÀN HÌNH CHỌN USER ĐỂ KHIẾU NẠI
+// ═══════════════════════════════════════════════════════
+
+class _SelectComplaintUserScreen extends StatefulWidget {
+  final List<UserModel> candidates;
+  final DisbursementNoticeModel req;
+  final JobWorkflowService workflow;
+  final VoidCallback onDone;
+
+  const _SelectComplaintUserScreen({
+    required this.candidates,
+    required this.req,
+    required this.workflow,
+    required this.onDone,
+  });
+
+  @override
+  State<_SelectComplaintUserScreen> createState() => _SelectComplaintUserScreenState();
+}
+
+class _SelectComplaintUserScreenState extends State<_SelectComplaintUserScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        flexibleSpace: Container(decoration: const BoxDecoration(gradient: AppColors.employerGradient)),
+        foregroundColor: Colors.white,
+        title: const Text('Chọn ứng viên khiếu nại'),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: widget.candidates.length,
+        itemBuilder: (_, i) {
+          final c = widget.candidates[i];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundImage: c.avatarUrl?.isNotEmpty == true ? NetworkImage(c.avatarUrl!) : null,
+                child: c.avatarUrl?.isNotEmpty != true
+                    ? Text(c.firstName.isNotEmpty ? c.firstName[0] : '?')
+                    : null,
+              ),
+              title: Text('${c.firstName} ${c.lastName}',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Lương: ${(widget.req.candidateAmounts[c.id] ?? 0).toStringAsFixed(0)}₫'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => _ComplaintFormScreen(
+                      candidate: c,
+                      req: widget.req,
+                      workflow: widget.workflow,
+                      onSubmitted: () {
+                        // Quay về trang trước
+                        widget.onDone();
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MÀN HÌNH NHẬP KHIẾU NẠI CHO 1 ỨNG VIÊN
+// ═══════════════════════════════════════════════════════
+
+class _ComplaintFormScreen extends StatefulWidget {
+  final UserModel candidate;
+  final DisbursementNoticeModel req;
+  final JobWorkflowService workflow;
+  final VoidCallback onSubmitted;
+
+  const _ComplaintFormScreen({
+    required this.candidate,
+    required this.req,
+    required this.workflow,
+    required this.onSubmitted,
+  });
+
+  @override
+  State<_ComplaintFormScreen> createState() => _ComplaintFormScreenState();
+}
+
+class _ComplaintFormScreenState extends State<_ComplaintFormScreen> {
+  final _reasonCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  bool _submitting = false;
+
+  Future<void> _submit() async {
+    final reason = _reasonCtrl.text.trim();
+    final amount = double.tryParse(_amountCtrl.text.replaceAll('.', '').replaceAll(',', '')) ?? 0;
+
+    if (reason.isEmpty) {
+      Get.snackbar('Lỗi', 'Vui lòng nhập lý do khiếu nại');
+      return;
+    }
+    if (amount <= 0) {
+      Get.snackbar('Lỗi', 'Vui lòng nhập số tiền đền bù');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await widget.workflow.submitComplaint(
+        noticeId: widget.req.noticeId,
+        candidateId: widget.candidate.id,
+        reason: reason,
+        compensationAmount: amount,
+      );
+      Get.snackbar('Đã gửi', 'Khiếu nại đã được gửi tới Admin',
+          backgroundColor: Colors.green, colorText: Colors.white);
+      widget.onSubmitted();
+    } catch (e) {
+      Get.snackbar('Lỗi', e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wage = widget.req.candidateAmounts[widget.candidate.id] ?? 0;
+
+    return Scaffold(
+      appBar: AppBar(
+        flexibleSpace: Container(decoration: const BoxDecoration(gradient: AppColors.employerGradient)),
+        foregroundColor: Colors.white,
+        title: const Text('Gửi khiếu nại'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Thông tin ứng viên
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundImage: widget.candidate.avatarUrl?.isNotEmpty == true
+                          ? NetworkImage(widget.candidate.avatarUrl!)
+                          : null,
+                      child: widget.candidate.avatarUrl?.isNotEmpty != true
+                          ? Text(widget.candidate.firstName.isNotEmpty
+                              ? widget.candidate.firstName[0]
+                              : '?',
+                              style: const TextStyle(fontSize: 24))
+                          : null,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.candidate.firstName} ${widget.candidate.lastName}',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Tiền công: ${wage.toStringAsFixed(0)}₫',
+                              style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Lý do khiếu nại
+            const Text('Lý do khiếu nại *',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _reasonCtrl,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'VD: Đi trễ 2 tiếng, hư hỏng thiết bị...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Số tiền đền bù
+            const Text('Số tiền đền bù yêu cầu (VNĐ) *',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: 'VD: 100000',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.monetization_on_outlined),
+                helperText: 'Tiền công ứng viên: ${wage.toStringAsFixed(0)}₫.\n'
+                    'Nếu vượt tiền công, ứng viên sẽ phải bồi thường phần chênh lệch.',
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            FilledButton.icon(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+                minimumSize: const Size.fromHeight(52),
+              ),
+              icon: const Icon(Icons.send),
+              label: Text(_submitting ? 'Đang gửi...' : 'Gửi khiếu nại tới Admin',
+                  style: const TextStyle(fontSize: 16)),
+            ),
+          ],
         ),
       ),
-      body: _step < 1
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_step == 1 && _readiness != null && !_readiness!.canDisburse)
-                  _buildAttendanceWarning(),
-                if (_step == 1) _buildDisbursementStep(),
-                if (_step == 2) ...[
-                  const Text(
-                    'Đánh giá nhân viên',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedCandidateId,
-                    decoration: const InputDecoration(
-                      labelText: 'Chọn nhân viên *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _candidateIds
-                        .map((id) =>
-                            DropdownMenuItem(value: id, child: Text(id)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedCandidateId = v),
-                  ),
-                  const SizedBox(height: 16),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MÀN HÌNH ĐÁNH GIÁ SAU GIẢI NGÂN
+// ═══════════════════════════════════════════════════════
+
+class _RatingScreen extends StatefulWidget {
+  final List<UserModel> candidates;
+  final String jobId;
+  final String jobTitle;
+  final JobWorkflowService workflow;
+
+  const _RatingScreen({
+    required this.candidates,
+    required this.jobId,
+    required this.jobTitle,
+    required this.workflow,
+  });
+
+  @override
+  State<_RatingScreen> createState() => _RatingScreenState();
+}
+
+class _RatingScreenState extends State<_RatingScreen> {
+  final Map<String, double> _ratings = {};
+  final Map<String, TextEditingController> _comments = {};
+  final Set<String> _ratedIds = {};
+  bool _submitting = false;
+
+  Future<void> _submitRating(String candidateId) async {
+    final r = _ratings[candidateId] ?? 4.0;
+    final c = _comments[candidateId]?.text.trim() ?? '';
+
+    setState(() => _submitting = true);
+    try {
+      await widget.workflow.submitEmployerRating(
+        jobId: widget.jobId,
+        candidateId: candidateId,
+        rating: r,
+        comment: c,
+      );
+      setState(() => _ratedIds.add(candidateId));
+      Get.snackbar('Thành công', 'Đã đánh giá',
+          backgroundColor: Colors.green, colorText: Colors.white);
+
+      // Nếu đánh giá hết → quay về
+      if (_ratedIds.length >= widget.candidates.length) {
+        Get.back();
+        Get.snackbar('Hoàn tất', 'Đã đánh giá tất cả ứng viên');
+      }
+    } catch (e) {
+      Get.snackbar('Lỗi', e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        flexibleSpace: Container(decoration: const BoxDecoration(gradient: AppColors.employerGradient)),
+        foregroundColor: Colors.white,
+        title: const Text('Đánh giá ứng viên'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Bỏ qua', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: widget.candidates.length,
+        itemBuilder: (_, i) {
+          final c = widget.candidates[i];
+          final isRated = _ratedIds.contains(c.id);
+          _ratings.putIfAbsent(c.id, () => 4.0);
+          _comments.putIfAbsent(c.id, () => TextEditingController());
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (i) {
-                      final star = i + 1;
-                      return IconButton(
-                        icon: Icon(
-                          star <= _rating.round()
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          color: const Color(0xFFF57F17),
-                          size: 36,
-                        ),
-                        onPressed: () =>
-                            setState(() => _rating = star.toDouble()),
-                      );
-                    }),
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: c.avatarUrl?.isNotEmpty == true ? NetworkImage(c.avatarUrl!) : null,
+                        child: c.avatarUrl?.isNotEmpty != true
+                            ? Text(c.firstName.isNotEmpty ? c.firstName[0] : '?')
+                            : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text('${c.firstName} ${c.lastName}',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      ),
+                      if (isRated)
+                        const Icon(Icons.check_circle, color: Colors.green),
+                    ],
                   ),
-                  TextField(
-                    controller: _commentCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Nhận xét (tùy chọn)',
-                      border: OutlineInputBorder(),
+                  if (!isRated) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (idx) {
+                        final star = idx + 1;
+                        return IconButton(
+                          icon: Icon(
+                            star <= (_ratings[c.id] ?? 4).round()
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            color: const Color(0xFFF57F17),
+                            size: 32,
+                          ),
+                          onPressed: () => setState(() => _ratings[c.id] = star.toDouble()),
+                        );
+                      }),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _submitting ? null : _submitRating,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.employerPrimary,
-                      minimumSize: const Size.fromHeight(48),
+                    TextField(
+                      controller: _comments[c.id],
+                      decoration: const InputDecoration(
+                        labelText: 'Nhận xét (tùy chọn)',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                    child: Text(
-                      _submitting ? 'Đang gửi...' : 'Gửi đánh giá & hoàn tất',
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _submitting ? null : () => _submitRating(c.id),
+                      child: const Text('Gửi đánh giá'),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
+          );
+        },
+      ),
     );
   }
 }
