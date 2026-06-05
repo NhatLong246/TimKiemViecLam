@@ -11,6 +11,9 @@ import '../../data/models/user_model.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../data/services/job_attendance_completion_service.dart';
 import '../../data/services/job_workflow_service.dart';
+import '../../data/services/file_upload_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class JobDayEndFlowScreen extends StatefulWidget {
   const JobDayEndFlowScreen({super.key});
@@ -814,7 +817,22 @@ class _ComplaintFormScreen extends StatefulWidget {
 class _ComplaintFormScreenState extends State<_ComplaintFormScreen> {
   final _reasonCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
+  final List<File> _evidenceImages = [];
   bool _submitting = false;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage(limit: 3);
+    if (images.isNotEmpty) {
+      setState(() {
+        for (var img in images) {
+          if (_evidenceImages.length < 3) {
+            _evidenceImages.add(File(img.path));
+          }
+        }
+      });
+    }
+  }
 
   Future<void> _submit() async {
     final reason = _reasonCtrl.text.trim();
@@ -832,14 +850,25 @@ class _ComplaintFormScreenState extends State<_ComplaintFormScreen> {
       Get.snackbar('Lỗi', 'Vui lòng nhập số tiền đền bù');
       return;
     }
+    if (_evidenceImages.isEmpty) {
+      Get.snackbar('Lỗi', 'Vui lòng cung cấp ít nhất 1 hình ảnh bằng chứng (tối đa 3 ảnh)');
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
+      List<String> evidenceUrls = [];
+      for (final file in _evidenceImages) {
+        final url = await FileUploadService.uploadAnonymous(file);
+        evidenceUrls.add(url);
+      }
+
       await widget.workflow.submitComplaint(
         noticeId: widget.req.noticeId,
         candidateId: widget.candidate.id,
         reason: reason,
         compensationAmount: amount,
+        evidenceUrls: evidenceUrls,
       );
       Get.snackbar(
         'Đã gửi',
@@ -953,6 +982,80 @@ class _ComplaintFormScreenState extends State<_ComplaintFormScreen> {
                     'Nếu vượt tiền công, ứng viên sẽ phải bồi thường phần chênh lệch.',
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Hình ảnh bằng chứng
+            const Text(
+              'Bằng chứng (Bắt buộc, tối đa 3 ảnh)',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._evidenceImages.map((file) {
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          file,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: -8,
+                        right: -8,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _evidenceImages.remove(file);
+                            });
+                          },
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+                if (_evidenceImages.length < 3)
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.grey.shade100,
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_a_photo, color: Colors.grey),
+                          SizedBox(height: 4),
+                          Text('Thêm ảnh', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 32),
 
             FilledButton.icon(
@@ -961,9 +1064,18 @@ class _ComplaintFormScreenState extends State<_ComplaintFormScreen> {
                 backgroundColor: Colors.red,
                 minimumSize: const Size.fromHeight(52),
               ),
-              icon: const Icon(Icons.send),
+              icon: _submitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.send),
               label: Text(
-                _submitting ? 'Đang gửi...' : 'Gửi khiếu nại tới Admin',
+                _submitting ? 'Đang tải bằng chứng lên...' : 'Gửi khiếu nại tới Admin',
                 style: const TextStyle(fontSize: 16),
               ),
             ),
