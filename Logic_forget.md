@@ -83,3 +83,16 @@ Luồng đúng nên nằm trong Cloud Function hoặc backend transaction:
    - `refundTransactionIds`
 
 Client Flutter chỉ nên gọi API hủy và hiển thị kết quả. Mọi tính toán tiền, ghi ví, cập nhật trạng thái quan trọng phải do backend xử lý để tránh gian lận và tránh lỗi ghi dữ liệu không đồng bộ.
+1. Part-time gửi duyệt/tạo bài phải đủ tiền app để ứng trước.
+2. Số tiền ứng = tính theo lương, số người, số ngày, giờ/ngày.
+3. Lương phải > 0.
+4. Số lượng người thuê phải > 0.
+5. Ngày kết thúc không được trước ngày bắt đầu.
+6. Cùng ngày bắt đầu/kết thúc được phép, tính 1 ngày.
+7. Nếu trả lương theo giờ thì bắt buộc nhập Giờ làm/ngày.
+8. Giờ làm/ngày nếu nhập phải > 0 và <= 24.
+9. Nếu có hạn mức chi ví, tiền ứng không được vượt hạn mức đó.
+10. Khi sửa bài, nếu ngân sách tăng thì phải đủ tiền để giữ thêm phần chênh lệch.
+11. Khi sửa bài, nếu ngân sách giảm thì hoàn lại phần chênh lệch.
+12. Khi rút nháp/xóa/hủy trước giờ bắt đầu thì mới hoàn tiền held.
+13. “Đã bắt đầu” giờ tính bằng ngày + giờ bắt đầu, không còn tính từ 00:00.
