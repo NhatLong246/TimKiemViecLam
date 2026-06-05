@@ -7,6 +7,7 @@ import '../../controller/login_controller.dart';
 import '../../data/models/complaint_catalog_item.dart';
 import '../../data/models/group_chat_model.dart';
 import '../../data/services/complaints_catalog_service.dart';
+import '../../data/services/group_chat_service.dart';
 import '../../routes/app_routes.dart';
 
 /// Danh mục khiếu nại — gửi đi + nhận về.
@@ -62,11 +63,15 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
   List<ComplaintCatalogItem> _filtered(int tabIndex) {
     if (_isEmployer) {
       switch (tabIndex) {
-        case 0:
+        case 1:
+          return _all
+              .where((e) => e.direction == ComplaintDirection.sent)
+              .toList();
+        case 2:
           return _all
               .where((e) => e.direction == ComplaintDirection.received && e.type != ComplaintCatalogType.warning)
               .toList();
-        case 1:
+        case 3:
           return _all
               .where((e) => e.type == ComplaintCatalogType.warning)
               .toList();
@@ -98,7 +103,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
       return const ['Tất cả', 'Tôi gửi', 'Ca làm của tôi'];
     }
     if (_isEmployer) {
-      return const ['Nhận về', 'Cảnh báo'];
+      return const ['Tất cả', 'Đã gửi', 'Nhận về', 'Cảnh báo'];
     }
     return const ['Tất cả', 'Đã gửi', 'Nhận về'];
   }
@@ -172,9 +177,11 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
                                 padding: const EdgeInsets.symmetric(horizontal: 24),
                                 child: Text(
                                   _isEmployer
-                                      ? (tab == 0
-                                          ? 'Chưa có UV khiếu nại về tin đăng của bạn.'
-                                          : 'Chưa có cảnh báo nào từ Admin.')
+                                      ? (tab == 1 
+                                          ? 'Chưa có khiếu nại nào bạn gửi đi.'
+                                          : tab == 2
+                                              ? 'Chưa có UV khiếu nại về tin đăng của bạn.'
+                                              : 'Chưa có cảnh báo nào từ Admin.')
                                       : (tab == 1
                                           ? (_isCandidate
                                               ? 'Chưa khiếu nại về công việc bạn gửi.'
@@ -220,7 +227,7 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
             ? 'Theo dõi khiếu nại bạn gửi và khiếu nại NTD gửi về ca làm của bạn. '
                 'Gửi khiếu nại mới sau khi nhóm công việc đã giải tán.'
             : _isEmployer
-                ? 'Theo dõi khiếu nại UV gửi về tin đăng và cảnh báo từ Admin.'
+                ? 'Theo dõi khiếu nại lúc giải ngân, khiếu nại UV gửi và cảnh báo từ Admin.'
                 : 'Tất cả khiếu nại nhân viên và công việc trong hệ thống.',
         style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
       ),
@@ -242,17 +249,33 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        onTap: isWarning && _isEmployer
-            ? () async {
-                final changed = await Get.toNamed(
-                  AppRoutes.warningAppeal,
-                  arguments: item,
-                );
-                if (changed == true) {
-                  _load(); // reload after appeal
-                }
-              }
-            : null,
+        onTap: () async {
+          if (isWarning && _isEmployer) {
+            final changed = await Get.toNamed(
+              AppRoutes.warningAppeal,
+              arguments: item,
+            );
+            if (changed == true) {
+              _load(); // reload after appeal
+            }
+          } else if (item.id.startsWith('disb_') && _isEmployer && item.extraData != null) {
+            Get.dialog(const Center(child: CircularProgressIndicator()));
+            final g = await GroupChatService().getGroup(item.groupId);
+            Get.back(); // close loading
+            if (g != null) {
+              final changed = await Get.toNamed(
+                AppRoutes.jobDayEndFlow,
+                arguments: {
+                  'group': g,
+                  'workDate': item.extraData!['workDate'],
+                },
+              );
+              if (changed == true) _load();
+            } else {
+              Get.snackbar('Lỗi', 'Không tìm thấy thông tin nhóm.');
+            }
+          }
+        },
         borderRadius: BorderRadius.circular(8),
         child: ListTile(
         leading: CircleAvatar(

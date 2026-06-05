@@ -192,6 +192,10 @@ class PushNavigationHandler {
           return;
         }
       }
+      if (type.contains('complaint')) {
+        await Get.toNamed(AppRoutes.complaintsCatalog);
+        return;
+      }
       await Get.toNamed(AppRoutes.employerNotifications);
       return;
     }

@@ -119,8 +119,31 @@ class ScheduleService {
     final jobs = await _loadJobs(jobIds);
     final employers = await _loadEmployerNames(employerIds);
 
-    final list = raw.map((s) {
+    final list = raw.where((s) {
       final job = jobs[s.jobId];
+      if (job != null) {
+        final isInactive = ['closed', 'completed', 'cancelled', 'deleted'].contains(job.status);
+        final cutoffDate = job.closedAt ?? job.updatedAt ?? DateTime.now();
+        final cutoffKey = _dateKey(cutoffDate);
+        if (isInactive && s.date.compareTo(cutoffKey) > 0) {
+          return false;
+        }
+      }
+      return true;
+    }).map((s) {
+      final job = jobs[s.jobId];
+      String finalStatus = s.status;
+      if (job != null) {
+        final isInactive = ['closed', 'completed', 'cancelled', 'deleted'].contains(job.status);
+        if (isInactive) {
+          if (['closed', 'completed'].contains(job.status)) {
+            finalStatus = 'completed';
+          } else {
+            finalStatus = 'cancelled';
+          }
+        }
+      }
+
       return ScheduleModel(
         scheduleId: s.scheduleId,
         jobId: s.jobId,
@@ -129,7 +152,7 @@ class ScheduleService {
         date: s.date,
         startTime: s.startTime,
         endTime: s.endTime,
-        status: s.status,
+        status: finalStatus,
         jobTitle: s.jobTitle ?? job?.title ?? 'Công việc',
         jobLocation: s.jobLocation ?? job?.locationDisplay ?? '',
         employerName:
@@ -181,10 +204,20 @@ class ScheduleService {
       var current = DateTime(startDate.year, startDate.month, startDate.day);
       final end = DateTime(endDate.year, endDate.month, endDate.day);
 
+      final isInactive = ['closed', 'completed', 'cancelled', 'deleted'].contains(job.status);
+      final cutoffDate = job.closedAt ?? job.updatedAt ?? DateTime.now();
+      final cutoffKey = _dateKey(cutoffDate);
+
       int count = 0;
       while ((current.isBefore(end) || current.isAtSameMomentAs(end)) &&
           count < limitDays) {
         final dateKey = _dateKey(current);
+
+        if (isInactive && dateKey.compareTo(cutoffKey) > 0) {
+          current = current.add(const Duration(days: 1));
+          count++;
+          continue;
+        }
 
         final startTime = job.startTime ?? '08:00';
         final workHours = job.workHoursPerDay ?? 8.0;
@@ -203,6 +236,15 @@ class ScheduleService {
               '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
         }
 
+        String finalStatus = appStatus == 'pending' ? 'pending' : 'scheduled';
+        if (isInactive) {
+          if (['closed', 'completed'].contains(job.status)) {
+            finalStatus = 'completed';
+          } else {
+            finalStatus = 'cancelled';
+          }
+        }
+
         list.add(
           ScheduleModel(
             scheduleId: 'app_${appId}_$dateKey',
@@ -212,7 +254,7 @@ class ScheduleService {
             date: dateKey,
             startTime: startTime,
             endTime: endTime,
-            status: appStatus == 'pending' ? 'pending' : 'scheduled',
+            status: finalStatus,
             jobTitle: job.title,
             jobLocation: job.locationDisplay,
             employerName: empName,
