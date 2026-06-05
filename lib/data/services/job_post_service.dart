@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/job_post_model.dart';
 import '../../utils/job_time_helper.dart';
+import 'group_chat_service.dart';
 import 'job_pricing_service.dart';
 import 'job_workflow_service.dart';
 import 'sqlite_cache_service.dart';
@@ -592,6 +593,10 @@ class JobPostService {
 
       transaction.update(jobRef, updates);
     });
+    
+    if (['closed', 'completed', 'cancelled', 'deleted'].contains(status)) {
+      await GroupChatService().closeGroupsForJob(jobId);
+    }
   }
 
   // ── Lấy 1 bài đăng ───────────────────────────────────────────────────────

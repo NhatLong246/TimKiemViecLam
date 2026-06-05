@@ -9,6 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:viecnow/data/models/chat_message.dart';
 import 'package:viecnow/data/services/gemini_service.dart';
 
+const Color _primary = Color(0xFF6A11CB);
+const Color _secondary = Color(0xFF2575FC);
+
 class ChatbotScreen extends StatefulWidget {
   final String? appContext;
   const ChatbotScreen({super.key, this.appContext});
@@ -28,9 +31,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   bool _isSending = false;
   bool _isLoadingHistory = true;
 
-  static const Color _primary = Color(0xFF2E7D32);
-  static const Color _userBubble = Color(0xFF2E7D32);
-  static const Color _botBubble = Color(0xFFF1F5F1);
   static const String _sessionsKey = 'chatbot_sessions';
 
   static const _quickQuestions = [
@@ -360,7 +360,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
+      backgroundColor: const Color(0xFFF4F7F9),
       appBar: _buildAppBar(),
       body: _isLoadingHistory
           ? const Center(child: CircularProgressIndicator(color: _primary))
@@ -376,50 +376,57 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      elevation: 0,
+      backgroundColor: Colors.white,
+      elevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.05),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF444444)),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1A1A1A)),
         onPressed: () => Navigator.pop(context),
       ),
       title: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF43A047), Color(0xFF1E88E5)],
+                colors: [_primary, _secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: _primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: const Icon(
-              Icons.smart_toy_outlined,
-              color: Colors.white,
-              size: 22,
-            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Trợ lý ViecNow',
+                  'ViecNow AI Pro',
                   style: TextStyle(
                     color: Color(0xFF1A1A1A),
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Tư vấn việc làm AI',
+                  'Trợ lý trực tuyến 24/7',
                   style: TextStyle(
-                    color: Color(0xFF4CAF50),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    color: _primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -601,50 +608,62 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Widget _buildMessageItem(ChatMessage msg) {
     final isUser = msg.role == MessageRole.user;
-    final maxWidth = MediaQuery.of(context).size.width * 0.72;
+    final maxWidth = MediaQuery.of(context).size.width * 0.75;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
             Container(
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF43A047), Color(0xFF1E88E5)],
+                  colors: [_primary, _secondary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(10),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _primary.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.smart_toy_outlined,
-                color: Colors.white,
-                size: 18,
-              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               constraints: BoxConstraints(maxWidth: maxWidth),
               decoration: BoxDecoration(
-                color: isUser ? _userBubble : _botBubble,
+                color: isUser ? null : Colors.white,
+                gradient: isUser
+                    ? const LinearGradient(
+                        colors: [_primary, _secondary],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(isUser ? 18 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 18),
+                  topLeft: const Radius.circular(20),
+                  topRight: const Radius.circular(20),
+                  bottomLeft: Radius.circular(isUser ? 20 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 20),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: isUser 
+                        ? _primary.withValues(alpha: 0.25) 
+                        : Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -661,11 +680,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         Text(
                           msg.text,
                           style: TextStyle(
-                            color: isUser
-                                ? Colors.white
-                                : const Color(0xFF1A1A1A),
-                            fontSize: 14.5,
-                            height: 1.45,
+                            color: isUser ? Colors.white : const Color(0xFF222222),
+                            fontSize: 15,
+                            height: 1.5,
                           ),
                         ),
                       ],
@@ -724,29 +741,37 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Widget _buildQuickQuestions() {
     if (_isSending) return const SizedBox.shrink();
     return Container(
-      height: 40,
-      color: Colors.white,
+      height: 44,
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         itemCount: _quickQuestions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
           return GestureDetector(
             onTap: () => _sendMessage(_quickQuestions[i]),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFA5D6A7)),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _primary.withValues(alpha: 0.2)),
+                boxShadow: [
+                  BoxShadow(
+                    color: _primary.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
+              alignment: Alignment.center,
               child: Text(
                 _quickQuestions[i],
                 style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF2E7D32),
-                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                  color: _primary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -758,12 +783,21 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Widget _buildInputBar() {
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 10,
-        bottom: MediaQuery.of(context).padding.bottom + 14,
+        left: 12,
+        right: 12,
+        top: 12,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -773,66 +807,94 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             const SizedBox(height: 8),
           ],
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              GestureDetector(
-                onTap: _isSending ? null : _showAttachmentOptions,
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE8F5E9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: _primary,
-                    size: 24,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: GestureDetector(
+                  onTap: _isSending ? null : _showAttachmentOptions,
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F2F5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Color(0xFF444444),
+                      size: 26,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F1),
-                    borderRadius: BorderRadius.circular(24),
+                    color: const Color(0xFFF0F2F5),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: Colors.transparent),
                   ),
                   child: TextField(
                     controller: _controller,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
+                    maxLines: 5,
+                    minLines: 1,
                     textInputAction: TextInputAction.newline,
-                    style: const TextStyle(fontSize: 14.5),
+                    style: const TextStyle(fontSize: 15),
                     decoration: const InputDecoration(
-                      hintText: 'Hỏi về việc làm...',
+                      hintText: 'Nhập tin nhắn cho AI...',
                       hintStyle: TextStyle(
-                        color: Color(0xFFAAAAAA),
-                        fontSize: 14,
+                        color: Color(0xFF999999),
+                        fontSize: 14.5,
                       ),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
+                        horizontal: 18,
+                        vertical: 12,
                       ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
-              GestureDetector(
-                onTap: () => _sendMessage(_controller.text),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: _isSending ? const Color(0xFFCCCCCC) : _primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _isSending ? Icons.hourglass_top : Icons.send_rounded,
-                    color: Colors.white,
-                    size: 20,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: GestureDetector(
+                  onTap: () => _sendMessage(_controller.text),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: _isSending
+                          ? const LinearGradient(colors: [Color(0xFFCCCCCC), Color(0xFFB0B0B0)])
+                          : const LinearGradient(colors: [_primary, _secondary]),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: _isSending
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: _primary.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              )
+                            ],
+                    ),
+                    child: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                   ),
                 ),
               ),
@@ -972,7 +1034,7 @@ class _BouncingDotState extends State<_BouncingDot>
           height: 8,
           margin: const EdgeInsets.symmetric(horizontal: 3),
           decoration: const BoxDecoration(
-            color: Color(0xFF2E7D32),
+            gradient: LinearGradient(colors: [_primary, _secondary]),
             shape: BoxShape.circle,
           ),
         ),
