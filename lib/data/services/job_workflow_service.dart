@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/disbursement_notice_model.dart';
+import '../models/app_notification_model.dart';
 import 'notification_service.dart';
 import 'candidate_earnings_service.dart';
 
@@ -21,7 +22,10 @@ class JobWorkflowService {
   // ═══════════════════════════════════════════════════════
 
   Future<bool> hasBlockingDisbursementNotice(String jobId) async {
-    final snap = await _notices.where('jobId', isEqualTo: jobId).limit(10).get();
+    final snap = await _notices
+        .where('jobId', isEqualTo: jobId)
+        .limit(10)
+        .get();
     for (final doc in snap.docs) {
       final s = doc.data()['status'] as String? ?? '';
       if ([
@@ -49,11 +53,10 @@ class JobWorkflowService {
   Future<DisbursementNoticeModel?> getActiveRequestForJob(String jobId) async {
     final snap = await _notices
         .where('jobId', isEqualTo: jobId)
-        .where('status', whereIn: [
-          'approved',
-          'complaints_pending',
-          'complaints_reviewed',
-        ])
+        .where(
+          'status',
+          whereIn: ['approved', 'complaints_pending', 'complaints_reviewed'],
+        )
         .limit(1)
         .get();
     if (snap.docs.isEmpty) return null;
@@ -64,18 +67,17 @@ class JobWorkflowService {
   Stream<DisbursementNoticeModel?> streamActiveRequestForJob(String jobId) {
     return _notices
         .where('jobId', isEqualTo: jobId)
-        .where('status', whereIn: [
-          'approved',
-          'complaints_pending',
-          'complaints_reviewed',
-        ])
+        .where(
+          'status',
+          whereIn: ['approved', 'complaints_pending', 'complaints_reviewed'],
+        )
         .limit(1)
         .snapshots()
         .map((snap) {
-      if (snap.docs.isEmpty) return null;
-      final d = snap.docs.first;
-      return DisbursementNoticeModel.fromMap(d.data(), d.id);
-    });
+          if (snap.docs.isEmpty) return null;
+          final d = snap.docs.first;
+          return DisbursementNoticeModel.fromMap(d.data(), d.id);
+        });
   }
 
   /// Stream tất cả khiếu nại của NTD hiện tại (cho màn hình danh sách khiếu nại)
@@ -84,10 +86,13 @@ class JobWorkflowService {
         .where('employerId', isEqualTo: employerId)
         .where('status', whereIn: ['complaints_pending', 'complaints_reviewed'])
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => DisbursementNoticeModel.fromMap(d.data(), d.id))
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+        .map(
+          (snap) =>
+              snap.docs
+                  .map((d) => DisbursementNoticeModel.fromMap(d.data(), d.id))
+                  .toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+        );
   }
 
   // ═══════════════════════════════════════════════════════
@@ -101,6 +106,8 @@ class JobWorkflowService {
     required String employerId,
     required String workDate,
     required double amount,
+    required double totalEarned,
+    required Map<String, double> candidateAmounts,
     required String jobTitle,
   }) async {
     final existing = await getActiveRequestForJob(jobId);
@@ -108,21 +115,7 @@ class JobWorkflowService {
       throw Exception('Đã có yêu cầu giải ngân đang xử lý.');
     }
 
-    // Lấy danh sách ứng viên → chia đều
-    final groupSnap = await _groups.doc(groupId).get();
-    List<String> candidates = [];
-    if (groupSnap.exists) {
-      final members = (groupSnap.data()?['memberIds'] as List?)?.cast<String>() ?? [];
-      candidates = members.where((id) => id != employerId && id.isNotEmpty).toList();
-    }
-
-    final candidateAmounts = <String, double>{};
-    if (candidates.isNotEmpty) {
-      final splitAmount = amount / candidates.length;
-      for (final cid in candidates) {
-        candidateAmounts[cid] = splitAmount;
-      }
-    }
+    final excessRefund = (amount - totalEarned).clamp(0.0, double.infinity);
 
     final ref = _notices.doc();
     await ref.set({
@@ -131,6 +124,8 @@ class JobWorkflowService {
       'employerId': employerId,
       'workDate': workDate,
       'amount': amount,
+      'totalEarned': totalEarned,
+      'excessRefund': excessRefund,
       'jobTitle': jobTitle,
       'status': 'approved',
       'employerAck': false,
@@ -138,7 +133,7 @@ class JobWorkflowService {
       'createdAt': FieldValue.serverTimestamp(),
       'approvedAt': FieldValue.serverTimestamp(),
       'candidateAmounts': candidateAmounts,
-      'totalCandidates': candidates.length,
+      'totalCandidates': candidateAmounts.length,
       'complainedCandidates': [],
       'deductions': {},
       'complaintReasons': {},
@@ -177,6 +172,15 @@ class JobWorkflowService {
           amount: entry.value,
           details: 'Lương ca làm: ${notice.jobTitle}',
         );
+
+        await _notif.sendToUser(
+          userId: entry.key,
+          title: 'Nhận tiền công',
+          body:
+              'NTD đã giải ngân. Bạn nhận được ${entry.value.toStringAsFixed(0)}₫ cho công việc "${notice.jobTitle}".',
+          category: NotificationCategory.job,
+          data: {'type': 'disbursement_received', 'jobId': notice.jobId},
+        );
       }
     }
 
@@ -187,11 +191,17 @@ class JobWorkflowService {
       'completedAt': FieldValue.serverTimestamp(),
     });
 
-    // Xóa nhóm chat
-    await _deleteGroup(notice.groupId);
+    // Đóng nhóm chat (ẩn đi)
+    await _closeGroup(notice.groupId);
 
-    // Đóng bài đăng
-    await _closeJobPost(notice.jobId, employerId: notice.employerId);
+    // Đóng bài đăng và trừ tiền ví NTD
+    await _closeJobPost(
+      notice.jobId,
+      employerId: notice.employerId,
+      totalActualPayment: notice.amount,
+      excessRefund: notice.excessRefund,
+      jobTitle: notice.jobTitle,
+    );
   }
 
   // ═══════════════════════════════════════════════════════
@@ -216,14 +226,16 @@ class JobWorkflowService {
       'complainedCandidates': FieldValue.arrayUnion([candidateId]),
       'deductions.$candidateId': compensationAmount,
       'complaintReasons.$candidateId': reason,
-      if (evidenceUrls.isNotEmpty) 'complaintEvidence.$candidateId': evidenceUrls,
+      if (evidenceUrls.isNotEmpty)
+        'complaintEvidence.$candidateId': evidenceUrls,
     });
 
     // Thông báo cho admin
     await _notifyAdmins(
       type: 'complaint_review_needed',
       title: 'Khiếu nại mới từ NTD',
-      body: 'NTD khiếu nại ứng viên cho công việc "${data['jobTitle']}".\nLý do: $reason\nSố tiền đề xuất đền bù: ${compensationAmount.toStringAsFixed(0)}₫',
+      body:
+          'NTD khiếu nại ứng viên cho công việc "${data['jobTitle']}".\nLý do: $reason\nSố tiền đề xuất đền bù: ${compensationAmount.toStringAsFixed(0)}₫',
       data: {'noticeId': noticeId, 'candidateId': candidateId},
     );
   }
@@ -269,7 +281,8 @@ class JobWorkflowService {
     }
   }
 
-  Future<void> executeDisbursement(String noticeId) => disburseDirectly(noticeId);
+  Future<void> executeDisbursement(String noticeId) =>
+      disburseDirectly(noticeId);
 
   Future<void> rejectDisbursementRequest(
     String noticeId, {
@@ -330,7 +343,8 @@ class JobWorkflowService {
           recipientId: employerId,
           type: 'group_closed_by_admin',
           title: 'Admin da dong nhom',
-          body: 'Nhom cong viec da duoc Admin dong. Khong can giai ngan qua app.',
+          body:
+              'Nhom cong viec da duoc Admin dong. Khong can giai ngan qua app.',
           data: {'groupId': groupId, 'jobId': jobId},
         );
       }
@@ -362,7 +376,8 @@ class JobWorkflowService {
       recipientId: employerId,
       type: 'complaint_approved',
       title: 'Khiếu nại được duyệt',
-      body: 'Admin đã duyệt khiếu nại cho "${data['jobTitle']}". Số tiền đền bù: ${finalCompensation.toStringAsFixed(0)}₫',
+      body:
+          'Admin đã duyệt khiếu nại cho "${data['jobTitle']}". Số tiền đền bù: ${finalCompensation.toStringAsFixed(0)}₫',
       data: {'noticeId': noticeId, 'candidateId': candidateId},
     );
   }
@@ -401,7 +416,8 @@ class JobWorkflowService {
     if (!snap.exists) return;
     final data = snap.data()!;
 
-    final complained = (data['complainedCandidates'] as List?)?.cast<String>() ?? [];
+    final complained =
+        (data['complainedCandidates'] as List?)?.cast<String>() ?? [];
     final results = data['complaintResults'] as Map? ?? {};
 
     if (complained.isNotEmpty && results.length >= complained.length) {
@@ -416,7 +432,8 @@ class JobWorkflowService {
         recipientId: employerId,
         type: 'all_complaints_reviewed',
         title: 'Tất cả khiếu nại đã được xử lý',
-        body: 'Admin đã xem xét xong khiếu nại cho "${data['jobTitle']}". Bạn có thể giải ngân ngay.',
+        body:
+            'Admin đã xem xét xong khiếu nại cho "${data['jobTitle']}". Bạn có thể giải ngân ngay.',
         data: {'noticeId': noticeId},
       );
     }
@@ -443,7 +460,8 @@ class JobWorkflowService {
     for (final entry in notice.candidateAmounts.entries) {
       final cid = entry.key;
       final wage = entry.value; // tiền công của user
-      final compensation = notice.adminFinalDeductions[cid] ?? 0; // tiền đền bù admin chốt
+      final compensation =
+          notice.adminFinalDeductions[cid] ?? 0; // tiền đền bù admin chốt
 
       if (compensation <= 0) {
         // Không bị khiếu nại hoặc khiếu nại bị từ chối → nhận đủ lương
@@ -454,6 +472,15 @@ class JobWorkflowService {
             amount: wage,
             details: 'Lương ca làm: ${notice.jobTitle}',
           );
+
+          await _notif.sendToUser(
+            userId: cid,
+            title: 'Nhận tiền công',
+            body:
+                'NTD đã giải ngân. Bạn nhận được ${wage.toStringAsFixed(0)}₫ cho công việc "${notice.jobTitle}".',
+            category: NotificationCategory.job,
+            data: {'type': 'disbursement_received', 'jobId': notice.jobId},
+          );
         }
       } else if (compensation <= wage) {
         // Tiền đền bù <= lương → trừ từ lương, còn bao nhiêu gửi về user
@@ -463,7 +490,17 @@ class JobWorkflowService {
             candidateId: cid,
             jobId: notice.jobId,
             amount: remaining,
-            details: 'Lương ca làm (sau trừ đền bù ${compensation.toStringAsFixed(0)}₫): ${notice.jobTitle}',
+            details:
+                'Lương ca làm (sau trừ đền bù ${compensation.toStringAsFixed(0)}₫): ${notice.jobTitle}',
+          );
+
+          await _notif.sendToUser(
+            userId: cid,
+            title: 'Nhận tiền công (sau trừ khiếu nại)',
+            body:
+                'Bạn nhận được ${remaining.toStringAsFixed(0)}₫ cho công việc "${notice.jobTitle}" sau khi trừ đền bù.',
+            category: NotificationCategory.job,
+            data: {'type': 'disbursement_received', 'jobId': notice.jobId},
           );
         }
         totalRefundToEmployer += compensation;
@@ -500,26 +537,33 @@ class JobWorkflowService {
               candidateId: cid,
               jobId: notice.jobId,
               amount: -userBalance,
-              details: 'Trừ tiền ví để đền bù (phần có thể): ${notice.jobTitle}',
+              details:
+                  'Trừ tiền ví để đền bù (phần có thể): ${notice.jobTitle}',
             );
             totalRefundToEmployer += userBalance;
           }
 
           // Phần còn thiếu → thông báo user
           final stillOwed = deficit - userBalance;
-          await _notif.create(
-            recipientId: cid,
-            type: 'debt_notice',
+          await _notif.sendToUser(
+            userId: cid,
             title: 'Bạn cần chuyển tiền đền bù',
-            body: 'Bạn nợ ${stillOwed.toStringAsFixed(0)}₫ tiền đền bù cho công việc "${notice.jobTitle}". Vui lòng chuyển trong 48h, nếu không tài khoản sẽ bị khóa.',
-            data: {'noticeId': noticeId, 'amount': stillOwed},
+            body:
+                'Bạn nợ ${stillOwed.toStringAsFixed(0)}₫ tiền đền bù cho công việc "${notice.jobTitle}". Vui lòng chuyển trong 48h, nếu không tài khoản sẽ bị khóa.',
+            category: NotificationCategory.job,
+            data: {
+              'type': 'debt_notice',
+              'noticeId': noticeId,
+              'amount': stillOwed,
+            },
           );
 
           // Khóa rút tiền cho user
           await _db.collection('users').doc(cid).update({
             'withdrawLocked': true,
             'withdrawLockedUntil': Timestamp.fromDate(deadline),
-            'withdrawLockReason': 'Chờ đền bù khiếu nại cho "${notice.jobTitle}"',
+            'withdrawLockReason':
+                'Chờ đền bù khiếu nại cho "${notice.jobTitle}"',
           });
         }
       }
@@ -543,11 +587,17 @@ class JobWorkflowService {
       if (userDebts.isNotEmpty) 'userDebts': userDebts,
     });
 
-    // Xóa nhóm chat
-    await _deleteGroup(notice.groupId);
+    // Đóng nhóm chat (ẩn đi)
+    await _closeGroup(notice.groupId);
 
-    // Đóng bài đăng
-    await _closeJobPost(notice.jobId, employerId: notice.employerId);
+    // Đóng bài đăng và trừ tiền ví NTD
+    await _closeJobPost(
+      notice.jobId,
+      employerId: notice.employerId,
+      totalActualPayment: notice.amount,
+      excessRefund: notice.excessRefund,
+      jobTitle: notice.jobTitle,
+    );
   }
 
   // ═══════════════════════════════════════════════════════
@@ -580,32 +630,77 @@ class JobWorkflowService {
       if (comment != null && comment.isNotEmpty) 'comment': comment,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Cập nhật điểm uy tín cho ứng viên
+    try {
+      final snap = await _db
+          .collection('reviews')
+          .where('revieweeId', isEqualTo: candidateId)
+          .get();
+      double total = 0;
+      int count = 0;
+      for (final doc in snap.docs) {
+        final r = (doc.data()['rating'] as num?)?.toDouble() ?? 0;
+        if (r > 0) {
+          total += r;
+          count++;
+        }
+      }
+      final avg = count > 0 ? total / count : 0.0;
+      await _db.collection('users').doc(candidateId).update({
+        'averageRating': avg,
+        'reviewCount': count,
+      });
+    } catch (_) {}
+
+    // Thông báo cho ứng viên
+    await _notif.sendToUser(
+      userId: candidateId,
+      title: 'Đánh giá mới từ NTD',
+      body:
+          'Nhà tuyển dụng đã đánh giá $rating sao cho bạn trong công việc vừa hoàn thành.',
+      category: NotificationCategory.profile,
+      data: {'type': 'new_review', 'jobId': jobId, 'reviewerId': reviewerId},
+    );
   }
 
   // ═══════════════════════════════════════════════════════
   // HELPER
   // ═══════════════════════════════════════════════════════
 
-  Future<void> _deleteGroup(String groupId) async {
+  Future<void> _closeGroup(String groupId) async {
     if (groupId.isEmpty) return;
     try {
-      // Xóa tất cả messages trong nhóm
-      final msgs = await _groups.doc(groupId).collection('messages').get();
-      for (final m in msgs.docs) {
-        await m.reference.delete();
-      }
-      // Xóa nhóm
-      await _groups.doc(groupId).delete();
-    } catch (_) {
-      // Fallback: đóng nhóm nếu không xóa được
       await _groups.doc(groupId).update({
         'status': 'closed',
         'closedAt': FieldValue.serverTimestamp(),
       });
-    }
+      // Đóng tất cả nhóm chat cùng jobId để xử lý các bản sao do lỗi tạo lặp
+      final doc = await _groups.doc(groupId).get();
+      final jobId = (doc.data()?['jobId'] ?? '').toString();
+      if (jobId.isNotEmpty) {
+        final siblings = await _groups
+            .where('jobId', isEqualTo: jobId)
+            .where('chatType', isEqualTo: 'group')
+            .get();
+        for (final s in siblings.docs) {
+          if (s.id == groupId) continue;
+          await s.reference.update({
+            'status': 'closed',
+            'closedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (_) {}
   }
 
-  Future<void> _closeJobPost(String jobId, {String? employerId}) async {
+  Future<void> _closeJobPost(
+    String jobId, {
+    String? employerId,
+    double totalActualPayment = 0.0,
+    double excessRefund = 0.0,
+    String jobTitle = '',
+  }) async {
     if (jobId.isEmpty) return;
     final jobRef = _db.collection('jobPosts').doc(jobId);
     final jobSnap = await jobRef.get();
@@ -620,7 +715,68 @@ class JobWorkflowService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    if (depositHeld && heldAmount > 0 && employerId != null && employerId.isNotEmpty) {
+    if (employerId != null && employerId.isNotEmpty && totalActualPayment > 0) {
+      double walletBalanceAdjustment = 0.0;
+      if (depositHeld) {
+        walletBalanceAdjustment = heldAmount - totalActualPayment;
+      } else {
+        walletBalanceAdjustment = -totalActualPayment;
+      }
+
+      final batch = _db.batch();
+      final userRef = _db.collection('users').doc(employerId);
+
+      batch.set(userRef, {
+        if (depositHeld) 'walletHeldBalance': FieldValue.increment(-heldAmount),
+        'walletBalance': FieldValue.increment(walletBalanceAdjustment),
+        'totalSpent': FieldValue.increment(totalActualPayment),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Record transaction
+      final txRef = _db.collection('walletTransactions').doc();
+      batch.set(txRef, {
+        'userId': employerId,
+        'type': 'payment',
+        'amount': totalActualPayment,
+        'description': 'Thanh toán tiền công cho "$jobTitle"',
+        'status': 'completed',
+        'paymentMethod': 'wallet',
+        'jobId': jobId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (excessRefund > 0) {
+        final refundTxRef = _db.collection('walletTransactions').doc();
+        batch.set(refundTxRef, {
+          'userId': employerId,
+          'type': 'refund',
+          'amount': excessRefund,
+          'description': 'Hoàn tiền giải ngân dư cho "$jobTitle"',
+          'status': 'completed',
+          'paymentMethod': 'wallet',
+          'jobId': jobId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+
+        await _notif.create(
+          recipientId: employerId,
+          type: 'disbursement_refund',
+          title: 'Hoàn tiền dư',
+          body:
+              'Bạn được hoàn lại ${excessRefund.toStringAsFixed(0)}₫ tiền thừa sau khi giải ngân cho "$jobTitle".',
+          data: {'jobId': jobId},
+        );
+      }
+
+      await batch.commit();
+    } else if (depositHeld &&
+        heldAmount > 0 &&
+        employerId != null &&
+        employerId.isNotEmpty) {
+      // Legacy fallback
       await _db.collection('users').doc(employerId).set({
         'walletHeldBalance': FieldValue.increment(-heldAmount),
         'totalSpent': FieldValue.increment(heldAmount),

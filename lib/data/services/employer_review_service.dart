@@ -23,8 +23,9 @@ class EmployerReviewService {
       if (snap.docs.isEmpty) return [];
 
       // Thu thập tất cả reviewerIds để batch fetch user info
-      final reviewerIds =
-          snap.docs.map((d) => d.data()['reviewerId'] as String? ?? '').toSet();
+      final reviewerIds = snap.docs
+          .map((d) => d.data()['reviewerId'] as String? ?? '')
+          .toSet();
 
       // Batch fetch reviewer profiles (từng document)
       final reviewerMap = await _fetchReviewerProfiles(reviewerIds);
@@ -48,12 +49,40 @@ class EmployerReviewService {
         return dateB.compareTo(dateA);
       });
 
+      // Tự động đồng bộ lại điểm uy tín nếu bị lệch (Self-healing)
+      double total = 0;
+      int count = 0;
+      for (final doc in snap.docs) {
+        final r = (doc.data()['rating'] as num?)?.toDouble() ?? 0;
+        if (r > 0) {
+          total += r;
+          count++;
+        }
+      }
+      final avg = count > 0 ? total / count : 0.0;
+      try {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(uidToFetch)
+            .get();
+        final currentAvg =
+            (userDoc.data()?['averageRating'] as num?)?.toDouble() ?? 0.0;
+        if ((avg - currentAvg).abs() > 0.01) {
+          await _firestore.collection('users').doc(uidToFetch).update({
+            'averageRating': avg,
+            'reviewCount': count,
+          });
+        }
+      } catch (_) {}
+
       // Cache xuống SQLite
       await _cacheReviews(items, uidToFetch);
       return items;
     } catch (e) {
       // Fallback: đọc từ SQLite
-      final cached = await SqliteCacheService.getCachedEmployerReviews(uidToFetch);
+      final cached = await SqliteCacheService.getCachedEmployerReviews(
+        uidToFetch,
+      );
       if (cached.isNotEmpty) {
         return cached.map(EmployerReviewItem.fromSQLite).toList();
       }
@@ -63,7 +92,8 @@ class EmployerReviewService {
 
   /// Batch fetch thông tin reviewer (tên + avatar)
   Future<Map<String, Map<String, String?>>> _fetchReviewerProfiles(
-      Set<String> uids) async {
+    Set<String> uids,
+  ) async {
     final result = <String, Map<String, String?>>{};
     if (uids.isEmpty) return result;
 
@@ -71,8 +101,9 @@ class EmployerReviewService {
     final uidList = uids.toList();
     final chunks = <List<String>>[];
     for (var i = 0; i < uidList.length; i += 30) {
-      chunks.add(uidList.sublist(
-          i, i + 30 > uidList.length ? uidList.length : i + 30));
+      chunks.add(
+        uidList.sublist(i, i + 30 > uidList.length ? uidList.length : i + 30),
+      );
     }
 
     for (final chunk in chunks) {
@@ -100,12 +131,17 @@ class EmployerReviewService {
   }
 
   /// Cache danh sách review vào SQLite
-  Future<void> _cacheReviews(List<EmployerReviewItem> items, String uidToFetch) async {
+  Future<void> _cacheReviews(
+    List<EmployerReviewItem> items,
+    String uidToFetch,
+  ) async {
     try {
       // Xóa cache cũ trước khi ghi mới
       await SqliteCacheService.clearEmployerReviews(uidToFetch);
       for (final item in items) {
-        await SqliteCacheService.upsertEmployerReview(item.toSQLiteMap(uidToFetch));
+        await SqliteCacheService.upsertEmployerReview(
+          item.toSQLiteMap(uidToFetch),
+        );
       }
     } catch (_) {
       // Cache lỗi không critical

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import '../data/models/app_notification_model.dart';
@@ -331,6 +332,8 @@ class MessagingController extends GetxController {
     _employerOwnedInboxSub?.cancel();
     _ensureWatermarksLoaded().then((_) {
       _bindNotificationUnreadListener();
+      // Tự động ẩn nhóm chat của công việc đã hoàn thành
+      unawaited(_autoCloseCompletedJobGroups(uid));
       if (isEmployer) {
         _employerMemberInbox = [];
         _employerOwnedInbox = [];
@@ -356,6 +359,34 @@ class MessagingController extends GetxController {
         );
       }
     });
+  }
+
+  /// Tự động kiểm tra các nhóm việc chưa bị đóng nhưng jobPost đã hoàn thành
+  Future<void> _autoCloseCompletedJobGroups(String uid) async {
+    try {
+      final db = _service.db;
+      final snap = await db
+          .collection('groupChats')
+          .where('memberIds', arrayContains: uid)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final groupStatus = (data['status'] ?? '').toString();
+        final chatType = (data['chatType'] ?? '').toString();
+        final jobId = (data['jobId'] ?? '').toString();
+        if (groupStatus == 'closed') continue;
+        if (chatType == 'direct' || chatType == 'peer') continue;
+        if (jobId.isEmpty) continue;
+        final jobDoc = await db.collection('jobPosts').doc(jobId).get();
+        final jobStatus = (jobDoc.data()?['status'] ?? '').toString();
+        if (jobStatus == 'closed' || jobStatus == 'cancelled' || jobStatus == 'rejected') {
+          await doc.reference.update({
+            'status': 'closed',
+            'closedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _mergeEmployerInbox() {
@@ -607,6 +638,15 @@ class MessagingController extends GetxController {
     final thread = activeThread.value;
     if (thread == null) return;
     await _service.deleteMessage(groupId: thread.groupId, msgId: msgId);
+  }
+
+  Future<void> deleteConversation(String groupId) async {
+    try {
+      await _service.deleteConversation(groupId);
+      conversations.removeWhere((t) => t.groupId == groupId);
+    } catch (e) {
+      Get.snackbar('Lỗi', 'Không thể xoá cuộc trò chuyện');
+    }
   }
 
   Future<void> editMessage(String msgId, String newContent) async {

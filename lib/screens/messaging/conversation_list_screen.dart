@@ -154,6 +154,16 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         iconTheme: IconThemeData(
           color: widget.isEmployer ? Colors.black87 : Colors.white,
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.cleaning_services_rounded),
+            tooltip: 'Dọn dẹp tin nhắn lặp lại',
+            onPressed: () {
+              final auth = Get.find<AuthController>();
+              auth.cleanupDuplicateGroups();
+            },
+          ),
+        ],
       ),
       body: body,
     );
@@ -359,6 +369,52 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
             builder: (_) => ChatRoomScreen(
               groupId: thread.groupId,
               isEmployer: widget.isEmployer,
+            ),
+          ),
+        );
+      },
+      onLongPress: () {
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Xoá cuộc trò chuyện',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.error),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Bạn có chắc chắn muốn xoá vĩnh viễn cuộc trò chuyện này không? Thao tác này không thể hoàn tác.', textAlign: TextAlign.center),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Huỷ'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _ctrl.deleteConversation(thread.groupId);
+                          },
+                          child: const Text('Xoá'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );

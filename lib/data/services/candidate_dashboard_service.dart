@@ -38,9 +38,16 @@ class CandidateDashboardService {
         .map((d) => ApplicationModel.fromMap({...d.data(), 'appId': d.id}))
         .toList();
 
-    final jobIds = apps.map((a) => a.jobId).where((id) => id.isNotEmpty).toSet().toList();
-    final employerIds =
-        apps.map((a) => a.employerId).where((id) => id.isNotEmpty).toSet().toList();
+    final jobIds = apps
+        .map((a) => a.jobId)
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    final employerIds = apps
+        .map((a) => a.employerId)
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
 
     final jobs = await _fetchJobs(jobIds);
     final employers = await _fetchEmployerNames(employerIds);
@@ -59,10 +66,12 @@ class CandidateDashboardService {
     }
 
     rows.sort((a, b) {
-      final da = a.application.updatedAt ??
+      final da =
+          a.application.updatedAt ??
           a.application.appliedAt ??
           DateTime.fromMillisecondsSinceEpoch(0);
-      final db = b.application.updatedAt ??
+      final db =
+          b.application.updatedAt ??
           b.application.appliedAt ??
           DateTime.fromMillisecondsSinceEpoch(0);
       return db.compareTo(da);
@@ -231,7 +240,10 @@ class CandidateDashboardService {
     return disputed;
   }
 
-  Future<double> _computeHoursWorked(String uid, List<_AcceptedJobRow> rows) async {
+  Future<double> _computeHoursWorked(
+    String uid,
+    List<_AcceptedJobRow> rows,
+  ) async {
     var total = 0.0;
     for (final row in rows) {
       final hoursPerDay = row.job.workHoursPerDay ?? 4.0;
@@ -287,25 +299,28 @@ class CandidateDashboardService {
   Future<List<ReviewableJob>> fetchReviewableJobs() async {
     final rows = await _fetchAcceptedRows();
     final now = DateTime.now();
-    
-    return rows.where((r) {
-      final job = r.job;
-      if (job.status == 'closed') return true;
-      
-      final end = job.endDate ?? job.startDate;
-      // Xem như kết thúc nếu đã sang ngày hôm sau của endDate
-      final endOfDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
-      if (now.isAfter(endOfDay)) return true;
-      
-      return false;
-    }).map(
-      (r) => ReviewableJob(
-        jobId: r.job.jobId,
-        employerId: r.application.employerId,
-        jobTitle: r.job.title,
-        employerName: r.employerName,
-      ),
-    ).toList();
+
+    return rows
+        .where((r) {
+          final job = r.job;
+          if (job.status == 'closed') return true;
+
+          final end = job.endDate ?? job.startDate;
+          // Xem như kết thúc nếu đã sang ngày hôm sau của endDate
+          final endOfDay = DateTime(end.year, end.month, end.day, 23, 59, 59);
+          if (now.isAfter(endOfDay)) return true;
+
+          return false;
+        })
+        .map(
+          (r) => ReviewableJob(
+            jobId: r.job.jobId,
+            employerId: r.application.employerId,
+            jobTitle: r.job.title,
+            employerName: r.employerName,
+          ),
+        )
+        .toList();
   }
 
   Future<List<CandidateReviewGiven>> fetchReviewsGiven() async {
@@ -369,13 +384,90 @@ class CandidateDashboardService {
     return list;
   }
 
+  Future<List<CandidateReviewGiven>> fetchReviewsReceived() async {
+    final uid = _uid;
+    if (uid == null) return [];
+
+    final snap = await _firestore
+        .collection('reviews')
+        .where('revieweeId', isEqualTo: uid)
+        .get();
+
+    if (snap.docs.isEmpty) return [];
+
+    final jobIds = <String>{};
+    final employerIds = <String>{};
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final jobId = (data['jobId'] as String?) ?? '';
+      final reviewerId = (data['reviewerId'] as String?) ?? '';
+      if (jobId.isNotEmpty) jobIds.add(jobId);
+      if (reviewerId.isNotEmpty) employerIds.add(reviewerId);
+    }
+
+    final jobs = await _fetchJobs(jobIds.toList());
+    final employers = await _fetchEmployerNames(employerIds.toList());
+
+    final list = snap.docs.map((doc) {
+      final data = doc.data();
+      final jobId = (data['jobId'] as String?) ?? '';
+      final reviewerId = (data['reviewerId'] as String?) ?? '';
+      final job = jobs[jobId];
+      final rawTags = data['tags'];
+
+      return CandidateReviewGiven(
+        id: doc.id,
+        employerName: employers[reviewerId] ?? 'Nhà tuyển dụng',
+        jobTitle: job?.title ?? 'Công việc',
+        rating: (data['rating'] as num?)?.toDouble() ?? 0,
+        comment: data['comment']?.toString(),
+        tags: rawTags is List
+            ? rawTags.map((e) => e.toString()).toList()
+            : const [],
+        createdAt: CandidateReviewGiven.parseDate(data['createdAt']),
+      );
+    }).toList();
+
+    list.sort((a, b) {
+      final da = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return db.compareTo(da);
+    });
+
+    // Tự động đồng bộ lại điểm uy tín nếu bị lệch (Self-healing)
+    double total = 0;
+    int count = 0;
+    for (final doc in snap.docs) {
+      final r = (doc.data()['rating'] as num?)?.toDouble() ?? 0;
+      if (r > 0) {
+        total += r;
+        count++;
+      }
+    }
+    final avg = count > 0 ? total / count : 0.0;
+    try {
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      final currentAvg =
+          (userDoc.data()?['averageRating'] as num?)?.toDouble() ?? 0.0;
+      if ((avg - currentAvg).abs() > 0.01) {
+        await _firestore.collection('users').doc(uid).update({
+          'averageRating': avg,
+          'reviewCount': count,
+        });
+      }
+    } catch (_) {}
+
+    return list;
+  }
+
   Future<List<WorkGroup>> fetchWorkGroups() async {
     final col = _groupsCol;
     if (col == null) return [];
 
     final snap = await col.get();
-    final list =
-        snap.docs.map((d) => WorkGroup.fromMap(d.id, d.data())).toList();
+    final list = snap.docs
+        .map((d) => WorkGroup.fromMap(d.id, d.data()))
+        .toList();
     list.sort((a, b) {
       final da = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       final db = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -426,10 +518,7 @@ class CandidateDashboardService {
     return (userDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0;
   }
 
-  Future<void> withdraw({
-    required int amountVnd,
-    String? note,
-  }) async {
+  Future<void> withdraw({required int amountVnd, String? note}) async {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
     if (amountVnd <= 0) throw Exception('Số tiền rút phải lớn hơn 0');
@@ -439,7 +528,8 @@ class CandidateDashboardService {
 
     await _firestore.runTransaction((tx) async {
       final userSnap = await tx.get(userRef);
-      final balance = (userSnap.data()?['walletBalance'] as num?)?.toDouble() ?? 0;
+      final balance =
+          (userSnap.data()?['walletBalance'] as num?)?.toDouble() ?? 0;
       if (balance < amountVnd) {
         throw Exception('Số dư không đủ để rút');
       }
@@ -455,14 +545,10 @@ class CandidateDashboardService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      tx.set(
-        userRef,
-        {
-          'walletBalance': FieldValue.increment(-amountVnd),
-          'totalWithdrawn': FieldValue.increment(amountVnd),
-        },
-        SetOptions(merge: true),
-      );
+      tx.set(userRef, {
+        'walletBalance': FieldValue.increment(-amountVnd),
+        'totalWithdrawn': FieldValue.increment(amountVnd),
+      }, SetOptions(merge: true));
     });
   }
 
@@ -489,6 +575,28 @@ class CandidateDashboardService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
+    // Cập nhật điểm uy tín cho NTD
+    try {
+      final snap = await _firestore
+          .collection('reviews')
+          .where('revieweeId', isEqualTo: employerId)
+          .get();
+      double total = 0;
+      int count = 0;
+      for (final doc in snap.docs) {
+        final r = (doc.data()['rating'] as num?)?.toDouble() ?? 0;
+        if (r > 0) {
+          total += r;
+          count++;
+        }
+      }
+      final avg = count > 0 ? total / count : 0.0;
+      await _firestore.collection('users').doc(employerId).update({
+        'averageRating': avg,
+        'reviewCount': count,
+      });
+    } catch (_) {}
+
     var jobTitle = 'Công việc';
     var candidateName = 'Ứng viên';
     try {
@@ -499,8 +607,8 @@ class CandidateDashboardService {
       final userDoc = await _firestore.collection('users').doc(uid).get();
       if (userDoc.exists) {
         final d = userDoc.data() ?? {};
-        final combined =
-            '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
+        final combined = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'
+            .trim();
         if (combined.isNotEmpty) candidateName = combined;
       }
     } catch (_) {}

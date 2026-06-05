@@ -20,6 +20,9 @@ class MessagingService {
 
   String? get _uid => _auth.currentUser?.uid;
 
+  /// Public access to Firestore instance (for cleanup tasks)
+  FirebaseFirestore get db => _db;
+
   String _dateKey(DateTime dt) => DateFormat('yyyy-MM-dd').format(dt);
 
   String _timeKey(DateTime dt) => DateFormat('HH:mm').format(dt);
@@ -82,7 +85,14 @@ class MessagingService {
 
       final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
       if (!jobSnap.exists) continue;
-      final title = (jobSnap.data()?['title'] ?? 'Công việc').toString();
+      
+      final jobData = jobSnap.data() ?? {};
+      final status = (jobData['status'] ?? '').toString();
+      if (status == 'closed' || status == 'cancelled' || status == 'rejected') {
+        continue;
+      }
+      
+      final title = (jobData['title'] ?? 'Công việc').toString();
 
       await groupChat.ensureJobGroup(
         jobId: jobId,
@@ -126,7 +136,6 @@ class MessagingService {
 
     final existing = await _db
         .collection(_groups)
-        .where('jobId', isEqualTo: jobId)
         .where('employerId', isEqualTo: employerId)
         .where('candidateId', isEqualTo: candidateId)
         .where('chatType', isEqualTo: 'direct')
@@ -181,6 +190,10 @@ class MessagingService {
   ) {
     final sorted = [memberAId, memberBId]..sort();
     return '${jobId}_${sorted[0]}_${sorted[1]}';
+  }
+
+  Future<void> deleteConversation(String groupId) async {
+    await _db.collection(_groups).doc(groupId).delete();
   }
 
   /// Chat 1-1 giữa hai thành viên cùng nhóm việc (không phải cặp NTD–ứng viên).
@@ -255,12 +268,12 @@ class MessagingService {
   }
 
   /// Hội thoại user là thành viên (`memberIds`).
-  Stream<List<ConversationThread>> streamConversations(String uid) {
+  Stream<List<ConversationThread>> streamConversations(String uid, {bool isEmployer = false}) {
     return _db
         .collection(_groups)
         .where('memberIds', arrayContains: uid)
         .snapshots()
-        .asyncMap((snap) => _buildThreadsFromSnapshot(snap, uid));
+        .asyncMap((snap) => _buildThreadsFromSnapshot(snap, uid, isEmployer: isEmployer));
   }
 
   /// NTD: thêm nhóm theo `employerId` (nhóm cũ có thể thiếu NTD trong memberIds).
@@ -269,22 +282,32 @@ class MessagingService {
         .collection(_groups)
         .where('employerId', isEqualTo: uid)
         .snapshots()
-        .asyncMap((snap) => _buildThreadsFromSnapshot(snap, uid));
+        .asyncMap((snap) => _buildThreadsFromSnapshot(snap, uid, isEmployer: true));
   }
 
   Future<List<ConversationThread>> _buildThreadsFromSnapshot(
     QuerySnapshot<Map<String, dynamic>> snap,
-    String uid,
-  ) async {
+    String uid, {
+    bool isEmployer = false,
+  }) async {
     final threads = <ConversationThread>[];
     final peerIds = <String>{};
 
     for (final doc in snap.docs) {
       final data = doc.data();
+      final status = (data['status'] ?? '').toString();
+      final chatType = (data['chatType'] ?? '').toString();
       final members = (data['memberIds'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           [];
+
+      // Xác định có phải nhóm việc không: chỉ 'direct' và 'peer' mới là chat cá nhân
+      final isGroup = chatType != 'direct' && chatType != 'peer';
+
+      // NTD luôn thấy tất cả; Ứng viên không thấy nhóm việc đã đóng
+      if (!isEmployer && status == 'closed' && isGroup) continue;
+
       final peerId = _resolvePeerId(
         members: members,
         currentUid: uid,
@@ -298,10 +321,19 @@ class MessagingService {
 
     for (final doc in snap.docs) {
       final data = doc.data();
+      final status = (data['status'] ?? '').toString();
+      final employerId = (data['employerId'] ?? '').toString();
+      final chatType = (data['chatType'] ?? '').toString();
       final members = (data['memberIds'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           [];
+
+      final isGroup = chatType != 'direct' && chatType != 'peer';
+
+      // NTD luôn thấy tất cả; Ứng viên không thấy nhóm việc đã đóng
+      if (!isEmployer && status == 'closed' && isGroup) continue;
+
       final peerId = _resolvePeerId(
         members: members,
         currentUid: uid,

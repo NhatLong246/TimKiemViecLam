@@ -8,6 +8,7 @@ class CandidateDashboardController extends GetxController {
 
   final payments = <CandidatePayment>[].obs;
   final reviews = <CandidateReviewGiven>[].obs;
+  final reviewsReceived = <CandidateReviewGiven>[].obs;
   final reviewableJobs = <ReviewableJob>[].obs;
   final groups = <WorkGroup>[].obs;
   final summary = Rxn<CandidateEarningsSummary>();
@@ -34,6 +35,7 @@ class CandidateDashboardController extends GetxController {
     await _load(() async {
       reviewableJobs.assignAll(await _service.fetchReviewableJobs());
       reviews.assignAll(await _service.fetchReviewsGiven());
+      reviewsReceived.assignAll(await _service.fetchReviewsReceived());
     });
   }
 
@@ -72,10 +74,7 @@ class CandidateDashboardController extends GetxController {
     return g;
   }
 
-  Future<void> withdraw({
-    required int amountVnd,
-    String? note,
-  }) async {
+  Future<void> withdraw({required int amountVnd, String? note}) async {
     isWithdrawing.value = true;
     try {
       await _service.withdraw(amountVnd: amountVnd, note: note);

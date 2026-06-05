@@ -45,11 +45,16 @@ class AuthController extends GetxController {
 
     final user = await _authService.restoreSessionFromFirebase();
     if (user != null) {
-      final docSnap = await FirebaseFirestore.instance.collection('users').doc(user.id).get();
+      final docSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.id)
+          .get();
       final remoteSessionId = docSnap.data()?['currentSessionId'] as String?;
       final localSessionId = await PreferencesHelper.getOrCreateDeviceId();
 
-      if (remoteSessionId != null && remoteSessionId.isNotEmpty && remoteSessionId != localSessionId) {
+      if (remoteSessionId != null &&
+          remoteSessionId.isNotEmpty &&
+          remoteSessionId != localSessionId) {
         // Session bị lấy bởi thiết bị khác khi app tắt
         await _authService.logout();
         currentUser = null;
@@ -66,11 +71,12 @@ class AuthController extends GetxController {
         });
         return;
       }
-      
+
       if (remoteSessionId != localSessionId) {
-        await FirebaseFirestore.instance.collection('users').doc(user.id).update({
-          'currentSessionId': localSessionId,
-        });
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.id)
+            .update({'currentSessionId': localSessionId});
       }
 
       currentUser = user;
@@ -80,6 +86,7 @@ class AuthController extends GetxController {
       await PushNotificationService.instance.bindToUser(user.id);
       await PushNavigationHandler.processPendingIfAny();
       _listenToSession(user.id);
+      unawaited(cleanupDuplicateGroups());
     }
   }
 
@@ -88,6 +95,120 @@ class AuthController extends GetxController {
       AttendanceAutoNotifyService.instance.startEmployerPolling();
     } else {
       AttendanceAutoNotifyService.instance.stopEmployerPolling();
+    }
+  }
+
+  Future<void> cleanupDuplicateGroups() async {
+    try {
+      final db = FirebaseFirestore.instance;
+      // Lấy TẤT CẢ các cuộc trò chuyện mà user đang tham gia
+      final groupsSnap = await db
+          .collection('groupChats')
+          .where('memberIds', arrayContains: currentUser?.id)
+          .get();
+
+      // Gom nhóm theo jobId + chatType (+ candidateId nếu là direct)
+      final mapDuplicates = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+
+      for (final doc in groupsSnap.docs) {
+        final data = doc.data();
+        final jobId = (data['jobId'] ?? '').toString();
+        String chatType = (data['chatType'] ?? '').toString();
+        final members = List<String>.from(data['memberIds'] as List? ?? []);
+        
+        // Fallback for old chats that didn't have chatType saved
+        if (chatType.isEmpty) {
+          chatType = members.length > 2 ? 'group' : 'direct';
+        }
+
+        if (chatType == 'group' && jobId.isEmpty) continue;
+
+        String key = '${jobId}_$chatType';
+        if (chatType == 'direct') {
+          // Gộp tất cả chat cá nhân giữa 2 người thành 1 duy nhất (bỏ qua jobId)
+          members.sort();
+          key = 'direct_${members.join("_")}';
+        } else if (chatType == 'peer') {
+          members.sort();
+          key += '_${members.join("_")}';
+        }
+
+        mapDuplicates.putIfAbsent(key, () => []).add(doc);
+      }
+
+      int deletedCount = 0;
+      // Xử lý xóa các nhóm lặp lại, chỉ giữ lại 1 cái (cái cũ nhất hoặc cái đang được gắn vào jobPost)
+      for (final entry in mapDuplicates.entries) {
+        final list = entry.value;
+        if (list.length > 1) {
+          // Sắp xếp theo createdAt (cũ nhất đứng trước)
+          list.sort((a, b) {
+            final ta = (a.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+            final tb = (b.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+            return ta.compareTo(tb);
+          });
+
+          // Giữ lại phần tử đầu tiên (cũ nhất), XÓA các phần tử còn lại
+          for (int i = 1; i < list.length; i++) {
+            await list[i].reference.delete();
+            deletedCount++;
+          }
+        }
+        
+        // Kiểm tra phần tử giữ lại (hoặc duy nhất), nếu job đã đóng thì đóng group
+        if (list.isNotEmpty) {
+          final keptDoc = list.first;
+          final status = (keptDoc.data()['status'] ?? '').toString();
+          if (status != 'closed') {
+            final jobId = (keptDoc.data()['jobId'] ?? '').toString();
+            if (jobId.isNotEmpty) {
+              final jobDoc = await db.collection('jobPosts').doc(jobId).get();
+              final jobStatus = (jobDoc.data()?['status'] ?? '').toString();
+              if (jobStatus == 'closed' || jobStatus == 'cancelled' || jobStatus == 'rejected') {
+                await keptDoc.reference.update({
+                  'status': 'closed',
+                  'closedAt': FieldValue.serverTimestamp(),
+                });
+              }
+            }
+          }
+        }
+      }
+      // Bước 2: Kiểm tra tất cả nhóm việc (không chỉ bản sao) — đóng nếu job đã hoàn thành
+      int closedCount = 0;
+      for (final doc in groupsSnap.docs) {
+        final data = doc.data();
+        final groupStatus = (data['status'] ?? '').toString();
+        final chatType = (data['chatType'] ?? '').toString();
+        final jobId = (data['jobId'] ?? '').toString();
+        // Chỉ kiểm tra nhóm việc (không phải direct/peer) chưa bị đóng
+        if (groupStatus == 'closed') continue;
+        if (chatType == 'direct' || chatType == 'peer') continue;
+        if (jobId.isEmpty) continue;
+        final jobDoc = await db.collection('jobPosts').doc(jobId).get();
+        final jobStatus = (jobDoc.data()?['status'] ?? '').toString();
+        if (jobStatus == 'closed' || jobStatus == 'cancelled' || jobStatus == 'rejected') {
+          await doc.reference.update({
+            'status': 'closed',
+            'closedAt': FieldValue.serverTimestamp(),
+          });
+          closedCount++;
+        }
+      }
+
+      if (deletedCount > 0 || closedCount > 0) {
+        Get.snackbar(
+          'Dọn dẹp thành công',
+          [
+            if (deletedCount > 0) 'Đã xóa $deletedCount nhóm chat lặp lại.',
+            if (closedCount > 0) 'Đã ẩn $closedCount nhóm công việc đã hoàn thành.',
+          ].join(' '),
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar('Lỗi dọn dẹp', e.toString(), backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
     }
   }
 
@@ -193,6 +314,7 @@ class AuthController extends GetxController {
 
     currentUser = user;
     update();
+    unawaited(cleanupDuplicateGroups());
     MessagingBootstrap.startIfLoggedIn();
     _startAttendanceAutoIfEmployer();
     await PushNotificationService.instance.bindToUser(user.id);
@@ -234,44 +356,51 @@ class AuthController extends GetxController {
         .doc(uid)
         .snapshots()
         .listen((snapshot) async {
-      if (snapshot.exists) {
-        final data = snapshot.data();
-        if (data != null) {
-          final remoteSessionId = data['currentSessionId'] as String?;
-          final localSessionId = await PreferencesHelper.getOrCreateDeviceId();
-          
-          if (remoteSessionId != null && 
-              remoteSessionId.isNotEmpty && 
-              remoteSessionId != localSessionId) {
-            // Phiên đã bị thiết bị khác chiếm
-            _userSubscription?.cancel();
-            await _authService.logout();
-            currentUser = null;
-            MessagingBootstrap.stop();
-            AttendanceAutoNotifyService.instance.stopEmployerPolling();
-            update();
-            
-            Get.offAllNamed(AppRoutes.onboarding);
-            Get.snackbar(
-              'Cảnh báo bảo mật',
-              'Tài khoản của bạn đã được đăng nhập ở thiết bị khác.',
-              snackPosition: SnackPosition.TOP,
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-              duration: const Duration(seconds: 5),
-            );
-            return;
-          }
+          if (snapshot.exists) {
+            final data = snapshot.data();
+            if (data != null) {
+              final remoteSessionId = data['currentSessionId'] as String?;
+              final localSessionId =
+                  await PreferencesHelper.getOrCreateDeviceId();
 
-          final attempt = data['lastLoginAttempt'] as int?;
-          if (attempt != null) {
-            if (_lastSeenAttempt != null && attempt > _lastSeenAttempt!) {
-                _showLoginAttemptWarning();
+              if (remoteSessionId != null &&
+                  remoteSessionId.isNotEmpty &&
+                  remoteSessionId != localSessionId) {
+                // Phiên đã bị thiết bị khác chiếm
+                _userSubscription?.cancel();
+                await _authService.logout();
+                currentUser = null;
+                MessagingBootstrap.stop();
+                AttendanceAutoNotifyService.instance.stopEmployerPolling();
+                update();
+
+                Get.offAllNamed(AppRoutes.onboarding);
+                Get.snackbar(
+                  'Cảnh báo bảo mật',
+                  'Tài khoản của bạn đã được đăng nhập ở thiết bị khác.',
+                  snackPosition: SnackPosition.TOP,
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 5),
+                );
+                return;
+              }
+
+              final attempt = data['lastLoginAttempt'] as int?;
+              if (attempt != null) {
+                if (_lastSeenAttempt != null && attempt > _lastSeenAttempt!) {
+                  _showLoginAttemptWarning();
+                }
+                _lastSeenAttempt = attempt;
+              }
+
+              if (currentUser != null) {
+                data['uid'] = uid;
+                currentUser = UserModel.fromMap(data);
+                update();
+              }
             }
-            _lastSeenAttempt = attempt;
           }
-        }
-      }
         });
   }
 
