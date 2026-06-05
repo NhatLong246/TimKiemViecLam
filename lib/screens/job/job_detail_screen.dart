@@ -14,6 +14,7 @@ import '../../data/services/candidates_service.dart';
 import '../../data/services/messaging_service.dart';
 import '../../utils/job_time_helper.dart';
 import '../messaging/chat_room_screen.dart';
+import '../candidate/candidate_employer_reviews_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -438,54 +439,157 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         final compLogo =
                             employer.companyLogoUrl ?? employer.avatarUrl;
 
-                        return Row(
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              clipBehavior: Clip.hardEdge,
-                              child: compLogo != null
-                                  ? Image.network(
-                                      compLogo,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              const Icon(
-                                                Icons.business,
-                                                color: Colors.grey,
+                            Row(
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.grey.shade200),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  clipBehavior: Clip.hardEdge,
+                                  child: compLogo != null
+                                      ? Image.network(
+                                          compLogo,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) =>
+                                              const Icon(Icons.business, color: Colors.grey),
+                                        )
+                                      : const Icon(Icons.business, color: Colors.grey),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              compName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 17,
+                                                color: Colors.black87,
                                               ),
-                                    )
-                                  : const Icon(
-                                      Icons.business,
-                                      color: Colors.grey,
-                                    ),
+                                            ),
+                                          ),
+                                          if (employer.isVerified)
+                                            const Icon(Icons.verified, color: Colors.blue, size: 18),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        employer.businessType == 'company' 
+                                            ? 'Doanh nghiệp' 
+                                            : employer.businessType == 'cooperative' 
+                                                ? 'Hợp tác xã' 
+                                                : 'Cá nhân',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
+                            const SizedBox(height: 16),
+                            if (employer.companyAddress != null && employer.companyAddress!.isNotEmpty) ...[
+                              Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    compName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Quy mô: $compSize nhân viên',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 13,
+                                  Icon(Icons.location_on_outlined, size: 18, color: Colors.grey.shade600),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      employer.companyAddress!,
+                                      style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
                                     ),
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (employer.companyPhone != null && employer.companyPhone!.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  Icon(Icons.phone_outlined, size: 18, color: Colors.grey.shade600),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    employer.companyPhone!,
+                                    style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (employer.companyWebsite != null && employer.companyWebsite!.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  Icon(Icons.language_outlined, size: 18, color: Colors.grey.shade600),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    employer.companyWebsite!,
+                                    style: TextStyle(fontSize: 14, color: Colors.blue.shade700),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            Row(
+                              children: [
+                                Icon(Icons.people_outline, size: 18, color: Colors.grey.shade600),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Quy mô: $compSize nhân viên',
+                                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                                ),
+                              ],
+                            ),
+                            if (employer.companyDescription != null && employer.companyDescription!.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                employer.companyDescription!,
+                                style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  Get.to(() => CandidateEmployerReviewsScreen(
+                                        employerId: employer.id,
+                                        employerName: compName,
+                                      ));
+                                },
+                                icon: const Icon(Icons.star_outline, size: 18),
+                                label: const Text('Xem đánh giá về nhà tuyển dụng'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: primaryColor,
+                                  side: BorderSide(color: primaryColor),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
                               ),
                             ),
                           ],
