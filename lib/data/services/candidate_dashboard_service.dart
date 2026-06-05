@@ -10,6 +10,7 @@ import '../models/employer_stats_model.dart';
 import '../models/job_post_model.dart';
 import 'attendance_service.dart';
 import 'notification_service.dart';
+import 'candidate_earnings_service.dart';
 
 class CandidateDashboardService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -643,8 +644,7 @@ class CandidateDashboardService {
   Future<double> _fetchWalletBalance() async {
     final uid = _uid;
     if (uid == null) return 0;
-    final userDoc = await _firestore.collection('users').doc(uid).get();
-    return (userDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0;
+    return CandidateEarningsService().getTotalEarnings(uid);
   }
 
   Future<void> withdraw({required int amountVnd, String? note}) async {

@@ -59,16 +59,41 @@ class CandidateEarningsService {
     });
   }
 
-  /// Lấy tổng thu nhập (số dư ví)
+  /// Lấy số dư ví hiện tại của ứng viên (tính toán lại từ gốc để đảm bảo chính xác tuyệt đối)
   Future<double> getTotalEarnings(String candidateId) async {
-    final snap = await _earnings
+    // 1. Tổng tiền nhận được từ lịch sử
+    final earningsSnap = await _db.collection('candidateEarnings')
         .where('candidateId', isEqualTo: candidateId)
         .get();
-    double total = 0.0;
-    for (var doc in snap.docs) {
-      total += (doc.data()['amount'] as num?)?.toDouble() ?? 0.0;
+    double earned = 0.0;
+    for (var doc in earningsSnap.docs) {
+      earned += (doc.data()['amount'] as num?)?.toDouble() ?? 0.0;
     }
-    return total;
+
+    // 2. Tổng tiền đã rút thành công
+    final withdrawalsSnap = await _db.collection('walletTransactions')
+        .where('userId', isEqualTo: candidateId)
+        .where('type', isEqualTo: 'withdraw')
+        .where('status', isEqualTo: 'completed')
+        .get();
+    double withdrawn = 0.0;
+    for (var doc in withdrawalsSnap.docs) {
+      withdrawn += (doc.data()['amount'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    // 3. Số dư thực tế
+    double actualBalance = earned - withdrawn;
+    if (actualBalance < 0) actualBalance = 0;
+
+    // Đồng bộ ngược lại vào user document để sửa các lỗi sai lệch trước đây
+    try {
+      await _db.collection('users').doc(candidateId).set(
+        {'walletBalance': actualBalance},
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+
+    return actualBalance;
   }
 
   /// Lấy lịch sử thu nhập mới nhất

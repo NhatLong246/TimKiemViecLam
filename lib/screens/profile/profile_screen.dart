@@ -597,9 +597,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Scaffold(
-            backgroundColor: Colors.white,
-            body: Center(
+          return const ColoredBox(
+            color: Colors.white,
+            child: Center(
               child: CircularProgressIndicator(color: _primary),
             ),
           );
@@ -622,9 +622,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const bottomNavPadding = 92.0;
         final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: Column(
+        return ColoredBox(
+          color: Colors.white,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(

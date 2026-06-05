@@ -94,7 +94,7 @@ class _CandidateBenefitsScreenState extends State<CandidateBenefitsScreen> {
             children: [
               const Expanded(
                 child: Text(
-                  'Đã nhận (tháng này)',
+                  'Số dư ví',
                   style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ),
@@ -133,21 +133,14 @@ class _CandidateBenefitsScreenState extends State<CandidateBenefitsScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            s.formatVnd(s.periodPaidVnd),
+            s.formatVnd(s.walletBalanceVnd),
             style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
               color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          if (s.totalPaidVnd != s.periodPaidVnd) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Tổng đã nhận: ${s.formatVnd(s.totalPaidVnd)}',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
@@ -157,12 +150,7 @@ class _CandidateBenefitsScreenState extends State<CandidateBenefitsScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: _walletChip(
-                  'Số dư ví',
-                  s.formatVnd(s.walletBalanceVnd),
-                ),
-              ),
+              const Expanded(child: SizedBox()),
             ],
           ),
         ],
