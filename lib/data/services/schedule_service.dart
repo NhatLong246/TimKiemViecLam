@@ -27,7 +27,7 @@ class ScheduleService {
       for (final s in explicitSchedules) {
         map['${s.jobId}_${s.date}'] = s;
       }
-      
+
       final list = map.values.toList();
       list.sort((a, b) {
         final d = a.date.compareTo(b.date);
@@ -44,20 +44,22 @@ class ScheduleService {
         .snapshots()
         .asyncMap((snap) => _enrichSchedules(snap.docs))
         .listen((data) {
-      explicitSchedules = data;
-      emit();
-    });
+          explicitSchedules = data;
+          emit();
+        });
 
     final sub2 = _db
         .collection('applications')
         .where('candidateId', isEqualTo: candidateId)
         .where('status', whereIn: ['pending', 'accepted'])
         .snapshots()
-        .asyncMap((snap) => _enrichApplicationsToSchedules(candidateId, snap.docs))
+        .asyncMap(
+          (snap) => _enrichApplicationsToSchedules(candidateId, snap.docs),
+        )
         .listen((data) {
-      appliedSchedules = data;
-      emit();
-    });
+          appliedSchedules = data;
+          emit();
+        });
 
     controller.onCancel = () {
       sub1.cancel();
@@ -69,24 +71,28 @@ class ScheduleService {
 
   Future<List<ScheduleModel>> fetchByCandidate(String candidateId) async {
     if (candidateId.isEmpty) return [];
-    final snap =
-        await _col.where('candidateId', isEqualTo: candidateId).get();
+    final snap = await _col.where('candidateId', isEqualTo: candidateId).get();
     return _enrichSchedules(snap.docs);
   }
 
   Future<List<ScheduleModel>> fetchAllSchedules(String candidateId) async {
     if (candidateId.isEmpty) return [];
-    
-    final explicitDocs = await _col.where('candidateId', isEqualTo: candidateId).get();
+
+    final explicitDocs = await _col
+        .where('candidateId', isEqualTo: candidateId)
+        .get();
     final explicitList = await _enrichSchedules(explicitDocs.docs);
-    
+
     final appDocs = await _db
         .collection('applications')
         .where('candidateId', isEqualTo: candidateId)
         .where('status', whereIn: ['pending', 'accepted'])
         .get();
-    final appList = await _enrichApplicationsToSchedules(candidateId, appDocs.docs);
-    
+    final appList = await _enrichApplicationsToSchedules(
+      candidateId,
+      appDocs.docs,
+    );
+
     final map = <String, ScheduleModel>{};
     for (final s in appList) {
       map['${s.jobId}_${s.date}'] = s;
@@ -102,13 +108,13 @@ class ScheduleService {
   ) async {
     if (docs.isEmpty) return [];
 
-    final raw = docs
-        .map((d) => ScheduleModel.fromMap(d.data(), d.id))
-        .toList();
+    final raw = docs.map((d) => ScheduleModel.fromMap(d.data(), d.id)).toList();
 
     final jobIds = raw.map((s) => s.jobId).where((id) => id.isNotEmpty).toSet();
-    final employerIds =
-        raw.map((s) => s.employerId).where((id) => id.isNotEmpty).toSet();
+    final employerIds = raw
+        .map((s) => s.employerId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
 
     final jobs = await _loadJobs(jobIds);
     final employers = await _loadEmployerNames(employerIds);
@@ -126,9 +132,8 @@ class ScheduleService {
         status: s.status,
         jobTitle: s.jobTitle ?? job?.title ?? 'Công việc',
         jobLocation: s.jobLocation ?? job?.locationDisplay ?? '',
-        employerName: s.employerName ??
-            employers[s.employerId] ??
-            'Nhà tuyển dụng',
+        employerName:
+            s.employerName ?? employers[s.employerId] ?? 'Nhà tuyển dụng',
         createdAt: s.createdAt,
       );
     }).toList();
@@ -147,7 +152,10 @@ class ScheduleService {
   ) async {
     if (docs.isEmpty) return [];
 
-    final jobIds = docs.map((d) => d.data()['jobId'] as String? ?? '').where((id) => id.isNotEmpty).toSet();
+    final jobIds = docs
+        .map((d) => d.data()['jobId'] as String? ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
     final jobs = await _loadJobs(jobIds);
 
     final employerIds = jobs.values.map((j) => j.employerId).toSet();
@@ -160,28 +168,29 @@ class ScheduleService {
       final data = doc.data();
       final jobId = data['jobId'] as String? ?? '';
       final appStatus = data['status'] as String? ?? 'pending';
-      
+
       final job = jobs[jobId];
       if (job == null) continue;
 
       final empName = employers[job.employerId] ?? 'Nhà tuyển dụng';
-      
+
       final startDate = job.startDate;
       final endDate = job.endDate ?? startDate;
-      
+
       final limitDays = 60;
       var current = DateTime(startDate.year, startDate.month, startDate.day);
       final end = DateTime(endDate.year, endDate.month, endDate.day);
-      
+
       int count = 0;
-      while ((current.isBefore(end) || current.isAtSameMomentAs(end)) && count < limitDays) {
+      while ((current.isBefore(end) || current.isAtSameMomentAs(end)) &&
+          count < limitDays) {
         final dateKey = _dateKey(current);
-        
+
         final startTime = job.startTime ?? '08:00';
         final workHours = job.workHoursPerDay ?? 8.0;
         final h = (workHours).floor();
         final m = ((workHours - h) * 60).round();
-        
+
         String endTime = '17:00';
         final p = startTime.split(':');
         if (p.length == 2) {
@@ -190,26 +199,29 @@ class ScheduleService {
           final totalM = sh * 60 + sm + h * 60 + m;
           final eh = (totalM ~/ 60) % 24;
           final em = totalM % 60;
-          endTime = '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
+          endTime =
+              '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
         }
 
-        list.add(ScheduleModel(
-          scheduleId: 'app_${appId}_$dateKey',
-          jobId: jobId,
-          candidateId: candidateId,
-          employerId: job.employerId,
-          date: dateKey,
-          startTime: startTime,
-          endTime: endTime,
-          status: appStatus == 'pending' ? 'pending' : 'scheduled',
-          jobTitle: job.title,
-          jobLocation: job.locationDisplay,
-          employerName: empName,
-          createdAt: data['createdAt'] != null 
-              ? (data['createdAt'] as Timestamp).toDate() 
-              : DateTime.now(),
-        ));
-        
+        list.add(
+          ScheduleModel(
+            scheduleId: 'app_${appId}_$dateKey',
+            jobId: jobId,
+            candidateId: candidateId,
+            employerId: job.employerId,
+            date: dateKey,
+            startTime: startTime,
+            endTime: endTime,
+            status: appStatus == 'pending' ? 'pending' : 'scheduled',
+            jobTitle: job.title,
+            jobLocation: job.locationDisplay,
+            employerName: empName,
+            createdAt: data['createdAt'] != null
+                ? (data['createdAt'] as Timestamp).toDate()
+                : DateTime.now(),
+          ),
+        );
+
         current = current.add(const Duration(days: 1));
         count++;
       }
@@ -260,7 +272,9 @@ class ScheduleService {
   ) {
     final s = _dateKey(start);
     final e = _dateKey(end);
-    return all.where((x) => x.date.compareTo(s) >= 0 && x.date.compareTo(e) <= 0).toList();
+    return all
+        .where((x) => x.date.compareTo(s) >= 0 && x.date.compareTo(e) <= 0)
+        .toList();
   }
 
   static List<ScheduleModel> forDay(List<ScheduleModel> all, DateTime day) {
@@ -312,16 +326,16 @@ class ScheduleService {
   /// Throws Exception nếu bị trùng.
   Future<void> checkOverlap(String candidateId, JobPostModel newJob) async {
     final existingSchedules = await fetchAllSchedules(candidateId);
-    
+
     // Tạo danh sách ngày dự kiến cho newJob
     final startDate = newJob.startDate;
     final endDate = newJob.endDate ?? startDate;
-    
+
     final startTime = newJob.startTime ?? '08:00';
     final workHours = newJob.workHoursPerDay ?? 8.0;
     final h = workHours.floor();
     final m = ((workHours - h) * 60).round();
-    
+
     String endTime = '17:00';
     final p = startTime.split(':');
     if (p.length == 2) {
@@ -330,7 +344,8 @@ class ScheduleService {
       final totalM = sh * 60 + sm + h * 60 + m;
       final eh = (totalM ~/ 60) % 24;
       final em = totalM % 60;
-      endTime = '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
+      endTime =
+          '${eh.toString().padLeft(2, '0')}:${em.toString().padLeft(2, '0')}';
     }
 
     final newStartMin = _parseMinutes(startTime) ?? 0;
@@ -338,23 +353,29 @@ class ScheduleService {
 
     var current = DateTime(startDate.year, startDate.month, startDate.day);
     final end = DateTime(endDate.year, endDate.month, endDate.day);
-    
+
     int limitDays = 60;
     int count = 0;
-    
-    while ((current.isBefore(end) || current.isAtSameMomentAs(end)) && count < limitDays) {
+
+    while ((current.isBefore(end) || current.isAtSameMomentAs(end)) &&
+        count < limitDays) {
       final dateKey = _dateKey(current);
-      
+
       // Check in existing schedules
       for (final s in existingSchedules) {
         if (s.jobId == newJob.jobId) continue; // Bỏ qua trùng với chính job này
-        if (s.date == dateKey && s.status != 'cancelled' && s.status != 'completed') {
+        if (s.date == dateKey &&
+            s.status != 'cancelled' &&
+            s.status != 'completed' &&
+            s.status != 'pending') {
           final sStartMin = _parseMinutes(s.startTime) ?? 0;
           final sEndMin = _parseMinutes(s.endTime) ?? 0;
-          
+
           // Trùng khi (NewStart < OldEnd) && (NewEnd > OldStart)
           if (newStartMin < sEndMin && newEndMin > sStartMin) {
-            throw Exception('Lịch trùng vào ngày ${s.date} (Ca: ${s.startTime}-${s.endTime}). Vui lòng kiểm tra lại!');
+            throw Exception(
+              'Lịch trùng vào ngày ${s.date} (Ca: ${s.startTime}-${s.endTime}). Vui lòng kiểm tra lại!',
+            );
           }
         }
       }

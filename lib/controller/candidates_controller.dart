@@ -4,14 +4,13 @@ import 'package:get/get.dart';
 import '../data/constants/full_time_policy.dart';
 import '../data/models/application_model.dart';
 import '../data/services/candidates_service.dart';
+
 class CandidatesController extends GetxController {
   final _service = CandidatesService();
   final RxBool isLoadingFullTime = false.obs;
   final RxBool isLoadingPartTime = false.obs;
-  final RxList<JobWithApplications> fullTimeJobs =
-      <JobWithApplications>[].obs;
-  final RxList<JobWithApplications> partTimeJobs =
-      <JobWithApplications>[].obs;
+  final RxList<JobWithApplications> fullTimeJobs = <JobWithApplications>[].obs;
+  final RxList<JobWithApplications> partTimeJobs = <JobWithApplications>[].obs;
 
   /// Lọc theo jobId khi mở từ Quản lý bài đăng.
   String? filterJobId;
@@ -33,15 +32,11 @@ class CandidatesController extends GetxController {
   }
 
   // Tổng số đơn đang chờ duyệt (dùng cho tab badge)
-  int get pendingFullTimeCount => fullTimeJobs
-      .expand((j) => j.entries)
-      .where((e) => e.application.status == 'pending')
-      .length;
+  int get pendingFullTimeCount =>
+      fullTimeJobs.fold(0, (total, job) => total + job.pendingCount);
 
-  int get pendingPartTimeCount => partTimeJobs
-      .expand((j) => j.entries)
-      .where((e) => e.application.status == 'pending')
-      .length;
+  int get pendingPartTimeCount =>
+      partTimeJobs.fold(0, (total, job) => total + job.pendingCount);
 
   @override
   void onInit() {
@@ -82,16 +77,15 @@ class CandidatesController extends GetxController {
   // ── Duyệt đơn ứng tuyển ───────────────────────────────────────────────────
   Future<void> accept(String appId, String jobId) async {
     try {
-      await _service.acceptApplication(appId, jobId);
+      final result = await _service.acceptApplication(appId, jobId);
       _updateEntry(appId, 'accepted');
+      _updateEntries(result.autoRejectedAppIds, 'rejected');
       _incrementFilledSlots(jobId);
       final isFullTime = _jobTypeOf(jobId) == 'full_time';
       if (!isFullTime) {
         await _refreshJobGroupChatId(jobId);
       }
-      _showSuccess(
-        isFullTime ? kFullTimeAcceptSuccess : 'Đã duyệt ứng viên',
-      );
+      _showSuccess(isFullTime ? kFullTimeAcceptSuccess : 'Đã duyệt ứng viên');
     } catch (e) {
       _showError('Không thể duyệt: $e');
     }
@@ -136,6 +130,20 @@ class CandidatesController extends GetxController {
     }
   }
 
+  Future<void> rejectRemaining(String jobId) async {
+    try {
+      final count = await _service.rejectRemainingPendingApplications(jobId);
+      _rejectPendingEntries(jobId);
+      _showSuccess(
+        count > 0
+            ? 'Đã từ chối $count ứng viên còn lại'
+            : 'Không còn ứng viên chờ duyệt',
+      );
+    } catch (e) {
+      _showError('Không thể từ chối nhanh: $e');
+    }
+  }
+
   // ── Huỷ duyệt (accepted → pending) ────────────────────────────────────────
   Future<void> revokeAcceptance(String appId, String jobId) async {
     try {
@@ -150,11 +158,16 @@ class CandidatesController extends GetxController {
 
   // ── Helpers cập nhật local state (tránh reload toàn bộ) ───────────────────
   void _updateEntry(String appId, String newStatus) {
+    _updateEntries({appId}, newStatus);
+  }
+
+  void _updateEntries(Set<String> appIds, String newStatus) {
+    if (appIds.isEmpty) return;
     for (final list in [fullTimeJobs, partTimeJobs]) {
       bool changed = false;
       final newList = list.map((jwA) {
         final newEntries = jwA.entries.map((e) {
-          if (e.application.appId == appId) {
+          if (appIds.contains(e.application.appId)) {
             changed = true;
             return e.copyWithStatus(newStatus);
           }
@@ -164,16 +177,29 @@ class CandidatesController extends GetxController {
       }).toList();
       if (changed) {
         list.value = newList;
-        break;
       }
     }
   }
 
-  void _incrementFilledSlots(String jobId) =>
-      _adjustFilledSlots(jobId, 1);
+  void _rejectPendingEntries(String jobId) {
+    for (final list in [fullTimeJobs, partTimeJobs]) {
+      final idx = list.indexWhere((j) => j.job.jobId == jobId);
+      if (idx < 0) continue;
 
-  void _decrementFilledSlots(String jobId) =>
-      _adjustFilledSlots(jobId, -1);
+      final job = list[idx];
+      final newEntries = job.entries.map((entry) {
+        return entry.application.status == 'pending'
+            ? entry.copyWithStatus('rejected')
+            : entry;
+      }).toList();
+      list[idx] = job.copyWithEntries(newEntries);
+      break;
+    }
+  }
+
+  void _incrementFilledSlots(String jobId) => _adjustFilledSlots(jobId, 1);
+
+  void _decrementFilledSlots(String jobId) => _adjustFilledSlots(jobId, -1);
 
   void _adjustFilledSlots(String jobId, int delta) {
     for (final list in [fullTimeJobs, partTimeJobs]) {
@@ -188,19 +214,19 @@ class CandidatesController extends GetxController {
   }
 
   void _showSuccess(String msg) => Get.snackbar(
-        'Thành công',
-        msg,
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.shade100,
-        colorText: Colors.green.shade800,
-        duration: const Duration(seconds: 2),
-      );
+    'Thành công',
+    msg,
+    snackPosition: SnackPosition.TOP,
+    backgroundColor: Colors.green.shade100,
+    colorText: Colors.green.shade800,
+    duration: const Duration(seconds: 2),
+  );
 
   void _showError(String msg) => Get.snackbar(
-        'Lỗi',
-        msg,
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.red.shade100,
-        colorText: Colors.red.shade800,
-      );
+    'Lỗi',
+    msg,
+    snackPosition: SnackPosition.TOP,
+    backgroundColor: Colors.red.shade100,
+    colorText: Colors.red.shade800,
+  );
 }

@@ -271,7 +271,8 @@ class JobPostService {
   List<JobPostModel> _filterExpiredJobs(List<JobPostModel> jobs) {
     final now = DateTime.now();
     return jobs.where((job) {
-      if (job.applicationDeadline != null && job.applicationDeadline!.isBefore(now)) {
+      final deadline = job.applicationDeadline;
+      if (deadline != null && !deadline.isAfter(now)) {
         return false;
       }
       return true;
@@ -319,7 +320,10 @@ class JobPostService {
         'salary': job.salary,
         'salaryType': job.salaryType,
         'slots': job.slots,
+        'filledSlots': job.filledSlots,
         'startDate': job.startDate.millisecondsSinceEpoch,
+        'applicationDeadline': job.applicationDeadline?.millisecondsSinceEpoch,
+        'createdAt': job.createdAt?.millisecondsSinceEpoch,
         'status': job.status,
       });
     }
@@ -364,11 +368,20 @@ class JobPostService {
       salary: (row['salary'] as num?)?.toDouble() ?? 0,
       salaryType: row['salaryType'] as String? ?? 'per_day',
       slots: (row['slots'] as num?)?.toInt() ?? 1,
+      filledSlots: (row['filledSlots'] as num?)?.toInt() ?? 0,
       startDate: startMs != null
           ? DateTime.fromMillisecondsSinceEpoch(startMs)
           : DateTime.now(),
       status: row['status'] as String? ?? 'active',
       totalBudget: 0,
+      applicationDeadline: (row['applicationDeadline'] as int?) != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              row['applicationDeadline'] as int,
+            )
+          : null,
+      createdAt: (row['createdAt'] as int?) != null
+          ? DateTime.fromMillisecondsSinceEpoch(row['createdAt'] as int)
+          : null,
     );
   }
 
@@ -585,6 +598,6 @@ class JobPostService {
   Future<JobPostModel?> getJobPostById(String jobId) async {
     final doc = await _db.collection(_collection).doc(jobId).get();
     if (!doc.exists) return null;
-    return JobPostModel.fromMap(doc.data()!);
+    return JobPostModel.fromMap({...doc.data()!, 'jobId': doc.id});
   }
 }

@@ -146,25 +146,32 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.22),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.55), width: 2),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.55),
+                          width: 2,
+                        ),
                       ),
                       child: ClipOval(
                         child: user?.avatarBase64?.isNotEmpty == true
-                            ? Image.memory(base64Decode(user!.avatarBase64!), fit: BoxFit.cover)
+                            ? Image.memory(
+                                base64Decode(user!.avatarBase64!),
+                                fit: BoxFit.cover,
+                              )
                             : user?.avatarUrl?.isNotEmpty == true
-                                ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
-                                : Center(
-                                    child: Text(
-                                      (user != null && user.firstName.trim().isNotEmpty)
-                                          ? user.firstName[0].toUpperCase()
-                                          : 'N',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
+                            ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
+                            : Center(
+                                child: Text(
+                                  (user != null &&
+                                          user.firstName.trim().isNotEmpty)
+                                      ? user.firstName[0].toUpperCase()
+                                      : 'N',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
                                   ),
+                                ),
+                              ),
                       ),
                     );
                   },
@@ -402,17 +409,70 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showFilterBottomSheet(BuildContext context) {
     final List<String> provinces = [
-      'Tất cả', 'Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
-      'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh',
-      'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau',
-      'Cao Bằng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai', 'Đồng Tháp',
-      'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Tĩnh', 'Hải Dương', 'Hậu Giang',
-      'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 'Kon Tum', 'Lai Châu',
-      'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 'Nghệ An',
-      'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 'Quảng Nam',
-      'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sóc Trăng', 'Sơn La', 'Tây Ninh',
-      'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang',
-      'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
+      'Tất cả',
+      'Hà Nội',
+      'TP.HCM',
+      'Đà Nẵng',
+      'Hải Phòng',
+      'Cần Thơ',
+      'An Giang',
+      'Bà Rịa - Vũng Tàu',
+      'Bắc Giang',
+      'Bắc Kạn',
+      'Bạc Liêu',
+      'Bắc Ninh',
+      'Bến Tre',
+      'Bình Định',
+      'Bình Dương',
+      'Bình Phước',
+      'Bình Thuận',
+      'Cà Mau',
+      'Cao Bằng',
+      'Đắk Lắk',
+      'Đắk Nông',
+      'Điện Biên',
+      'Đồng Nai',
+      'Đồng Tháp',
+      'Gia Lai',
+      'Hà Giang',
+      'Hà Nam',
+      'Hà Tĩnh',
+      'Hải Dương',
+      'Hậu Giang',
+      'Hòa Bình',
+      'Hưng Yên',
+      'Khánh Hòa',
+      'Kiên Giang',
+      'Kon Tum',
+      'Lai Châu',
+      'Lâm Đồng',
+      'Lạng Sơn',
+      'Lào Cai',
+      'Long An',
+      'Nam Định',
+      'Nghệ An',
+      'Ninh Bình',
+      'Ninh Thuận',
+      'Phú Thọ',
+      'Phú Yên',
+      'Quảng Bình',
+      'Quảng Nam',
+      'Quảng Ngãi',
+      'Quảng Ninh',
+      'Quảng Trị',
+      'Sóc Trăng',
+      'Sơn La',
+      'Tây Ninh',
+      'Thái Bình',
+      'Thái Nguyên',
+      'Thanh Hóa',
+      'Thừa Thiên Huế',
+      'Tiền Giang',
+      'Trà Vinh',
+      'Tuyên Quang',
+      'Vĩnh Long',
+      'Vĩnh Phúc',
+      'Yên Bái',
     ];
 
     double? tempMinSalary = _homeController.filterMinSalary.value;
@@ -420,8 +480,12 @@ class _HomeScreenState extends State<HomeScreen> {
     String tempLocation = _homeController.filterLocation.value;
     String tempJobType = _homeController.filterJobType.value;
 
-    final minCtrl = TextEditingController(text: tempMinSalary?.toInt().toString() ?? '');
-    final maxCtrl = TextEditingController(text: tempMaxSalary?.toInt().toString() ?? '');
+    final minCtrl = TextEditingController(
+      text: tempMinSalary?.toInt().toString() ?? '',
+    );
+    final maxCtrl = TextEditingController(
+      text: tempMaxSalary?.toInt().toString() ?? '',
+    );
 
     showModalBottomSheet(
       context: context,
@@ -433,14 +497,20 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setState) {
-            Widget buildChoiceChip(String label, String currentVal, Function(String) onSelect) {
+            Widget buildChoiceChip(
+              String label,
+              String currentVal,
+              Function(String) onSelect,
+            ) {
               final isSelected = currentVal == label;
               return ChoiceChip(
                 label: Text(
                   isSelected && label == 'Tất cả' ? '✓ Tất cả' : label,
                   style: TextStyle(
                     color: isSelected ? Colors.black87 : Colors.black54,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
                 selected: isSelected,
@@ -449,7 +519,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                   side: BorderSide(
-                    color: isSelected ? const Color(0xFF81C784) : Colors.grey.shade300,
+                    color: isSelected
+                        ? const Color(0xFF81C784)
+                        : Colors.grey.shade300,
                   ),
                 ),
                 onSelected: (_) => onSelect(label),
@@ -482,7 +554,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Text(
                           'Bộ lọc tìm kiếm',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         GestureDetector(
                           onTap: () => Navigator.pop(ctx),
@@ -491,8 +566,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    
-                    const Text('Khoảng mức lương (VNĐ)', style: TextStyle(fontWeight: FontWeight.bold)),
+
+                    const Text(
+                      'Khoảng mức lương (VNĐ)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -504,22 +582,33 @@ class _HomeScreenState extends State<HomeScreen> {
                               hintText: 'TỐI THIỂU',
                               filled: true,
                               fillColor: Colors.transparent,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.green.shade200),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.green.shade200),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                             ),
-                            onChanged: (val) => tempMinSalary = double.tryParse(val),
+                            onChanged: (val) =>
+                                tempMinSalary = double.tryParse(val),
                           ),
                         ),
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text('-', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: Text(
+                            '-',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                         Expanded(
                           child: TextField(
@@ -529,31 +618,47 @@ class _HomeScreenState extends State<HomeScreen> {
                               hintText: 'TỐI ĐA',
                               filled: true,
                               fillColor: Colors.transparent,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.green.shade200),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.green.shade200),
+                                borderSide: BorderSide(
+                                  color: Colors.green.shade200,
+                                ),
                               ),
                             ),
-                            onChanged: (val) => tempMaxSalary = double.tryParse(val),
+                            onChanged: (val) =>
+                                tempMaxSalary = double.tryParse(val),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
 
-                    const Text('Khu vực', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Khu vực',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: provinces.contains(tempLocation) ? tempLocation : 'Tất cả',
+                      value: provinces.contains(tempLocation)
+                          ? tempLocation
+                          : 'Tất cả',
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(color: Colors.green.shade200),
@@ -568,7 +673,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       items: provinces.map((String value) {
                         return DropdownMenuItem<String>(
                           value: value,
-                          child: Text(value, style: const TextStyle(fontSize: 14)),
+                          child: Text(
+                            value,
+                            style: const TextStyle(fontSize: 14),
+                          ),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -577,15 +685,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    const Text('Loại công việc', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Loại công việc',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        buildChoiceChip('Tất cả', tempJobType, (val) => setState(() => tempJobType = val)),
-                        buildChoiceChip('Part-time', tempJobType, (val) => setState(() => tempJobType = val)),
-                        buildChoiceChip('Full-time', tempJobType, (val) => setState(() => tempJobType = val)),
+                        buildChoiceChip(
+                          'Tất cả',
+                          tempJobType,
+                          (val) => setState(() => tempJobType = val),
+                        ),
+                        buildChoiceChip(
+                          'Part-time',
+                          tempJobType,
+                          (val) => setState(() => tempJobType = val),
+                        ),
+                        buildChoiceChip(
+                          'Full-time',
+                          tempJobType,
+                          (val) => setState(() => tempJobType = val),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 32),
@@ -609,7 +732,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text('Áp dụng', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Áp dụng',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -685,40 +815,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
-                  child: Builder(builder: (context) {
-                    if (job.imageUrls.isEmpty) {
-                      return Image.asset(
-                        'assets/images/banners/default_image.png',
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      );
-                    }
-                    final img = job.imageUrls.first;
-                    if (img.startsWith('http')) {
-                      return Image.network(
-                        img,
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Image.asset(
+                  child: Builder(
+                    builder: (context) {
+                      if (job.imageUrls.isEmpty) {
+                        return Image.asset(
                           'assets/images/banners/default_image.png',
                           height: 100,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                        ),
-                      );
-                    } else {
-                      try {
-                        String b64 = img;
-                        if (b64.contains(',')) {
-                          b64 = b64.split(',').last;
-                        }
-                        final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
-                        // Thêm padding nếu thiếu
-                        final padded = sanitized.padRight(sanitized.length + (4 - sanitized.length % 4) % 4, '=');
-                        return Image.memory(
-                          base64Decode(padded),
+                        );
+                      }
+                      final img = job.imageUrls.first;
+                      if (img.startsWith('http')) {
+                        return Image.network(
+                          img,
                           height: 100,
                           width: double.infinity,
                           fit: BoxFit.cover,
@@ -729,17 +839,42 @@ class _HomeScreenState extends State<HomeScreen> {
                             fit: BoxFit.cover,
                           ),
                         );
-                      } catch (e) {
-                        print('Lỗi base64 HomeScreen: $e');
-                        return Image.asset(
-                          'assets/images/banners/default_image.png',
-                          height: 100,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        );
+                      } else {
+                        try {
+                          String b64 = img;
+                          if (b64.contains(',')) {
+                            b64 = b64.split(',').last;
+                          }
+                          final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+                          // Thêm padding nếu thiếu
+                          final padded = sanitized.padRight(
+                            sanitized.length + (4 - sanitized.length % 4) % 4,
+                            '=',
+                          );
+                          return Image.memory(
+                            base64Decode(padded),
+                            height: 100,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx, err, stack) => Image.asset(
+                              'assets/images/banners/default_image.png',
+                              height: 100,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          );
+                        } catch (e) {
+                          print('Lỗi base64 HomeScreen: $e');
+                          return Image.asset(
+                            'assets/images/banners/default_image.png',
+                            height: 100,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          );
+                        }
                       }
-                    }
-                  }),
+                    },
+                  ),
                 ),
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
@@ -842,14 +977,43 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: double.infinity,
                       height: 32,
                       child: Obx(() {
-                        final hasApplied = _homeController.appliedJobIds.contains(job.jobId);
+                        final status =
+                            _homeController.appliedJobStatus[job.jobId];
+                        final isAccepted = status == 'accepted';
+                        final isPending = status == 'pending';
+                        final isWithdrawn = status == 'withdrawn';
+                        final isFullForOtherUsers =
+                            job.isFull && !isAccepted && !isPending;
+
+                        Color btnColor = _primary;
+                        String text = 'Ứng tuyển';
+                        VoidCallback? onPressed = () {
+                          Get.toNamed(AppRoutes.jobDetail, arguments: job);
+                        };
+
+                        if (isWithdrawn) {
+                          btnColor = Colors.grey.shade500;
+                          text = 'Không thể ứng tuyển';
+                          onPressed = null;
+                        } else if (isAccepted) {
+                          btnColor = Colors.red;
+                          text = 'Đã được nhận';
+                        } else if (isPending) {
+                          btnColor = Colors.amber.shade700;
+                          text = 'Đã ứng tuyển';
+                        } else if (isFullForOtherUsers) {
+                          btnColor = Colors.grey.shade500;
+                          text = 'Đã đủ người';
+                          onPressed = null;
+                        }
+
                         return ElevatedButton(
-                          onPressed: hasApplied ? null : () {
-                            Get.toNamed(AppRoutes.jobDetail, arguments: job);
-                          },
+                          onPressed: onPressed,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: hasApplied ? Colors.grey.shade400 : _primary,
+                            backgroundColor: btnColor,
                             foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey.shade500,
+                            disabledForegroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -857,7 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             padding: EdgeInsets.zero,
                           ),
                           child: Text(
-                            hasApplied ? 'Đã ứng tuyển' : 'Ứng tuyển',
+                            text,
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -1002,61 +1166,63 @@ class _JobCard extends StatelessWidget {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
-                  child: Builder(builder: (context) {
-                    if (job.imageUrls.isEmpty) {
-                      return Image.asset(
-                        'assets/images/banners/default_image.png',
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      );
-                    }
-                    final img = job.imageUrls.first;
-                    if (img.startsWith('http')) {
-                      return Image.network(
-                        img,
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Image.asset(
+                  child: Builder(
+                    builder: (context) {
+                      if (job.imageUrls.isEmpty) {
+                        return Image.asset(
                           'assets/images/banners/default_image.png',
                           height: 100,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                        ),
-                      );
-                    }
-                    try {
-                      var b64 = img;
-                      if (b64.contains(',')) {
-                        b64 = b64.split(',').last;
+                        );
                       }
-                      final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
-                      final padded = sanitized.padRight(
-                        sanitized.length + (4 - sanitized.length % 4) % 4,
-                        '=',
-                      );
-                      return Image.memory(
-                        base64Decode(padded),
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Image.asset(
+                      final img = job.imageUrls.first;
+                      if (img.startsWith('http')) {
+                        return Image.network(
+                          img,
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Image.asset(
+                            'assets/images/banners/default_image.png',
+                            height: 100,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      }
+                      try {
+                        var b64 = img;
+                        if (b64.contains(',')) {
+                          b64 = b64.split(',').last;
+                        }
+                        final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+                        final padded = sanitized.padRight(
+                          sanitized.length + (4 - sanitized.length % 4) % 4,
+                          '=',
+                        );
+                        return Image.memory(
+                          base64Decode(padded),
+                          height: 100,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => Image.asset(
+                            'assets/images/banners/default_image.png',
+                            height: 100,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        );
+                      } catch (e) {
+                        return Image.asset(
                           'assets/images/banners/default_image.png',
                           height: 100,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                        ),
-                      );
-                    } catch (e) {
-                      return Image.asset(
-                        'assets/images/banners/default_image.png',
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      );
-                    }
-                  }),
+                        );
+                      }
+                    },
+                  ),
                 ),
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(
@@ -1163,9 +1329,14 @@ class _JobCard extends StatelessWidget {
                         final isAccepted = status == 'accepted';
                         final isPending = status == 'pending';
                         final isWithdrawn = status == 'withdrawn';
+                        final isFullForOtherUsers =
+                            job.isFull && !isAccepted && !isPending;
 
                         Color btnColor = _primary;
                         String text = 'Ứng tuyển';
+                        VoidCallback? onPressed = () {
+                          Get.toNamed(AppRoutes.jobDetail, arguments: job);
+                        };
 
                         if (isWithdrawn) {
                           btnColor = Colors.grey.shade500;
@@ -1176,14 +1347,14 @@ class _JobCard extends StatelessWidget {
                         } else if (isPending) {
                           btnColor = Colors.amber.shade700;
                           text = 'Đã ứng tuyển';
+                        } else if (isFullForOtherUsers) {
+                          btnColor = Colors.grey.shade500;
+                          text = 'Đã đủ người';
+                          onPressed = null;
                         }
 
                         return ElevatedButton(
-                          onPressed: isWithdrawn
-                              ? null  // Không cho click nếu đã withdrawn
-                              : () {
-                                  Get.toNamed(AppRoutes.jobDetail, arguments: job);
-                                },
+                          onPressed: isWithdrawn ? null : onPressed,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: btnColor,
                             foregroundColor: Colors.white,
@@ -1216,8 +1387,6 @@ class _JobCard extends StatelessWidget {
   }
 }
 
-
-
 /// Chuông thông báo: lọc tin nhóm đã tắt thông báo + Obx tin nhắn.
 class _NotificationBellButton extends StatelessWidget {
   const _NotificationBellButton();
@@ -1236,9 +1405,7 @@ class _NotificationBellButton extends StatelessWidget {
           return GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const NotificationScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const NotificationScreen()),
             ),
             child: SizedBox(
               width: 38,
@@ -1309,8 +1476,7 @@ class _NotificationBellButton extends StatelessWidget {
           final mc = Get.find<MessagingController>();
           final notifUnread = mc.visibleUnreadNotificationCount(notifications);
           final chatUnread = mc.unreadTotal.value;
-          final total =
-              notifUnread > chatUnread ? notifUnread : chatUnread;
+          final total = notifUnread > chatUnread ? notifUnread : chatUnread;
           return bell(total);
         });
       },

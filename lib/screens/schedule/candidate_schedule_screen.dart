@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:viecnow/data/models/schedule_model.dart';
+import 'package:viecnow/data/services/job_post_service.dart';
 import 'package:viecnow/data/services/schedule_service.dart';
+import 'package:viecnow/routes/app_routes.dart';
 
 class CandidateScheduleScreen extends StatefulWidget {
   const CandidateScheduleScreen({super.key});
@@ -14,6 +17,7 @@ class CandidateScheduleScreen extends StatefulWidget {
 class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
   final Color _primary = const Color(0xFF2E7D32);
   final _scheduleService = ScheduleService();
+  final _jobPostService = JobPostService();
 
   late DateTime _selectedDate;
   late List<DateTime> _weekDates;
@@ -65,6 +69,38 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
       ScheduleDisplayKind.completed => Colors.grey,
       ScheduleDisplayKind.cancelled => Colors.red.shade300,
     };
+  }
+
+  Future<void> _openJobDetail(ScheduleModel schedule) async {
+    if (schedule.jobId.isEmpty) {
+      _showMessage('Không tìm thấy mã công việc.');
+      return;
+    }
+
+    try {
+      final job = await _jobPostService.getJobPostById(schedule.jobId);
+      if (!mounted) return;
+
+      if (job == null) {
+        _showMessage('Bài đăng này không còn tồn tại.');
+        return;
+      }
+
+      Get.toNamed(
+        AppRoutes.jobDetail,
+        arguments: {'job': job, 'readOnlyNoBottom': true},
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Không tải được chi tiết công việc.');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -308,137 +344,141 @@ class _CandidateScheduleScreenState extends State<CandidateScheduleScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: shifts.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final s = shifts[index];
         final kind = ScheduleService.displayKind(s);
         final statusColor = _colorForKind(kind);
         final statusLabel = kind.label;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 6,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _openJobDetail(s),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 6,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              s.timeRange,
-                              style: TextStyle(
-                                color: _primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                statusLabel,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                s.timeRange,
                                 style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 10,
+                                  color: _primary,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          s.jobTitle ?? 'Công việc',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.storefront_outlined,
-                              size: 14,
-                              color: Colors.grey.shade600,
+                          const SizedBox(height: 12),
+                          Text(
+                            s.jobTitle ?? 'Công việc',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                s.employerName ?? 'Nhà tuyển dụng',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (s.jobLocation != null &&
-                            s.jobLocation!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          ),
+                          const SizedBox(height: 6),
                           Row(
                             children: [
                               Icon(
-                                Icons.location_on_outlined,
+                                Icons.storefront_outlined,
                                 size: 14,
                                 color: Colors.grey.shade600,
                               ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  s.jobLocation!,
+                                  s.employerName ?? 'Nhà tuyển dụng',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.grey.shade600,
                                   ),
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
+                          if (s.jobLocation != null &&
+                              s.jobLocation!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  size: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    s.jobLocation!,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

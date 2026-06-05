@@ -26,10 +26,17 @@ class HomeController extends GetxController {
   StreamSubscription? _applicationsSub;
   StreamSubscription? _profileViewsSub;
   StreamSubscription? _authSub;
+  StreamSubscription? _approvedJobsSub;
+  StreamSubscription? _activeJobsSub;
+  final Map<String, JobPostModel> _approvedLiveJobs = {};
+  final Map<String, JobPostModel> _activeLiveJobs = {};
+  bool _hasApprovedJobsSnapshot = false;
+  bool _hasActiveJobsSnapshot = false;
 
   @override
   void onInit() {
     super.onInit();
+    _listenToLatestJobs();
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       fetchLatestJobs();
       _listenToApplications(user?.uid);
@@ -42,14 +49,78 @@ class HomeController extends GetxController {
     _applicationsSub?.cancel();
     _profileViewsSub?.cancel();
     _authSub?.cancel();
+    _approvedJobsSub?.cancel();
+    _activeJobsSub?.cancel();
     super.onClose();
+  }
+
+  void _listenToLatestJobs() {
+    _approvedJobsSub?.cancel();
+    _activeJobsSub?.cancel();
+
+    _approvedJobsSub = FirebaseFirestore.instance
+        .collection('jobPosts')
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .listen((snap) {
+          _hasApprovedJobsSnapshot = true;
+          _replaceLiveJobs(_approvedLiveJobs, snap);
+          _mergeLiveJobs();
+        });
+
+    _activeJobsSub = FirebaseFirestore.instance
+        .collection('jobPosts')
+        .where('status', isEqualTo: 'active')
+        .snapshots()
+        .listen((snap) {
+          _hasActiveJobsSnapshot = true;
+          _replaceLiveJobs(_activeLiveJobs, snap);
+          _mergeLiveJobs();
+        });
+  }
+
+  void _replaceLiveJobs(
+    Map<String, JobPostModel> target,
+    QuerySnapshot<Map<String, dynamic>> snap,
+  ) {
+    target
+      ..clear()
+      ..addEntries(
+        snap.docs.map(
+          (doc) => MapEntry(
+            doc.id,
+            JobPostModel.fromMap({...doc.data(), 'jobId': doc.id}),
+          ),
+        ),
+      );
+  }
+
+  void _mergeLiveJobs() {
+    if (!_hasApprovedJobsSnapshot || !_hasActiveJobsSnapshot) return;
+    final merged = <String, JobPostModel>{
+      ..._approvedLiveJobs,
+      ..._activeLiveJobs,
+    }.values.where(_isVisibleCandidateJob).toList();
+
+    merged.sort((a, b) {
+      final aTime = a.createdAt ?? DateTime(2000);
+      final bTime = b.createdAt ?? DateTime(2000);
+      return bTime.compareTo(aTime);
+    });
+    allJobs.value = merged;
+    _applyFilter();
+    isLoading.value = false;
+  }
+
+  bool _isVisibleCandidateJob(JobPostModel job) {
+    final deadline = job.applicationDeadline;
+    return deadline == null || deadline.isAfter(DateTime.now());
   }
 
   void _listenToApplications(String? uid) {
     _applicationsSub?.cancel();
     if (uid == null) {
-      appliedJobIds.clear();
-      appliedJobStatus.clear();
+      _setAppliedStatus({});
       return;
     }
 
@@ -58,20 +129,20 @@ class HomeController extends GetxController {
         .where('candidateId', isEqualTo: uid)
         .snapshots()
         .listen((snap) {
-      final map = <String, String>{};
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final jobId = data['jobId'] as String?;
-        final status = data['status'] as String?;
-        if (jobId == null || status == null) continue;
-        if (status == 'pending' ||
-            status == 'accepted' ||
-            status == 'withdrawn') {
-          map[jobId] = status;
-        }
-      }
-      _setAppliedStatus(map);
-    });
+          final map = <String, String>{};
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final jobId = data['jobId'] as String?;
+            final status = data['status'] as String?;
+            if (jobId == null || status == null) continue;
+            if (status == 'pending' ||
+                status == 'accepted' ||
+                status == 'withdrawn') {
+              map[jobId] = status;
+            }
+          }
+          _setAppliedStatus(map);
+        });
   }
 
   void _listenToProfileViews(String? uid) {
@@ -84,13 +155,13 @@ class HomeController extends GetxController {
         .doc(uid)
         .snapshots()
         .listen((doc) {
-      final data = doc.data();
-      if (data == null) {
-        profileViewCount.value = 0;
-        return;
-      }
-      profileViewCount.value = _parseProfileViewCount(data);
-    });
+          final data = doc.data();
+          if (data == null) {
+            profileViewCount.value = 0;
+            return;
+          }
+          profileViewCount.value = _parseProfileViewCount(data);
+        });
   }
 
   int _parseProfileViewCount(Map<String, dynamic> data) {
@@ -139,7 +210,7 @@ class HomeController extends GetxController {
   }
 
   void _applyFilter() {
-    latestJobs.value = allJobs.where((j) {
+    final filtered = allJobs.where((j) {
       if (filterJobType.value != 'Tất cả') {
         final jType = j.jobType == 'part_time' ? 'Part-time' : 'Full-time';
         if (jType != filterJobType.value) return false;
@@ -158,6 +229,25 @@ class HomeController extends GetxController {
 
       return true;
     }).toList();
+
+    filtered.sort(_compareDashboardJobs);
+    latestJobs.value = filtered;
+  }
+
+  int _compareDashboardJobs(JobPostModel a, JobPostModel b) {
+    final aPriority = _applicationSortPriority(appliedJobStatus[a.jobId]);
+    final bPriority = _applicationSortPriority(appliedJobStatus[b.jobId]);
+    if (aPriority != bPriority) return aPriority.compareTo(bPriority);
+
+    final aTime = a.createdAt ?? a.startDate;
+    final bTime = b.createdAt ?? b.startDate;
+    return bTime.compareTo(aTime);
+  }
+
+  int _applicationSortPriority(String? status) {
+    if (status == 'accepted') return 0;
+    if (status == 'pending') return 1;
+    return 2;
   }
 
   bool _matchLocation(String jobLocation, String filterLocation) {
@@ -186,29 +276,17 @@ class HomeController extends GetxController {
   }
 
   String _removeVietnameseTones(String str) {
-    str = str.replaceAll(
-      RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'),
-      'a',
-    );
+    str = str.replaceAll(RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'), 'a');
     str = str.replaceAll(RegExp(r'[èéẹẻẽêềếệểễ]'), 'e');
     str = str.replaceAll(RegExp(r'[ìíịỉĩ]'), 'i');
-    str = str.replaceAll(
-      RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'),
-      'o',
-    );
+    str = str.replaceAll(RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'), 'o');
     str = str.replaceAll(RegExp(r'[ùúụủũưừứựửữ]'), 'u');
     str = str.replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y');
     str = str.replaceAll(RegExp(r'[đ]'), 'd');
-    str = str.replaceAll(
-      RegExp(r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]'),
-      'A',
-    );
+    str = str.replaceAll(RegExp(r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]'), 'A');
     str = str.replaceAll(RegExp(r'[ÈÉẸẺẼÊỀẾỆỂỄ]'), 'E');
     str = str.replaceAll(RegExp(r'[ÌÍỊỈĨ]'), 'I');
-    str = str.replaceAll(
-      RegExp(r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]'),
-      'O',
-    );
+    str = str.replaceAll(RegExp(r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]'), 'O');
     str = str.replaceAll(RegExp(r'[ÙÚỤỦŨƯỪỨỰỬỮ]'), 'U');
     str = str.replaceAll(RegExp(r'[ỲÝỴỶỸ]'), 'Y');
     str = str.replaceAll(RegExp(r'[Đ]'), 'D');
@@ -250,10 +328,12 @@ class HomeController extends GetxController {
       ..clear()
       ..addAll(
         map.entries
-            .where((entry) =>
-                entry.value == 'pending' || entry.value == 'accepted')
+            .where(
+              (entry) => entry.value == 'pending' || entry.value == 'accepted',
+            )
             .map((entry) => entry.key),
       );
+    _applyFilter();
   }
 
   Future<void> refreshJobs() async {

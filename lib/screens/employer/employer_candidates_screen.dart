@@ -362,6 +362,8 @@ class _JobCardState extends State<_JobCard> {
     final job = widget.jwA.job;
     final entries = widget.jwA.entries;
     final pending = widget.jwA.pendingCount;
+    final overflowPendingIds = widget.jwA.overflowPendingApplicationIds;
+    final canQuickReject = !widget.readOnly && overflowPendingIds.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -500,6 +502,32 @@ class _JobCardState extends State<_JobCard> {
           // ── Danh sách ứng viên (khi mở rộng) ─────────────────────────────
           if (_expanded) ...[
             Divider(height: 1, color: Colors.grey.shade100),
+            if (canQuickReject)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmRejectRemaining(
+                      context,
+                      job.jobId,
+                      overflowPendingIds.length,
+                    ),
+                    icon: const Icon(Icons.block_rounded, size: 16),
+                    label: Text(
+                      'Từ chối nhanh ${overflowPendingIds.length} ứng viên còn lại',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
+                      side: BorderSide(color: Colors.red.shade200),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (entries.isEmpty)
               _NoApplicants()
             else
@@ -514,12 +542,32 @@ class _JobCardState extends State<_JobCard> {
                   job: widget.jwA.job,
                   ctrl: widget.ctrl,
                   readOnly: widget.readOnly,
+                  isOverflowRejected: overflowPendingIds.contains(
+                    entries[i].application.appId,
+                  ),
                 ),
               ),
           ],
         ],
       ),
     );
+  }
+
+  Future<void> _confirmRejectRemaining(
+    BuildContext ctx,
+    String jobId,
+    int count,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (_) => _ConfirmDialog(
+        title: 'Từ chối nhanh',
+        content: 'Từ chối $count ứng viên còn lại và gửi thông báo cho họ?',
+        confirmLabel: 'Từ chối',
+        confirmColor: Colors.red,
+      ),
+    );
+    if (confirmed == true) widget.ctrl.rejectRemaining(jobId);
   }
 }
 
@@ -529,19 +577,22 @@ class _ApplicantTile extends StatelessWidget {
   final JobPostModel job;
   final CandidatesController ctrl;
   final bool readOnly;
+  final bool isOverflowRejected;
 
   const _ApplicantTile({
     required this.entry,
     required this.job,
     required this.ctrl,
     this.readOnly = false,
+    this.isOverflowRejected = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final app = entry.application;
     final candidate = entry.candidate;
-    final isPending = app.status == 'pending';
+    final displayStatus = isOverflowRejected ? 'rejected' : app.status;
+    final isPending = app.status == 'pending' && !isOverflowRejected;
     final isAccepted = app.status == 'accepted';
 
     return InkWell(
@@ -630,9 +681,33 @@ class _ApplicantTile extends StatelessWidget {
                   ),
                 ),
                 // Status chip
-                _AppStatusChip(status: app.status),
+                _AppStatusChip(status: displayStatus),
               ],
             ),
+
+            if (isOverflowRejected) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.block_rounded,
+                    size: 13,
+                    color: Colors.red.shade400,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Tự động từ chối do vượt số lượng tuyển',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.red.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
 
             // ── Cover letter (nếu có, rút gọn 2 dòng) ───────────────────────
             if (app.coverLetter?.isNotEmpty == true) ...[
@@ -1120,7 +1195,8 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
                       () => const EmployerReviewsScreen(),
                       arguments: {
                         'uid': widget.candidateSnap.uid,
-                        'title': 'Đánh giá về ${widget.candidateSnap.fullName.isNotEmpty ? widget.candidateSnap.fullName : 'ứng viên'}'
+                        'title':
+                            'Đánh giá về ${widget.candidateSnap.fullName.isNotEmpty ? widget.candidateSnap.fullName : 'ứng viên'}',
                       },
                     );
                   },
