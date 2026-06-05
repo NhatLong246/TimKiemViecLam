@@ -998,8 +998,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         final isAccepted = status == 'accepted';
                         final isPending = status == 'pending';
                         final isWithdrawn = status == 'withdrawn';
+                        final isRejected = status == 'rejected';
+                        final cannotApply = isWithdrawn || isRejected;
                         final isFullForOtherUsers =
-                            job.isFull && !isAccepted && !isPending;
+                            job.isFull &&
+                            !isAccepted &&
+                            !isPending &&
+                            !cannotApply;
 
                         Color btnColor = _primary;
                         String text = 'Ứng tuyển';
@@ -1007,7 +1012,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Get.toNamed(AppRoutes.jobDetail, arguments: job);
                         };
 
-                        if (isWithdrawn) {
+                        if (cannotApply) {
                           btnColor = Colors.grey.shade500;
                           text = 'Không thể ứng tuyển';
                           onPressed = null;
@@ -1345,8 +1350,13 @@ class _JobCard extends StatelessWidget {
                         final isAccepted = status == 'accepted';
                         final isPending = status == 'pending';
                         final isWithdrawn = status == 'withdrawn';
+                        final isRejected = status == 'rejected';
+                        final cannotApply = isWithdrawn || isRejected;
                         final isFullForOtherUsers =
-                            job.isFull && !isAccepted && !isPending;
+                            job.isFull &&
+                            !isAccepted &&
+                            !isPending &&
+                            !cannotApply;
 
                         Color btnColor = _primary;
                         String text = 'Ứng tuyển';
@@ -1354,9 +1364,10 @@ class _JobCard extends StatelessWidget {
                           Get.toNamed(AppRoutes.jobDetail, arguments: job);
                         };
 
-                        if (isWithdrawn) {
+                        if (cannotApply) {
                           btnColor = Colors.grey.shade500;
                           text = 'Không thể ứng tuyển';
+                          onPressed = null;
                         } else if (isAccepted) {
                           btnColor = Colors.red;
                           text = 'Đã được nhận';
@@ -1370,7 +1381,7 @@ class _JobCard extends StatelessWidget {
                         }
 
                         return ElevatedButton(
-                          onPressed: isWithdrawn ? null : onPressed,
+                          onPressed: cannotApply ? null : onPressed,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: btnColor,
                             foregroundColor: Colors.white,
