@@ -195,46 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: () => _showJobStatusSheet(
-                        context,
-                        currentWorkStatus: currentWorkStatus,
-                        jobSearchStatus: jobSearchStatus,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                jobSearchStatus,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+
                     const SizedBox(height: 10),
                     if (email.isNotEmpty)
                       _buildHeaderInfo(Icons.email_outlined, email),
@@ -689,8 +650,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 22),
                     _buildAlarmCard(context),
                     const SizedBox(height: 22),
-                    _buildEarningsCard(context),
-                    const SizedBox(height: 22),
                     _buildJobCriteriaCard(),
                   ],
                 ),
@@ -736,53 +695,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     SizedBox(height: 4),
                     Text(
                       'Cài đặt chuông báo lịch làm việc',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEarningsCard(BuildContext context) {
-    return _ProfileCard(
-      child: InkWell(
-        onTap: () {
-          Get.toNamed(AppRoutes.candidateEarnings);
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.account_balance_wallet_rounded, color: Colors.green.shade800, size: 28),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ví thu nhập',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF262626),
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Xem lịch sử nhận lương từ các ca làm',
                       style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
                     ),
                   ],

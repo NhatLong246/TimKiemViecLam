@@ -241,7 +241,20 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
+      child: InkWell(
+        onTap: isWarning && _isEmployer
+            ? () async {
+                final changed = await Get.toNamed(
+                  AppRoutes.warningAppeal,
+                  arguments: item,
+                );
+                if (changed == true) {
+                  _load(); // reload after appeal
+                }
+              }
+            : null,
+        borderRadius: BorderRadius.circular(8),
+        child: ListTile(
         leading: CircleAvatar(
           backgroundColor: color.withValues(alpha: 0.12),
           child: Icon(
@@ -287,13 +300,41 @@ class _ComplaintsCatalogScreenState extends State<ComplaintsCatalogScreen>
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            Text(
-              '${DateFormat('dd/MM/yyyy HH:mm').format(item.createdAt)} · ${item.status}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${DateFormat('dd/MM/yyyy HH:mm').format(item.createdAt)} · ${item.status}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                ),
+                if (isWarning && item.appealStatus != null)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: item.appealStatus == 'pending' 
+                          ? Colors.orange.shade100 
+                          : Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      item.appealStatus == 'pending' ? 'Chờ kháng cáo' : 'Đã duyệt',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: item.appealStatus == 'pending' 
+                            ? Colors.orange.shade800 
+                            : Colors.blue.shade800,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
         isThreeLine: true,
+      ),
       ),
     );
   }

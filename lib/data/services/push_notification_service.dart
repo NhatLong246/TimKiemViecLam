@@ -16,6 +16,7 @@ import '../../push/push_background_handler.dart';
 import '../../screens/chat/widgets/incoming_call_overlay.dart';
 import '../../utils/push_navigation_handler.dart';
 import '../services/notification_service.dart';
+import '../services/alarm_manager_service.dart';
 import '../models/app_notification_model.dart';
 
 class PushNotificationService with WidgetsBindingObserver {
@@ -53,6 +54,9 @@ class PushNotificationService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appLifecycleState = state;
     debugPrint('📢 [PushLocal] App lifecycle: $state');
+    if (state == AppLifecycleState.resumed) {
+      AlarmManagerService.instance.syncAutomaticAlarms();
+    }
   }
 
   Future<void> initialize() async {
@@ -261,6 +265,9 @@ class PushNotificationService with WidgetsBindingObserver {
           if (_listenStartTime != null && createdAt.isBefore(_listenStartTime!.subtract(const Duration(seconds: 5)))) {
             continue;
           }
+
+          // Cập nhật lại lịch báo thức khi có notification mới (phòng khi công việc bị huỷ)
+          AlarmManagerService.instance.syncAutomaticAlarms();
 
           // Bắn local notification
           _showLocalNotificationFromFirestore(doc.id, data);

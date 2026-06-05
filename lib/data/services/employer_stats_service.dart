@@ -21,8 +21,6 @@ class EmployerStatsService {
       final jobsSnap = await _db
           .collection('jobPosts')
           .where('employerId', isEqualTo: employerId)
-          .where('createdAt', isGreaterThanOrEqualTo: startTs)
-          .where('createdAt', isLessThan: endTs)
           .get();
 
       int approvedPosts = 0;
@@ -31,6 +29,9 @@ class EmployerStatsService {
 
       for (final doc in jobsSnap.docs) {
         final data = doc.data();
+        final ts = (data['createdAt'] as Timestamp?)?.toDate();
+        if (ts == null || ts.isBefore(start) || ts.isAfter(end)) continue;
+
         final status = data['status'] as String? ?? '';
         final filled = (data['filledSlots'] as num?)?.toInt() ?? 0;
 
@@ -45,11 +46,9 @@ class EmployerStatsService {
 
       // --- transactions ---
       final txnSnap = await _db
-          .collection('transactions')
+          .collection('walletTransactions')
           .where('userId', isEqualTo: employerId)
           .where('status', isEqualTo: 'completed')
-          .where('createdAt', isGreaterThanOrEqualTo: startTs)
-          .where('createdAt', isLessThan: endTs)
           .get();
 
       double totalSpent = 0.0;
@@ -57,6 +56,9 @@ class EmployerStatsService {
 
       for (final doc in txnSnap.docs) {
         final data = doc.data();
+        final ts = (data['createdAt'] as Timestamp?)?.toDate();
+        if (ts == null || ts.isBefore(start) || ts.isAfter(end)) continue;
+
         final type = data['type'] as String? ?? '';
         final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
 
@@ -95,17 +97,13 @@ class EmployerStatsService {
       final jobsSnap = await _db
           .collection('jobPosts')
           .where('employerId', isEqualTo: employerId)
-          .where('createdAt', isGreaterThanOrEqualTo: startTs)
-          .where('createdAt', isLessThan: endTs)
           .get();
 
       // Fetch transactions
       final txnSnap = await _db
-          .collection('transactions')
+          .collection('walletTransactions')
           .where('userId', isEqualTo: employerId)
           .where('status', isEqualTo: 'completed')
-          .where('createdAt', isGreaterThanOrEqualTo: startTs)
-          .where('createdAt', isLessThan: endTs)
           .get();
 
       // Build bucket map
@@ -114,7 +112,7 @@ class EmployerStatsService {
       for (final doc in jobsSnap.docs) {
         final data = doc.data();
         final ts = (data['createdAt'] as Timestamp?)?.toDate();
-        if (ts == null) continue;
+        if (ts == null || ts.isBefore(start) || ts.isAfter(end)) continue;
         final key = _bucketKey(ts, period);
         if (buckets.containsKey(key)) {
           final status = data['status'] as String? ?? '';
@@ -131,7 +129,7 @@ class EmployerStatsService {
       for (final doc in txnSnap.docs) {
         final data = doc.data();
         final ts = (data['createdAt'] as Timestamp?)?.toDate();
-        if (ts == null) continue;
+        if (ts == null || ts.isBefore(start) || ts.isAfter(end)) continue;
         final key = _bucketKey(ts, period);
         if (buckets.containsKey(key)) {
           final type = data['type'] as String? ?? '';

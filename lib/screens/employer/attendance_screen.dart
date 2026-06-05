@@ -288,56 +288,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                   ),
                 ] else ...[
-                  // Công việc chưa kết thúc → cho tạo phiên điểm danh
-                  const Text('Giờ bắt đầu ca',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                  const SizedBox(height: 8),
-                  _TimePickerField(controller: _timeCtrl),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.employerPrimary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
+                  // Ẩn hoàn toàn nút Bắt đầu điểm danh
+                  const SizedBox(height: 32),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.info_outline,
-                            color: AppColors.employerPrimary, size: 20),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Nhấn "Bắt đầu điểm danh" để tạo phiên và tự gửi thông báo '
-                            'cho nhân viên. Đến giờ ca (phân công công việc), hệ thống '
-                            'cũng tự gửi nếu bạn chưa bấm bắt đầu.',
-                            style: TextStyle(fontSize: 13),
-                          ),
+                        Icon(Icons.people_outline, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Chưa có nhân viên nào điểm danh hôm nay.',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: AppColors.employerGradient,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14))),
-                        onPressed: _startSession,
-                        child: const Text('Bắt đầu điểm danh',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                      ),
                     ),
                   ),
                 ],

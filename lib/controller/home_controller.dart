@@ -15,6 +15,7 @@ class HomeController extends GetxController {
   final RxSet<String> appliedJobIds = <String>{}.obs;
   final RxMap<String, String> appliedJobStatus = <String, String>{}.obs;
   final RxInt profileViewCount = 0.obs;
+  final RxInt interestCount = 0.obs;
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
 
@@ -25,6 +26,7 @@ class HomeController extends GetxController {
 
   StreamSubscription? _applicationsSub;
   StreamSubscription? _profileViewsSub;
+  StreamSubscription? _interestSub;
   StreamSubscription? _authSub;
   StreamSubscription? _approvedJobsSub;
   StreamSubscription? _activeJobsSub;
@@ -41,6 +43,7 @@ class HomeController extends GetxController {
       fetchLatestJobs();
       _listenToApplications(user?.uid);
       _listenToProfileViews(user?.uid);
+      _listenToInterests(user?.uid);
     });
   }
 
@@ -48,6 +51,7 @@ class HomeController extends GetxController {
   void onClose() {
     _applicationsSub?.cancel();
     _profileViewsSub?.cancel();
+    _interestSub?.cancel();
     _authSub?.cancel();
     _approvedJobsSub?.cancel();
     _activeJobsSub?.cancel();
@@ -177,6 +181,28 @@ class HomeController extends GetxController {
       if (raw is Map) return raw.length;
     }
     return 0;
+  }
+
+  void _listenToInterests(String? uid) {
+    _interestSub?.cancel();
+    interestCount.value = 0;
+    if (uid == null) return;
+
+    _interestSub = FirebaseFirestore.instance
+        .collection('employerInterests')
+        .where('candidateId', isEqualTo: uid)
+        .snapshots()
+        .listen((snap) {
+      final uniqueEmployers = <String>{};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final empId = data['employerId'] as String?;
+        if (empId != null && empId.isNotEmpty) {
+          uniqueEmployers.add(empId);
+        }
+      }
+      interestCount.value = uniqueEmployers.length;
+    });
   }
 
   Future<void> fetchLatestJobs() async {

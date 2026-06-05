@@ -67,6 +67,22 @@ class CandidatePayment {
   }
 }
 
+class CandidateChartPoint {
+  final String label;
+  final double paidVnd;
+  final double pendingVnd;
+  final int completedJobs;
+  final double hoursWorked;
+
+  const CandidateChartPoint({
+    required this.label,
+    required this.paidVnd,
+    required this.pendingVnd,
+    required this.completedJobs,
+    required this.hoursWorked,
+  });
+}
+
 class ReviewableJob {
   final String jobId;
   final String employerId;
@@ -191,7 +207,7 @@ class WorkGroup {
 
 class CandidateEarningsSummary {
   final int totalPaidVnd;
-  final int monthPaidVnd;
+  final int periodPaidVnd;
   final int pendingVnd;
   final int walletBalanceVnd;
   final int jobCount;
@@ -200,7 +216,7 @@ class CandidateEarningsSummary {
 
   const CandidateEarningsSummary({
     required this.totalPaidVnd,
-    this.monthPaidVnd = 0,
+    this.periodPaidVnd = 0,
     required this.pendingVnd,
     this.walletBalanceVnd = 0,
     required this.jobCount,

@@ -109,8 +109,11 @@ class NotificationService {
     final uid = userId ?? _uid;
     if (uid == null) return Stream.value([]);
 
-    // Không orderBy trên Firestore — tránh stream lỗi im lặng (thiếu index).
-    return _userNotificationsCol(uid)!.limit(80).snapshots().map((snap) {
+    return _userNotificationsCol(uid)!
+        .orderBy('createdAt', descending: true)
+        .limit(80)
+        .snapshots()
+        .map((snap) {
       final list =
           snap.docs
               .map((d) => AppNotificationItem.fromMap(d.id, d.data()))

@@ -209,20 +209,6 @@ class _DashboardPlaceholder extends StatelessWidget {
       requiresAuth: true,
     ),
     _MenuItem(
-      Icons.bar_chart_rounded,
-      'Báo cáo',
-      Color(0xFF00897B),
-      Color(0xFFE0F2F1),
-      requiresAuth: true,
-    ),
-    _MenuItem(
-      Icons.group_rounded,
-      'Nhóm của bạn',
-      Color(0xFF1E88E5),
-      Color(0xFFE3F2FD),
-      requiresAuth: true,
-    ),
-    _MenuItem(
       Icons.star_rounded,
       'Đánh giá',
       Color(0xFFD81B60),
@@ -378,12 +364,6 @@ class _DashboardPlaceholder extends StatelessWidget {
         break;
       case 'Thụ hưởng':
         screen = const CandidateBenefitsScreen();
-        break;
-      case 'Báo cáo':
-        Navigator.pushNamed(context, AppRoutes.stats);
-        return;
-      case 'Nhóm của bạn':
-        screen = const CandidateGroupsScreen();
         break;
       case 'Đánh giá':
         screen = const CandidateReviewsScreen();

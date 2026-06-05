@@ -1835,13 +1835,40 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               ),
             ),
           // Input row
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-                12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
-            child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          _InputIconBtn(
+          Obx(() {
+            final currentGroup = _ctrl.currentGroup.value;
+            if (currentGroup?.isDissolved == true) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                    12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Nhóm chat đã bị khóa do công việc đã hoàn tất.',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                  12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
+              child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _InputIconBtn(
             icon: Icons.add_rounded,
             bgColor: const Color(0xFF1565C0),
             onTap: _showAttachMenu,
@@ -1919,7 +1946,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 )),
           ],
         ),
-          ),
+            );
+          }),
         ],
       ),
     );

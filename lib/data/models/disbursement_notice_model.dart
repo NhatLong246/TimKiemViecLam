@@ -10,6 +10,8 @@ class DisbursementNoticeModel {
   final String employerId;
   final String workDate;
   final double amount;
+  final double totalEarned;
+  final double excessRefund;
   final String jobTitle;
   final String status;
   final bool employerAck;
@@ -66,6 +68,8 @@ class DisbursementNoticeModel {
     required this.employerId,
     required this.workDate,
     required this.amount,
+    this.totalEarned = 0.0,
+    this.excessRefund = 0.0,
     this.jobTitle = '',
     required this.status,
     this.employerAck = false,
@@ -99,13 +103,14 @@ class DisbursementNoticeModel {
 
   /// Tổng tiền sau trừ khiếu nại
   double get totalAfterDeductions {
-    final totalDeducted =
-        adminFinalDeductions.values.fold<double>(0, (sum, v) => sum + v);
+    final totalDeducted = adminFinalDeductions.values.fold<double>(
+      0,
+      (sum, v) => sum + v,
+    );
     return amount - totalDeducted;
   }
 
-  factory DisbursementNoticeModel.fromMap(
-      Map<String, dynamic> map, String id) {
+  factory DisbursementNoticeModel.fromMap(Map<String, dynamic> map, String id) {
     return DisbursementNoticeModel(
       noticeId: id,
       jobId: map['jobId'] as String? ?? '',
@@ -113,12 +118,13 @@ class DisbursementNoticeModel {
       employerId: map['employerId'] as String? ?? '',
       workDate: map['workDate'] as String? ?? '',
       amount: (map['amount'] as num?)?.toDouble() ?? 0,
+      totalEarned: (map['totalEarned'] as num?)?.toDouble() ?? 0,
+      excessRefund: (map['excessRefund'] as num?)?.toDouble() ?? 0,
       jobTitle: map['jobTitle'] as String? ?? '',
       status: map['status'] as String? ?? 'approved',
       employerAck: map['employerAck'] as bool? ?? false,
       adminAck: map['adminAck'] as bool? ?? false,
-      createdAt:
-          (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       candidateAmounts: _parseDoubleMap(map['candidateAmounts']),
       deductions: _parseDoubleMap(map['deductions']),
       complainedCandidates:
@@ -129,10 +135,9 @@ class DisbursementNoticeModel {
       adminFinalDeductions: _parseDoubleMap(map['adminFinalDeductions']),
       adminNote: map['adminNote'] as String? ?? '',
       totalCandidates: (map['totalCandidates'] as num?)?.toInt() ?? 0,
-      ratedCandidates:
-          (map['ratedCandidates'] as List?)?.cast<String>() ?? [],
-      complaintsReviewedAt:
-          (map['complaintsReviewedAt'] as Timestamp?)?.toDate(),
+      ratedCandidates: (map['ratedCandidates'] as List?)?.cast<String>() ?? [],
+      complaintsReviewedAt: (map['complaintsReviewedAt'] as Timestamp?)
+          ?.toDate(),
       userDebts: _parseDynamicMapMap(map['userDebts']),
     );
   }
@@ -140,7 +145,8 @@ class DisbursementNoticeModel {
   static Map<String, double> _parseDoubleMap(dynamic raw) {
     if (raw == null || raw is! Map) return {};
     return raw.map(
-        (k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0));
+      (k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0),
+    );
   }
 
   static Map<String, String> _parseStringMap(dynamic raw) {
@@ -159,32 +165,36 @@ class DisbursementNoticeModel {
   static Map<String, Map<String, dynamic>> _parseDynamicMapMap(dynamic raw) {
     if (raw == null || raw is! Map) return {};
     return raw.map((k, v) {
-      final inner = v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+      final inner = v is Map
+          ? Map<String, dynamic>.from(v)
+          : <String, dynamic>{};
       return MapEntry(k.toString(), inner);
     });
   }
 
   Map<String, dynamic> toMap() => {
-        'jobId': jobId,
-        'groupId': groupId,
-        'employerId': employerId,
-        'workDate': workDate,
-        'amount': amount,
-        'jobTitle': jobTitle,
-        'status': status,
-        'employerAck': employerAck,
-        'adminAck': adminAck,
-        'createdAt': FieldValue.serverTimestamp(),
-        'candidateAmounts': candidateAmounts,
-        'deductions': deductions,
-        'complainedCandidates': complainedCandidates,
-        'complaintReasons': complaintReasons,
-        'complaintEvidence': complaintEvidence,
-        'complaintResults': complaintResults,
-        'adminFinalDeductions': adminFinalDeductions,
-        'adminNote': adminNote,
-        'totalCandidates': totalCandidates,
-        'ratedCandidates': ratedCandidates,
-        'userDebts': userDebts,
-      };
+    'jobId': jobId,
+    'groupId': groupId,
+    'employerId': employerId,
+    'workDate': workDate,
+    'amount': amount,
+    'totalEarned': totalEarned,
+    'excessRefund': excessRefund,
+    'jobTitle': jobTitle,
+    'status': status,
+    'employerAck': employerAck,
+    'adminAck': adminAck,
+    'createdAt': FieldValue.serverTimestamp(),
+    'candidateAmounts': candidateAmounts,
+    'deductions': deductions,
+    'complainedCandidates': complainedCandidates,
+    'complaintReasons': complaintReasons,
+    'complaintEvidence': complaintEvidence,
+    'complaintResults': complaintResults,
+    'adminFinalDeductions': adminFinalDeductions,
+    'adminNote': adminNote,
+    'totalCandidates': totalCandidates,
+    'ratedCandidates': ratedCandidates,
+    'userDebts': userDebts,
+  };
 }

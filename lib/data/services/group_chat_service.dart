@@ -47,10 +47,12 @@ class GroupChatService {
     if (byJob.docs.isNotEmpty) {
       groupId = byJob.docs.first.id;
       await _addMembers(groupId, employerId, candidateId);
-      await _db.collection('jobPosts').doc(jobId).update({
-        'groupChatId': groupId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      try {
+        await _db.collection('jobPosts').doc(jobId).update({
+          'groupChatId': groupId,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
       return groupId;
     }
 
@@ -129,10 +131,12 @@ class GroupChatService {
       'unreadCounts': <String, int>{},
     });
 
-    await _db.collection('jobPosts').doc(jobId).update({
-      'groupChatId': ref.id,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _db.collection('jobPosts').doc(jobId).update({
+        'groupChatId': ref.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
 
     await _sendSystemMessage(
       ref.id,
@@ -196,16 +200,16 @@ class GroupChatService {
     return _groups.where('employerId', isEqualTo: employerId).snapshots().map((
       snap,
     ) {
-      final list =
-          snap.docs
-              .map(
-                (d) => GroupChatModel.fromMap(
-                  d.data() as Map<String, dynamic>,
-                  d.id,
-                ),
-              )
-              .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final list = snap.docs
+          .where((d) => (d.data()['status'] ?? '').toString() != 'closed')
+          .map(
+            (d) => GroupChatModel.fromMap(
+              d.data() as Map<String, dynamic>,
+              d.id,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
     });
   }
@@ -215,6 +219,7 @@ class GroupChatService {
     if (employerId.isEmpty) return [];
     final snap = await _groups.where('employerId', isEqualTo: employerId).get();
     return snap.docs
+        .where((d) => (d.data()['status'] ?? '').toString() != 'closed')
         .map(
           (d) => GroupChatModel.fromMap(d.data() as Map<String, dynamic>, d.id),
         )
@@ -229,6 +234,7 @@ class GroupChatService {
         .where('chatType', isEqualTo: 'group')
         .get();
     return snap.docs
+        .where((d) => (d.data()['status'] ?? '').toString() != 'closed')
         .map(
           (d) => GroupChatModel.fromMap(d.data() as Map<String, dynamic>, d.id),
         )

@@ -14,6 +14,7 @@ class EmployerStatsController extends GetxController {
   final isLoading = false.obs;
   final summary = EmployerStatsSummary.empty().obs;
   final chartData = <EmployerChartPoint>[].obs;
+  final insightMessage = ''.obs;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
   @override
@@ -61,12 +62,37 @@ class EmployerStatsController extends GetxController {
       ]);
       summary.value = results[0] as EmployerStatsSummary;
       chartData.value = results[1] as List<EmployerChartPoint>;
+      _generateInsight(summary.value);
     } finally {
       isLoading.value = false;
     }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────
+
+  void _generateInsight(EmployerStatsSummary s) {
+    if (s.approvedPosts == 0 && s.totalDeposited == 0) {
+      insightMessage.value = "Kỳ này bạn chưa có hoạt động nào. Hãy tạo thêm tin tuyển dụng để tìm kiếm ứng viên nhé!";
+      return;
+    }
+    
+    if (s.totalHired > 0) {
+      insightMessage.value = "Tuyệt vời! 🎉 Bạn đã tuyển được ${s.totalHired} nhân sự trong kỳ này. Hệ thống đang giúp bạn tiếp cận ứng viên rất hiệu quả.";
+      return;
+    }
+
+    if (s.approvedPosts > 0 && s.totalHired == 0) {
+      insightMessage.value = "Bạn có ${s.approvedPosts} bài đăng nhưng chưa thuê được ai. Hãy thử xem lại mức lương để thu hút thêm ứng viên nhé!";
+      return;
+    }
+    
+    if (s.totalDeposited > 0 && s.totalSpent == 0) {
+      insightMessage.value = "Bạn đã nạp ${formatVnd(s.totalDeposited)} nhưng chưa chi tiêu. Tạo tin tuyển dụng ngay để bắt đầu tìm người!";
+      return;
+    }
+
+    insightMessage.value = "Mọi thứ đang hoạt động ổn định. Hãy duy trì tin đăng để luôn có nguồn ứng viên dồi dào.";
+  }
 
   void _adjustDateRange(StatsPeriod p) {
     final now = DateTime.now();

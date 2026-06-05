@@ -35,45 +35,93 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
         icon: const Icon(Icons.rate_review_outlined),
         label: const Text('Đánh giá NTD'),
       ),
-      body: Obx(() {
-        if (_ctrl.isLoading.value && _ctrl.reviews.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(color: candidateMenuPrimary),
-          );
-        }
-        return RefreshIndicator(
-          color: candidateMenuPrimary,
-          onRefresh: _ctrl.loadReviews,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-            children: [
-              _buildRatingHeader(),
-              const SizedBox(height: 20),
-              const Text(
-                'Đánh giá bạn đã gửi',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+      body: DefaultTabController(
+        length: 2,
+        child: Obx(() {
+          if (_ctrl.isLoading.value &&
+              _ctrl.reviews.isEmpty &&
+              _ctrl.reviewsReceived.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(color: candidateMenuPrimary),
+            );
+          }
+          return RefreshIndicator(
+            color: candidateMenuPrimary,
+            onRefresh: _ctrl.loadReviews,
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  sliver: SliverToBoxAdapter(child: _buildRatingHeader()),
                 ),
-              ),
-              const SizedBox(height: 12),
-              if (_ctrl.reviews.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: Text(
-                      'Chưa có đánh giá. Hoàn thành ca làm và đánh giá nhà tuyển dụng.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _SliverAppBarDelegate(
+                    TabBar(
+                      indicatorColor: candidateMenuPrimary,
+                      labelColor: candidateMenuPrimary,
+                      unselectedLabelColor: Colors.grey.shade600,
+                      labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      tabs: const [
+                        Tab(text: 'Đã nhận từ NTD'),
+                        Tab(text: 'Đã đánh giá NTD'),
+                      ],
                     ),
                   ),
-                )
-              else
-                ..._ctrl.reviews.map(_reviewCard),
-            ],
+                ),
+                SliverFillRemaining(
+                  child: TabBarView(
+                    children: [
+                      _buildReceivedReviewsTab(),
+                      _buildGivenReviewsTab(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildReceivedReviewsTab() {
+    if (_ctrl.reviewsReceived.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+        child: Center(
+          child: Text(
+            'Chưa có đánh giá nào từ nhà tuyển dụng.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade600),
           ),
-        );
-      }),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+      itemCount: _ctrl.reviewsReceived.length,
+      itemBuilder: (_, index) => _reviewCard(_ctrl.reviewsReceived[index]),
+    );
+  }
+
+  Widget _buildGivenReviewsTab() {
+    if (_ctrl.reviews.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+        child: Center(
+          child: Text(
+            'Chưa có đánh giá. Hoàn thành ca làm và đánh giá nhà tuyển dụng.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+      itemCount: _ctrl.reviews.length,
+      itemBuilder: (_, index) => _reviewCard(_ctrl.reviews[index]),
     );
   }
 
@@ -118,10 +166,7 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
               children: [
                 const Text(
                   'Điểm uy tín của bạn',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -197,7 +242,10 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
           ),
           if (date.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(date, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+            Text(
+              date,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+            ),
           ],
           if (r.tags.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -271,10 +319,7 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
                 children: [
                   const Text(
                     'Đánh giá nhà tuyển dụng',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<ReviewableJob>(
@@ -360,16 +405,14 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Đã gửi đánh giá'),
-                            ),
+                            const SnackBar(content: Text('Đã gửi đánh giá')),
                           );
                         }
                       } catch (e) {
                         if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text(e.toString())),
-                          );
+                          ScaffoldMessenger.of(
+                            ctx,
+                          ).showSnackBar(SnackBar(content: Text(e.toString())));
                         }
                       }
                     },
@@ -386,5 +429,33 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
         );
       },
     );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  _SliverAppBarDelegate(this._tabBar);
+
+  final TabBar _tabBar;
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }
