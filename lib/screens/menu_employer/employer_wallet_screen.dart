@@ -432,8 +432,8 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
             stream: _wallet.watchTransactions(_uid),
             builder: (ctx2, txSnap) {
               final txs = txSnap.data ?? const [];
-              return CustomScrollView(
-                slivers: [
+              return NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) => [
                   _buildHeader(summary),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -445,24 +445,21 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                     sliver: SliverToBoxAdapter(child: _buildTabBar()),
                   ),
-                  SliverFillRemaining(
-                    hasScrollBody: true,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 80),
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _WalletHistoryTab(
-                            uid: _uid,
-                            wallet: _wallet,
-                            onResumeMomo: _resumeMomoPayment,
-                          ),
-                          _WalletStatsTab(transactions: txs),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
+                body: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 80),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _WalletHistoryTab(
+                        uid: _uid,
+                        wallet: _wallet,
+                        onResumeMomo: _resumeMomoPayment,
+                      ),
+                      _WalletStatsTab(transactions: txs),
+                    ],
+                  ),
+                ),
               );
             },
           );
