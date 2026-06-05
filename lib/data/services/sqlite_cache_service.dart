@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 class SqliteCacheService {
   static Database? _db;
   static const String _dbName = 'viecnow_cache.db';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 5;
 
   static Future<Database> get database async {
     _db ??= await _initDb();
@@ -97,7 +97,10 @@ class SqliteCacheService {
         salary     REAL,
         salaryType TEXT,
         slots      INTEGER,
+        filledSlots INTEGER,
         startDate  INTEGER,
+        applicationDeadline INTEGER,
+        createdAt  INTEGER,
         status     TEXT,
         cachedAt   INTEGER
       )
@@ -139,7 +142,11 @@ class SqliteCacheService {
     ''');
   }
 
-  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _onUpgrade(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     if (oldVersion < 2) {
       await _createEmployerProfileTable(db);
     }
@@ -148,6 +155,29 @@ class SqliteCacheService {
     }
     if (oldVersion < 4) {
       await _createApplicationsTable(db);
+    }
+    if (oldVersion < 5) {
+      await _addColumnIfMissing(db, 'cached_jobs', 'filledSlots', 'INTEGER');
+      await _addColumnIfMissing(
+        db,
+        'cached_jobs',
+        'applicationDeadline',
+        'INTEGER',
+      );
+      await _addColumnIfMissing(db, 'cached_jobs', 'createdAt', 'INTEGER');
+    }
+  }
+
+  static Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String type,
+  ) async {
+    final info = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = info.any((row) => row['name'] == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
     }
   }
 
@@ -173,9 +203,18 @@ class SqliteCacheService {
           candidateName, candidateAvatar, candidateRating, status, appliedAt, cachedAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
-        appId, jobId, candidateId, employerId, jobType, jobTitle,
-        candidateName, candidateAvatar, candidateRating, status,
-        appliedAt, DateTime.now().millisecondsSinceEpoch,
+        appId,
+        jobId,
+        candidateId,
+        employerId,
+        jobType,
+        jobTitle,
+        candidateName,
+        candidateAvatar,
+        candidateRating,
+        status,
+        appliedAt,
+        DateTime.now().millisecondsSinceEpoch,
       ],
     );
   }
@@ -227,7 +266,16 @@ class SqliteCacheService {
       '''INSERT OR REPLACE INTO cached_profile
          (uid, role, firstName, lastName, email, phone, avatarUrl, cachedAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-      [uid, role, firstName, lastName, email, phone, avatarUrl, DateTime.now().millisecondsSinceEpoch],
+      [
+        uid,
+        role,
+        firstName,
+        lastName,
+        email,
+        phone,
+        avatarUrl,
+        DateTime.now().millisecondsSinceEpoch,
+      ],
     );
   }
 
@@ -256,8 +304,10 @@ class SqliteCacheService {
     final db = await database;
     await db.rawInsert(
       '''INSERT OR REPLACE INTO cached_jobs
-         (jobId, employerId, title, category, jobType, location, salary, salaryType, slots, startDate, status, cachedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+         (jobId, employerId, title, category, jobType, location, salary,
+          salaryType, slots, filledSlots, startDate, applicationDeadline,
+          createdAt, status, cachedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         jobMap['jobId'],
         jobMap['employerId'],
@@ -268,7 +318,10 @@ class SqliteCacheService {
         jobMap['salary'],
         jobMap['salaryType'],
         jobMap['slots'],
+        jobMap['filledSlots'],
         jobMap['startDate'],
+        jobMap['applicationDeadline'],
+        jobMap['createdAt'],
         jobMap['status'],
         DateTime.now().millisecondsSinceEpoch,
       ],
@@ -313,19 +366,35 @@ class SqliteCacheService {
           companyDescription, walletBalance, totalSpent, isVerified, cachedAt)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
       [
-        m['uid'], m['firstName'], m['lastName'], m['email'], m['phone'],
-        m['gender'], m['dateOfBirth'], m['avatarUrl'], m['cccd'],
-        m['companyName'], m['companyAddress'], m['companyLogoUrl'],
-        m['companyPhone'], m['companyWebsite'], m['companyTaxCode'],
-        m['companySize'], m['businessType'], m['companyDescription'],
-        m['walletBalance'] ?? 0.0, m['totalSpent'] ?? 0.0,
+        m['uid'],
+        m['firstName'],
+        m['lastName'],
+        m['email'],
+        m['phone'],
+        m['gender'],
+        m['dateOfBirth'],
+        m['avatarUrl'],
+        m['cccd'],
+        m['companyName'],
+        m['companyAddress'],
+        m['companyLogoUrl'],
+        m['companyPhone'],
+        m['companyWebsite'],
+        m['companyTaxCode'],
+        m['companySize'],
+        m['businessType'],
+        m['companyDescription'],
+        m['walletBalance'] ?? 0.0,
+        m['totalSpent'] ?? 0.0,
         (m['isVerified'] == true) ? 1 : 0,
         DateTime.now().millisecondsSinceEpoch,
       ],
     );
   }
 
-  static Future<Map<String, dynamic>?> getCachedEmployerProfile(String uid) async {
+  static Future<Map<String, dynamic>?> getCachedEmployerProfile(
+    String uid,
+  ) async {
     final db = await database;
     final rows = await db.query(
       'cached_employer_profile',
@@ -338,7 +407,11 @@ class SqliteCacheService {
 
   static Future<void> clearEmployerProfile(String uid) async {
     final db = await database;
-    await db.delete('cached_employer_profile', where: 'uid = ?', whereArgs: [uid]);
+    await db.delete(
+      'cached_employer_profile',
+      where: 'uid = ?',
+      whereArgs: [uid],
+    );
   }
 
   // ─── Employer Reviews ────────────────────────────────────
@@ -351,16 +424,23 @@ class SqliteCacheService {
           jobId, rating, comment, createdAt, cachedAt)
          VALUES (?,?,?,?,?,?,?,?,?,?)''',
       [
-        m['reviewId'], m['revieweeId'], m['reviewerId'],
-        m['reviewerName'], m['reviewerAvatar'],
-        m['jobId'], m['rating'], m['comment'],
-        m['createdAt'], m['cachedAt'] ?? DateTime.now().millisecondsSinceEpoch,
+        m['reviewId'],
+        m['revieweeId'],
+        m['reviewerId'],
+        m['reviewerName'],
+        m['reviewerAvatar'],
+        m['jobId'],
+        m['rating'],
+        m['comment'],
+        m['createdAt'],
+        m['cachedAt'] ?? DateTime.now().millisecondsSinceEpoch,
       ],
     );
   }
 
   static Future<List<Map<String, dynamic>>> getCachedEmployerReviews(
-      String revieweeId) async {
+    String revieweeId,
+  ) async {
     final db = await database;
     return db.query(
       'cached_employer_reviews',
@@ -379,4 +459,3 @@ class SqliteCacheService {
     );
   }
 }
-

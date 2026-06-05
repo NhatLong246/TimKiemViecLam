@@ -7,6 +7,7 @@ import '../data/services/job_post_service.dart';
 import '../data/services/wallet_service.dart';
 import '../data/services/group_chat_service.dart';
 import '../data/services/notification_service.dart';
+import '../data/services/schedule_lock_service.dart';
 import '../routes/app_routes.dart';
 import '../utils/job_time_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -45,16 +46,19 @@ class JobPostController extends GetxController {
   List<JobPostModel> get expiredPosts => allPosts
       .where(
         (p) =>
-            (!pendingDisbursementJobIds.contains(p.jobId) || p.filledSlots == 0) &&
+            (!pendingDisbursementJobIds.contains(p.jobId) ||
+                p.filledSlots == 0) &&
             (p.status == 'rejected' ||
-            (p.exactEndTime.isBefore(DateTime.now()) &&
-                (p.status == 'approved' || p.status == 'active'))),
+                (p.exactEndTime.isBefore(DateTime.now()) &&
+                    (p.status == 'approved' || p.status == 'active'))),
       )
       .toList();
 
   // Chờ giải ngân (đang có yêu cầu giải ngân pending_admin hoặc approved và phải có nhân viên)
   List<JobPostModel> get pendingDisbursementPosts => allPosts
-      .where((p) => pendingDisbursementJobIds.contains(p.jobId) && p.filledSlots > 0)
+      .where(
+        (p) => pendingDisbursementJobIds.contains(p.jobId) && p.filledSlots > 0,
+      )
       .toList();
 
   // Đã hoàn thành (đã giải ngân xong)
@@ -102,20 +106,27 @@ class JobPostController extends GetxController {
         .collection('disbursementNotices')
         .where('employerId', isEqualTo: uid)
         .snapshots()
-        .listen((snap) {
-      final newSet = snap.docs
-          .where((d) {
-            final s = d.data()['status'] as String? ?? '';
-            return ['approved', 'complaints_pending', 'complaints_reviewed'].contains(s);
-          })
-          .map((d) => d.data()['jobId'] as String)
-          .toSet();
-          
-      pendingDisbursementJobIds.assignAll(newSet);
-      allPosts.refresh(); // Ép giao diện vẽ lại
-    }, onError: (e) {
-      debugPrint('Error _listenToDisbursementNotices: $e');
-    });
+        .listen(
+          (snap) {
+            final newSet = snap.docs
+                .where((d) {
+                  final s = d.data()['status'] as String? ?? '';
+                  return [
+                    'approved',
+                    'complaints_pending',
+                    'complaints_reviewed',
+                  ].contains(s);
+                })
+                .map((d) => d.data()['jobId'] as String)
+                .toSet();
+
+            pendingDisbursementJobIds.assignAll(newSet);
+            allPosts.refresh(); // Ép giao diện vẽ lại
+          },
+          onError: (e) {
+            debugPrint('Error _listenToDisbursementNotices: $e');
+          },
+        );
   }
 
   // ── Tạo bài đăng ──────────────────────────────────────────────────────────
@@ -202,6 +213,11 @@ class JobPostController extends GetxController {
           .where('jobId', isEqualTo: post.jobId)
           .get();
 
+      final acceptedApps = appsSnap.docs.where((doc) {
+        final data = doc.data();
+        return (data['status'] ?? '').toString() == 'accepted';
+      }).toList();
+
       final candidateIds = appsSnap.docs
           .map((d) => d.data())
           .where(
@@ -257,6 +273,20 @@ class JobPostController extends GetxController {
         });
       }
       await batch.commit();
+
+      final scheduleLocks = ScheduleLockService();
+      for (final doc in acceptedApps) {
+        final data = doc.data();
+        final candidateId = (data['candidateId'] ?? '').toString();
+        final appId = (data['appId'] ?? doc.id).toString();
+        try {
+          await scheduleLocks.releaseLocksForApplication(
+            candidateId: candidateId,
+            appId: appId,
+            job: post,
+          );
+        } catch (_) {}
+      }
 
       await _notifyCandidatesJobCancelled(
         post,

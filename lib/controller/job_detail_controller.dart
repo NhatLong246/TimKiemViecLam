@@ -9,6 +9,7 @@ import '../data/models/user_model.dart';
 import '../data/services/application_service.dart';
 import '../data/services/group_chat_service.dart';
 import '../data/services/notification_service.dart';
+import '../data/services/schedule_lock_service.dart';
 import '../routes/app_routes.dart';
 import '../utils/job_time_helper.dart';
 import 'home_controller.dart';
@@ -17,6 +18,7 @@ import 'login_controller.dart';
 class JobDetailController extends GetxController {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final ApplicationService _appService = ApplicationService();
+  final ScheduleLockService _scheduleLocks = ScheduleLockService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final Rx<UserModel?> employer = Rx<UserModel?>(null);
@@ -235,13 +237,39 @@ class JobDetailController extends GetxController {
         final appId = (data['appId'] ?? doc.id).toString();
 
         if (wasAccepted) {
-          await doc.reference.update({
-            'status': 'withdrawn',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          await _db.collection('jobPosts').doc(job.jobId).update({
-            'filledSlots': FieldValue.increment(-1),
-            'updatedAt': FieldValue.serverTimestamp(),
+          final jobRef = _db.collection('jobPosts').doc(job.jobId);
+          await _db.runTransaction((tx) async {
+            final latestApp = await tx.get(doc.reference);
+            final latestJob = await tx.get(jobRef);
+            if (!latestApp.exists) {
+              throw Exception('Không tìm thấy đơn ứng tuyển.');
+            }
+            if (!latestJob.exists) {
+              throw Exception('Không tìm thấy công việc.');
+            }
+            if ((latestApp.data()?['status'] ?? '').toString() != 'accepted') {
+              throw Exception('Đơn ứng tuyển đã được xử lý.');
+            }
+
+            final latestJobModel = JobPostModel.fromMap({
+              ...latestJob.data()!,
+              'jobId': latestJob.id,
+            });
+            await _scheduleLocks.releaseLocksInTransaction(
+              tx: tx,
+              candidateId: uid,
+              appId: appId,
+              windows: ScheduleLockService.buildShiftWindows(latestJobModel),
+            );
+
+            tx.update(doc.reference, {
+              'status': 'withdrawn',
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+            tx.update(jobRef, {
+              'filledSlots': FieldValue.increment(-1),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
           });
           await _cancelCandidateSchedules(job.jobId, uid);
           await _leaveAcceptedJobGroup(job, uid);

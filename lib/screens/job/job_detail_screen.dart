@@ -14,9 +14,6 @@ import '../../data/services/candidates_service.dart';
 import '../../data/services/messaging_service.dart';
 import '../../utils/job_time_helper.dart';
 import '../messaging/chat_room_screen.dart';
-import 'package:geolocator/geolocator.dart';
-import '../../utils/location_helper.dart';
-import '../../utils/maps_directions_url.dart';
 
 class JobDetailScreen extends StatefulWidget {
   const JobDetailScreen({super.key});
@@ -32,6 +29,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   late JobPostModel job;
   bool _hasJob = false;
   bool _historyMode = false;
+  bool _readOnlyNoBottom = false;
   bool _dialogShowing = false;
   bool _isLoadingHiredUsers = false;
   String? _hiredUsersError;
@@ -52,10 +50,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       job = parsedJob;
       _hasJob = true;
       _historyMode = args is Map && args['fromPostHistory'] == true;
+      _readOnlyNoBottom = args is Map && args['readOnlyNoBottom'] == true;
       _controller.fetchEmployerInfo(job.employerId);
       if (_historyMode) {
         _loadHiredUsers();
-      } else {
+      } else if (!_readOnlyNoBottom) {
         _controller.checkApplicationStatus(job.jobId);
       }
     }
@@ -114,6 +113,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final type = job.jobType == 'part_time' ? 'Part-time' : 'Full-time';
     final description = job.description;
     final requirements = job.requirements;
+    final hideBottomActions = _historyMode || _readOnlyNoBottom;
 
     // Format dates
     final dateFormat = DateFormat('dd/MM/yyyy');
@@ -152,7 +152,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: EdgeInsets.only(bottom: _historyMode ? 24 : 100),
+            padding: EdgeInsets.only(bottom: hideBottomActions ? 24 : 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -502,7 +502,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             ),
           ),
           // 7. Nút ứng tuyển cố định phía dưới
-          if (!_historyMode)
+          if (!hideBottomActions)
             Positioned(
               bottom: 0,
               left: 0,
@@ -536,11 +536,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     final jobStarted =
                         (isPending || isAccepted) &&
                         JobTimeHelper.hasStarted(job);
+                    final isFullForOtherUsers =
+                        job.isFull && !isPending && !isAccepted;
 
                     Color btnColor;
                     if (!_controller.canApply.value ||
                         isWithdrawn ||
-                        jobStarted) {
+                        jobStarted ||
+                        isFullForOtherUsers) {
                       btnColor = Colors.grey.shade500;
                     } else if (isAccepted) {
                       btnColor = Colors.red;
@@ -559,6 +562,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       btnText = 'Hủy ứng tuyển';
                     } else if (isWithdrawn) {
                       btnText = 'Không thể ứng tuyển';
+                    } else if (isFullForOtherUsers) {
+                      btnText = 'Đã đủ người';
                     } else {
                       btnText = 'Ứng tuyển ngay';
                     }
@@ -596,7 +601,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               onPressed:
                                   (!_controller.canApply.value ||
                                       isWithdrawn ||
-                                      jobStarted)
+                                      jobStarted ||
+                                      isFullForOtherUsers)
                                   ? null
                                   : () {
                                       if (isAccepted || isPending) {
@@ -656,7 +662,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
               ),
             ),
-          if (!_historyMode && !_controller.canApply.value)
+          if (!hideBottomActions && !_controller.canApply.value)
             Positioned(
               bottom: 78,
               left: 16,
@@ -1013,19 +1019,23 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     // Thử mở bằng geo intent (mở app bản đồ native)
     final label = Uri.encodeComponent(job.mapsDestinationQuery);
     String geoUrl = 'geo:0,0?q=$label';
-    
+
     if (job.hasMapCoordinates) {
       geoUrl = 'geo:${job.locationLat},${job.locationLng}?q=$label';
     }
 
     final geoUri = Uri.parse(geoUrl);
-    
+
     if (await canLaunchUrl(geoUri)) {
       await launchUrl(geoUri, mode: LaunchMode.externalApplication);
     } else {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không tìm thấy ứng dụng bản đồ trên máy. Vui lòng cài đặt Google Maps!')),
+          const SnackBar(
+            content: Text(
+              'Không tìm thấy ứng dụng bản đồ trên máy. Vui lòng cài đặt Google Maps!',
+            ),
+          ),
         );
       }
     }

@@ -62,6 +62,7 @@ class JobDisbursementReminderService {
       final data = Map<String, dynamic>.from(doc.data());
       data['jobId'] = doc.id;
       final job = JobPostModel.fromMap(data);
+      await _rejectPendingApplicationsAfterDeadline(job);
       if (!_shouldNotifyUnderfilledApplicationDeadline(job)) continue;
       if (!await _claimOnce(
         job.jobId,
@@ -77,6 +78,44 @@ class JobDisbursementReminderService {
         filledSlots: job.filledSlots,
         slots: job.slots,
       );
+    }
+  }
+
+  Future<void> _rejectPendingApplicationsAfterDeadline(JobPostModel job) async {
+    final deadline = job.applicationDeadline;
+    if (deadline == null) return;
+    if (!_isActiveJob(job)) return;
+    if (deadline.isAfter(DateTime.now())) return;
+
+    final snap = await _db
+        .collection('applications')
+        .where('jobId', isEqualTo: job.jobId)
+        .where('status', isEqualTo: 'pending')
+        .get();
+    if (snap.docs.isEmpty) return;
+
+    for (var i = 0; i < snap.docs.length; i += 450) {
+      final end = (i + 450).clamp(0, snap.docs.length);
+      final batch = _db.batch();
+      for (final doc in snap.docs.sublist(i, end)) {
+        batch.update(doc.reference, {
+          'status': 'rejected',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
+
+    for (final doc in snap.docs) {
+      final candidateId = (doc.data()['candidateId'] ?? '').toString();
+      try {
+        await NotificationService.notifyApplicationRejected(
+          candidateId: candidateId,
+          jobTitle: job.title,
+          jobId: job.jobId,
+          reason: 'deadline',
+        );
+      } catch (_) {}
     }
   }
 
@@ -325,7 +364,7 @@ class JobDisbursementReminderService {
     if (job.slots <= 0 || job.filledSlots >= job.slots) return false;
 
     final now = DateTime.now();
-    if (!now.isAfter(deadline)) return false;
+    if (deadline.isAfter(now)) return false;
     return JobTimeHelper.startsAfterNow(job, now: now);
   }
 

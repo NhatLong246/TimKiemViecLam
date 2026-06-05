@@ -118,10 +118,7 @@ class ApplicationEntry {
   final ApplicationModel application;
   final CandidateSnapshot candidate;
 
-  const ApplicationEntry({
-    required this.application,
-    required this.candidate,
-  });
+  const ApplicationEntry({required this.application, required this.candidate});
 
   ApplicationEntry copyWithStatus(String newStatus) {
     return ApplicationEntry(
@@ -136,16 +133,31 @@ class JobWithApplications {
   final JobPostModel job;
   final List<ApplicationEntry> entries;
 
-  const JobWithApplications({
-    required this.job,
-    required this.entries,
-  });
+  const JobWithApplications({required this.job, required this.entries});
 
-  int get pendingCount =>
-      entries.where((e) => e.application.status == 'pending').length;
+  int get pendingCount {
+    final overflowIds = overflowPendingApplicationIds;
+    return entries
+        .where(
+          (e) =>
+              e.application.status == 'pending' &&
+              !overflowIds.contains(e.application.appId),
+        )
+        .length;
+  }
 
   int get acceptedCount =>
       entries.where((e) => e.application.status == 'accepted').length;
+
+  Set<String> get overflowPendingApplicationIds {
+    if (job.slots <= 0 || job.filledSlots >= job.slots) {
+      return entries
+          .where((e) => e.application.status == 'pending')
+          .map((e) => e.application.appId)
+          .toSet();
+    }
+    return const <String>{};
+  }
 
   JobWithApplications copyWithEntries(List<ApplicationEntry> newEntries) {
     return JobWithApplications(job: job, entries: newEntries);

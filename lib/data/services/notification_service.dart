@@ -295,7 +295,10 @@ class NotificationService {
     if (col == null) return false;
 
     final since = DateTime.now().subtract(within);
-    final snap = await col.orderBy('createdAt', descending: true).limit(60).get();
+    final snap = await col
+        .orderBy('createdAt', descending: true)
+        .limit(60)
+        .get();
     for (final doc in snap.docs) {
       final item = AppNotificationItem.fromMap(doc.id, doc.data());
       if (item.createdAt.isBefore(since)) continue;
@@ -494,6 +497,41 @@ class NotificationService {
     );
   }
 
+  static Future<void> notifyApplicationRejected({
+    required String candidateId,
+    required String jobTitle,
+    String reason = 'manual',
+    String? jobId,
+  }) async {
+    if (candidateId.isEmpty) return;
+    final svc = NotificationService();
+    final titleText = jobTitle.trim().isNotEmpty
+        ? jobTitle.trim()
+        : 'Công việc';
+    final body = switch (reason) {
+      'deadline' =>
+        'Đơn ứng tuyển của bạn vào "$titleText" đã bị từ chối vì đã hết hạn ứng tuyển.',
+      'job_full' =>
+        'Đơn ứng tuyển của bạn vào "$titleText" đã bị từ chối vì nhà tuyển dụng đã nhận đủ người.',
+      'schedule_conflict' =>
+        'Đơn ứng tuyển của bạn vào "$titleText" đã bị từ chối tự động vì bạn đã được nhận ở một công việc trùng lịch.',
+      _ =>
+        'Đơn ứng tuyển của bạn vào "$titleText" đã bị nhà tuyển dụng từ chối.',
+    };
+
+    await svc.sendToUser(
+      userId: candidateId,
+      title: 'Đơn ứng tuyển bị từ chối',
+      body: body,
+      category: NotificationCategory.job,
+      data: {
+        'type': 'application_rejected',
+        'reason': reason,
+        if (jobId != null && jobId.isNotEmpty) 'jobId': jobId,
+      },
+    );
+  }
+
   static Future<void> notifyNewApplication({
     required String employerId,
     required String jobTitle,
@@ -528,7 +566,6 @@ class NotificationService {
       },
     );
   }
-
 
   static Future<void> notifyApplicationWithdrawn({
     required String employerId,
@@ -634,6 +671,7 @@ class NotificationService {
       },
     );
   }
+
   static Future<void> notifyInterestRejected({
     required String employerId,
     required String jobTitle,
@@ -652,7 +690,6 @@ class NotificationService {
         'type': 'interest_rejected',
         'jobId': jobId,
         'candidateId': candidateId,
-
       },
     );
   }

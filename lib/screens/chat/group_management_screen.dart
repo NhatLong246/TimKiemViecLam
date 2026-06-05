@@ -7,10 +7,12 @@ import 'package:image_picker/image_picker.dart';
 import '../../common/styles/app_colors.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/group_chat_model.dart';
+import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../data/services/messaging_service.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/services/schedule_lock_service.dart';
 import '../../utils/messaging_bootstrap.dart';
 import '../../routes/app_routes.dart';
 import '../messaging/chat_room_screen.dart';
@@ -34,6 +36,7 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
   late final GroupChatModel _initGroup;
   late final bool _isCandidateTheme;
   final _service = GroupChatService();
+  final _scheduleLocks = ScheduleLockService();
   final _auth = Get.find<AuthController>();
   bool _isUploadingAvatar = false;
   bool _togglingMute = false;
@@ -793,16 +796,47 @@ class _GroupManagementScreenState extends State<GroupManagementScreen> {
                   appId = (data['appId'] ?? doc.id).toString();
                   final status = data['status'] as String?;
                   wasAccepted = status == 'accepted';
-                  await doc.reference.update({
-                    'status': 'withdrawn',
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  });
                   if (wasAccepted) {
-                    await db.collection('jobPosts').doc(group.jobId).update({
-                      'filledSlots': FieldValue.increment(-1),
-                      'updatedAt': FieldValue.serverTimestamp(),
+                    final jobRef = db.collection('jobPosts').doc(group.jobId);
+                    await db.runTransaction((tx) async {
+                      final latestApp = await tx.get(doc.reference);
+                      final latestJob = await tx.get(jobRef);
+                      if (!latestApp.exists || !latestJob.exists) {
+                        throw Exception('Không tìm thấy dữ liệu công việc.');
+                      }
+                      if ((latestApp.data()?['status'] ?? '').toString() !=
+                          'accepted') {
+                        throw Exception('Đơn ứng tuyển đã được xử lý.');
+                      }
+
+                      final latestJobModel = JobPostModel.fromMap({
+                        ...latestJob.data()!,
+                        'jobId': latestJob.id,
+                      });
+                      await _scheduleLocks.releaseLocksInTransaction(
+                        tx: tx,
+                        candidateId: _currentUserId,
+                        appId: appId,
+                        windows: ScheduleLockService.buildShiftWindows(
+                          latestJobModel,
+                        ),
+                      );
+
+                      tx.update(doc.reference, {
+                        'status': 'withdrawn',
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                      tx.update(jobRef, {
+                        'filledSlots': FieldValue.increment(-1),
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
                     });
                     await _cancelCurrentUserSchedules(group.jobId);
+                  } else {
+                    await doc.reference.update({
+                      'status': 'withdrawn',
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
                   }
                 }
 
