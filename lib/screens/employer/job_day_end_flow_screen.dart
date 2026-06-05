@@ -70,7 +70,16 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
         candidateIds: candidateIds,
       );
       _totalEarned = _calculatedSalaries.values.fold(0.0, (a, b) => a + b);
-      _amountCtrl.text = _totalEarned.toStringAsFixed(0);
+
+      // Lấy tổng ngân sách từ bài đăng để tự động điền vào ô Giải ngân
+      final jobDoc = await FirebaseFirestore.instance
+          .collection('jobPosts')
+          .doc(_group.jobId)
+          .get();
+      final totalBudget =
+          (jobDoc.data()?['totalBudget'] as num?)?.toDouble() ?? _totalEarned;
+
+      _amountCtrl.text = totalBudget.toStringAsFixed(0);
 
       _candidates = await _groupChatSvc.getGroupMembers(candidateIds);
 
@@ -145,14 +154,34 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
         return;
       }
 
+      // Đảm bảo tổng chia cho ứng viên không vượt quá số tiền giải ngân (amount)
+      // Chia theo tỷ lệ lương đã tính (dựa trên điểm danh)
+      final proportionalAmounts = <String, double>{};
+      final totalCalc = _calculatedSalaries.values.fold(0.0, (a, b) => a + b);
+      
+      if (totalCalc > 0) {
+        for (final entry in _calculatedSalaries.entries) {
+          proportionalAmounts[entry.key] = (entry.value / totalCalc) * amount;
+        }
+      } else {
+        // Nếu không ai có điểm danh hợp lệ nhưng NTD vẫn giải ngân, chia đều
+        final count = _candidates.where((c) => c.id != _group.employerId).length;
+        final split = count > 0 ? amount / count : 0.0;
+        for (final c in _candidates) {
+          if (c.id != _group.employerId) {
+            proportionalAmounts[c.id] = split;
+          }
+        }
+      }
+
       await _workflow.requestDisbursement(
         jobId: _group.jobId,
         groupId: _group.groupId,
         employerId: empId,
         workDate: _workDate,
         amount: amount,
-        totalEarned: _totalEarned,
-        candidateAmounts: _calculatedSalaries,
+        totalEarned: amount, // Coi như giải ngân hết số amount, không có tiền thừa
+        candidateAmounts: proportionalAmounts,
         jobTitle: _group.jobTitle,
       );
     } catch (e) {
@@ -325,32 +354,58 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Nhập tổng số tiền lương cho ca làm này. Số dư (nếu có) sẽ được hoàn lại vào ví của bạn.',
+          'Hệ thống sẽ tự động giải ngân đúng toàn bộ số tiền đã tạm giữ cho ca làm này.',
           style: TextStyle(fontSize: 14),
         ),
         const SizedBox(height: 16),
-        TextField(
-          controller: _amountCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Tổng số tiền giải ngân (VNĐ) *',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.payments_outlined),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.payments_outlined, color: Colors.green.shade700, size: 28),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tổng số tiền giải ngân',
+                      style: TextStyle(color: Colors.green.shade800, fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_amountCtrl.text} VNĐ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.green.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           'Số nhân viên: ${_candidates.length}',
           style: TextStyle(color: Colors.grey.shade600),
         ),
         const SizedBox(height: 24),
-        FilledButton(
+        FilledButton.icon(
           onPressed: _submitting ? null : _submitRequest,
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.employerPrimary,
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size.fromHeight(52),
           ),
-          child: Text(_submitting ? 'Đang xử lý...' : 'Xác nhận số tiền'),
+          icon: const Icon(Icons.check_circle_outline),
+          label: Text(_submitting ? 'Đang xử lý...' : 'Xác nhận giải ngân'),
         ),
       ],
     );
@@ -362,21 +417,55 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
       children: [
         const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
         const SizedBox(height: 16),
-        const Text(
-          'Đã xác nhận số tiền',
-          style: TextStyle(
+        Text(
+          'Tổng tiền: ${req.amount.toStringAsFixed(0)}₫',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 20,
             color: Colors.green,
           ),
-          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
-        Text(
-          'Tổng tiền: ${req.amount.toStringAsFixed(0)}₫\n'
-          'Mỗi nhân viên nhận: ${(req.amount / (req.totalCandidates == 0 ? 1 : req.totalCandidates)).toStringAsFixed(0)}₫',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 15, height: 1.5),
+        // Liệt kê chi tiết từng người nhận
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Chi tiết phân bổ:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...req.candidateAmounts.entries.map((e) {
+                final user = _candidates.firstWhereOrNull((c) => c.id == e.key);
+                final name = user != null ? '${user.firstName} ${user.lastName}' : 'Ứng viên';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(name, style: const TextStyle(fontSize: 14)),
+                      Text(
+                        '${e.value.toStringAsFixed(0)}₫',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
         const SizedBox(height: 32),
         FilledButton.icon(

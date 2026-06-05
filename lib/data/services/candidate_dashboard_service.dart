@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/candidate_dashboard_models.dart';
+import '../models/candidate_dashboard_models.dart';
 import '../models/disbursement_notice_model.dart';
+import '../models/employer_stats_model.dart';
 import '../models/job_post_model.dart';
 import 'attendance_service.dart';
 import 'notification_service.dart';
@@ -242,13 +244,21 @@ class CandidateDashboardService {
 
   Future<double> _computeHoursWorked(
     String uid,
-    List<_AcceptedJobRow> rows,
-  ) async {
+    List<_AcceptedJobRow> rows, {
+    DateTime? start,
+    DateTime? end,
+  }) async {
     var total = 0.0;
     for (final row in rows) {
       final hoursPerDay = row.job.workHoursPerDay ?? 4.0;
       final sessions = await _attendance.fetchAllByJob(row.job.jobId);
       for (final session in sessions) {
+        final sessionDate = DateTime.tryParse(session.date);
+        if (sessionDate != null) {
+          if (start != null && sessionDate.isBefore(start)) continue;
+          if (end != null && sessionDate.isAfter(end)) continue;
+        }
+
         for (final rec in session.records) {
           if (rec.candidateId != uid) continue;
           if (rec.status == 'absent' || rec.status == 'not_marked') continue;
@@ -266,10 +276,11 @@ class CandidateDashboardService {
     return null;
   }
 
-  static bool _isInCurrentMonth(DateTime? date) {
+  static bool _isInRange(DateTime? date, DateTime? start, DateTime? end) {
     if (date == null) return false;
-    final now = DateTime.now();
-    return date.year == now.year && date.month == now.month;
+    if (start != null && date.isBefore(start)) return false;
+    if (end != null && date.isAfter(end)) return false;
+    return true;
   }
 
   Future<List<CandidatePayment>> fetchPayments() async {
@@ -479,16 +490,18 @@ class CandidateDashboardService {
   Future<CandidateEarningsSummary> fetchSummary({
     required List<CandidatePayment> payments,
     required double profileRating,
+    DateTime? start,
+    DateTime? end,
   }) async {
     var paid = 0;
-    var monthPaid = 0;
+    var periodPaid = 0;
     var pending = 0;
 
     for (final p in payments) {
       if (p.status == 'paid') {
         paid += p.amountVnd;
-        if (_isInCurrentMonth(p.paidAt)) {
-          monthPaid += p.amountVnd;
+        if (_isInRange(p.paidAt, start, end)) {
+          periodPaid += p.amountVnd;
         }
       } else if (p.status == 'pending') {
         pending += p.amountVnd;
@@ -497,18 +510,134 @@ class CandidateDashboardService {
 
     final rows = await _fetchAcceptedRows();
     final uid = _uid ?? '';
-    final hours = uid.isEmpty ? 0.0 : await _computeHoursWorked(uid, rows);
+    final hours = uid.isEmpty ? 0.0 : await _computeHoursWorked(uid, rows, start: start, end: end);
     final walletBalance = await _fetchWalletBalance();
 
     return CandidateEarningsSummary(
       totalPaidVnd: paid,
-      monthPaidVnd: monthPaid,
+      periodPaidVnd: periodPaid,
       pendingVnd: pending,
       walletBalanceVnd: walletBalance.round(),
       jobCount: payments.where((p) => p.status == 'paid').length,
       hoursWorked: hours.round(),
       avgRating: profileRating,
     );
+  }
+
+  Future<List<CandidateChartPoint>> fetchChartData({
+    required List<CandidatePayment> payments,
+    required DateTime start,
+    required DateTime end,
+    required StatsPeriod period,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return [];
+
+    final buckets = _buildBuckets(start, end, period);
+    
+    for (final p in payments) {
+      final date = p.paidAt ?? DateTime.now();
+      if (date.isBefore(start) || date.isAfter(end)) continue;
+
+      final key = _bucketKey(date, period);
+      if (buckets.containsKey(key)) {
+        if (p.status == 'paid') {
+          buckets[key] = CandidateChartPoint(
+            label: buckets[key]!.label,
+            paidVnd: buckets[key]!.paidVnd + p.amountVnd,
+            pendingVnd: buckets[key]!.pendingVnd,
+            completedJobs: buckets[key]!.completedJobs + 1,
+            hoursWorked: buckets[key]!.hoursWorked,
+          );
+        } else if (p.status == 'pending') {
+          buckets[key] = CandidateChartPoint(
+            label: buckets[key]!.label,
+            paidVnd: buckets[key]!.paidVnd,
+            pendingVnd: buckets[key]!.pendingVnd + p.amountVnd,
+            completedJobs: buckets[key]!.completedJobs,
+            hoursWorked: buckets[key]!.hoursWorked,
+          );
+        }
+      }
+    }
+
+    final rows = await _fetchAcceptedRows();
+    for (final row in rows) {
+      final hoursPerDay = row.job.workHoursPerDay ?? 4.0;
+      final sessions = await _attendance.fetchAllByJob(row.job.jobId);
+      for (final session in sessions) {
+        final sessionDate = DateTime.tryParse(session.date);
+        if (sessionDate == null) continue;
+        if (sessionDate.isBefore(start) || sessionDate.isAfter(end)) continue;
+        final key = _bucketKey(sessionDate, period);
+        if (buckets.containsKey(key)) {
+          for (final rec in session.records) {
+            if (rec.candidateId != uid) continue;
+            if (rec.status == 'absent' || rec.status == 'not_marked') continue;
+            
+            buckets[key] = CandidateChartPoint(
+              label: buckets[key]!.label,
+              paidVnd: buckets[key]!.paidVnd,
+              pendingVnd: buckets[key]!.pendingVnd,
+              completedJobs: buckets[key]!.completedJobs,
+              hoursWorked: buckets[key]!.hoursWorked + hoursPerDay,
+            );
+          }
+        }
+      }
+    }
+
+    final list = buckets.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return list.map((e) => e.value).toList();
+  }
+
+  Map<String, CandidateChartPoint> _buildBuckets(
+      DateTime start, DateTime end, StatsPeriod period) {
+    final map = <String, CandidateChartPoint>{};
+    var current = start;
+    while (!current.isAfter(end)) {
+      final key = _bucketKey(current, period);
+      if (!map.containsKey(key)) {
+        map[key] = CandidateChartPoint(
+          label: _bucketLabel(current, period),
+          paidVnd: 0,
+          pendingVnd: 0,
+          completedJobs: 0,
+          hoursWorked: 0,
+        );
+      }
+      current = current.add(const Duration(days: 1));
+    }
+    return map;
+  }
+
+  String _bucketKey(DateTime date, StatsPeriod period) {
+    switch (period) {
+      case StatsPeriod.day:
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      case StatsPeriod.week:
+        final w = ((date.day - 1) / 7).floor() + 1;
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}-W$w';
+      case StatsPeriod.month:
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+      case StatsPeriod.year:
+        return '${date.year}';
+    }
+  }
+
+  String _bucketLabel(DateTime date, StatsPeriod period) {
+    switch (period) {
+      case StatsPeriod.day:
+        return '${date.day}/${date.month}';
+      case StatsPeriod.week:
+        final w = ((date.day - 1) / 7).floor() + 1;
+        return 'Tuần $w T${date.month}';
+      case StatsPeriod.month:
+        return 'T${date.month}';
+      case StatsPeriod.year:
+        return '${date.year}';
+    }
   }
 
   Future<double> _fetchWalletBalance() async {

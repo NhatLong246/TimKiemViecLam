@@ -133,14 +133,14 @@ class _CandidateBenefitsScreenState extends State<CandidateBenefitsScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            s.formatVnd(s.monthPaidVnd),
+            s.formatVnd(s.periodPaidVnd),
             style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
               color: Colors.white,
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
             ),
           ),
-          if (s.totalPaidVnd != s.monthPaidVnd) ...[
+          if (s.totalPaidVnd != s.periodPaidVnd) ...[
             const SizedBox(height: 6),
             Text(
               'Tổng đã nhận: ${s.formatVnd(s.totalPaidVnd)}',

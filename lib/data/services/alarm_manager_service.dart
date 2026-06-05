@@ -98,11 +98,13 @@ class AlarmManagerService {
 
     final appsSnap = await _db.collection('applications')
         .where('candidateId', isEqualTo: uid)
-        .where('status', isEqualTo: 'accepted')
         .get();
 
     for (final doc in appsSnap.docs) {
-      final jobId = (doc.data()['jobId'] ?? '').toString();
+      final appData = doc.data();
+      final jobId = (appData['jobId'] ?? '').toString();
+      final appStatus = (appData['status'] ?? '').toString();
+      
       if (jobId.isEmpty) continue;
 
       final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
@@ -112,9 +114,7 @@ class AlarmManagerService {
       jobData['jobId'] = jobId;
       final job = JobPostModel.fromMap(jobData);
 
-      if (job.startTime == null || job.startDate.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
-        continue;
-      }
+      if (job.startTime == null) continue;
 
       final startParts = job.startTime!.split(':');
       if (startParts.length != 2) continue;
@@ -130,6 +130,39 @@ class AlarmManagerService {
 
       DateTime currentDay = DateTime(job.startDate.year, job.startDate.month, job.startDate.day);
       final endDay = job.endDate != null ? DateTime(job.endDate!.year, job.endDate!.month, job.endDate!.day) : currentDay;
+
+      // Nếu công việc đã kết thúc/hủy, hoặc ứng dụng không còn được chấp nhận, hủy toàn bộ báo thức
+      if (appStatus != 'accepted' || 
+          job.status == 'completed' || 
+          job.status == 'cancelled' || 
+          job.status == 'closed' || 
+          job.status == 'deleted') {
+        DateTime cancelDay = currentDay;
+        while (cancelDay.compareTo(endDay.add(const Duration(days: 1))) < 0) {
+          final startAlarmTime = DateTime(cancelDay.year, cancelDay.month, cancelDay.day, startHours, startMins);
+          await cancelAlarm((jobId + startAlarmTime.toIso8601String() + "_start").hashCode);
+
+          final endAlarmTime = DateTime(cancelDay.year, cancelDay.month, cancelDay.day, endHours, endMins);
+          final finalEndAlarmTime = endAlarmTime.isBefore(startAlarmTime) 
+              ? endAlarmTime.add(const Duration(days: 1)) 
+              : endAlarmTime;
+          await cancelAlarm((jobId + finalEndAlarmTime.toIso8601String() + "_end").hashCode);
+
+          cancelDay = cancelDay.add(const Duration(days: 1));
+        }
+        continue;
+      }
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      
+      // Bỏ qua nếu công việc đã hoàn toàn nằm trong quá khứ
+      if (endDay.isBefore(today.subtract(const Duration(days: 1)))) continue;
+
+      // Fast-forward currentDay tới hôm nay nếu nó nằm quá xa trong quá khứ (để tránh lặp dư thừa)
+      if (currentDay.isBefore(today)) {
+        currentDay = today;
+      }
 
       while (currentDay.compareTo(endDay.add(const Duration(days: 1))) < 0) {
         // Báo thức ĐẦU CA (đúng giờ bắt đầu)

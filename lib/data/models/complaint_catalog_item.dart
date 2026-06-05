@@ -19,6 +19,9 @@ class ComplaintCatalogItem {
   final String status;
   final bool postDissolution;
   final DateTime createdAt;
+  final String? appealStatus;
+  final String? appealText;
+  final String? adminResponse;
 
   const ComplaintCatalogItem({
     required this.id,
@@ -33,6 +36,9 @@ class ComplaintCatalogItem {
     required this.status,
     this.postDissolution = false,
     required this.createdAt,
+    this.appealStatus,
+    this.appealText,
+    this.adminResponse,
   });
 
   String get typeLabel {
@@ -111,6 +117,9 @@ class ComplaintCatalogItem {
       status: map['status'] as String? ?? 'pending',
       postDissolution: map['postDissolution'] == true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      appealStatus: map['appealStatus'] as String?,
+      appealText: map['appealText'] as String?,
+      adminResponse: map['adminResponse'] as String?,
     );
   }
 
@@ -132,6 +141,9 @@ class ComplaintCatalogItem {
       status: map['status'] as String? ?? 'pending',
       postDissolution: map['postDissolution'] == true,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      appealStatus: map['appealStatus'] as String?,
+      appealText: map['appealText'] as String?,
+      adminResponse: map['adminResponse'] as String?,
     );
   }
 
@@ -152,6 +164,9 @@ class ComplaintCatalogItem {
       status: 'warning',
       postDissolution: false,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      appealStatus: map['appealStatus'] as String?,
+      appealText: map['appealText'] as String?,
+      adminResponse: map['adminResponse'] as String?,
     );
   }
 }

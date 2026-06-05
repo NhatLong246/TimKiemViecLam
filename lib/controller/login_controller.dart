@@ -11,6 +11,7 @@ import '../routes/app_routes.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/services/alarm_manager_service.dart';
 
 class AuthController extends GetxController {
   final LoginAuthService _authService = LoginAuthService();
@@ -84,6 +85,9 @@ class AuthController extends GetxController {
       MessagingBootstrap.startIfLoggedIn();
       _startAttendanceAutoIfEmployer();
       await PushNotificationService.instance.bindToUser(user.id);
+      if (user.role == 'candidate') {
+        unawaited(AlarmManagerService.instance.syncAutomaticAlarms());
+      }
       await PushNavigationHandler.processPendingIfAny();
       _listenToSession(user.id);
       unawaited(cleanupDuplicateGroups());
@@ -315,9 +319,13 @@ class AuthController extends GetxController {
     currentUser = user;
     update();
     unawaited(cleanupDuplicateGroups());
+
     MessagingBootstrap.startIfLoggedIn();
     _startAttendanceAutoIfEmployer();
     await PushNotificationService.instance.bindToUser(user.id);
+    if (user.role == 'candidate') {
+      unawaited(AlarmManagerService.instance.syncAutomaticAlarms());
+    }
     await PushNavigationHandler.processPendingIfAny();
     await FirebaseFirestore.instance.collection('users').doc(user.id).update({
       'currentSessionId': localSessionId,

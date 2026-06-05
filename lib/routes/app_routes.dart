@@ -62,6 +62,7 @@ import 'package:viecnow/screens/profile/my_profile_screen.dart';
 import 'package:viecnow/screens/profile/update_account_screen.dart';
 import 'package:viecnow/screens/shipping_address/my_shipping_address_screen.dart';
 import 'package:flutter/material.dart';
+import '../screens/employer/warning_appeal_screen.dart';
 import '../screens/home/main_navigation_screen.dart';
 import '../screens/spalsh/splash_screen.dart';
 
@@ -132,7 +133,9 @@ class AppRoutes {
   static const String employerSearch = '/employer-search';
   static const String jobCriteria = '/job-criteria';
   static const String candidateEarnings = '/candidate-earnings';
+  static const String warningAppeal = '/warning_appeal';
   static Map<String, WidgetBuilder> routes = {
+    warningAppeal: (context) => const WarningAppealScreen(),
     splash: (context) => const SplashScreen(),
     onboarding: (context) => const OnboardingScreen(),
     home: (context) => const MainNavigationScreen(),

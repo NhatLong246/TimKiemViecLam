@@ -199,7 +199,6 @@ class JobWorkflowService {
       notice.jobId,
       employerId: notice.employerId,
       totalActualPayment: notice.amount,
-      excessRefund: notice.excessRefund,
       jobTitle: notice.jobTitle,
     );
   }
@@ -595,7 +594,6 @@ class JobWorkflowService {
       notice.jobId,
       employerId: notice.employerId,
       totalActualPayment: notice.amount,
-      excessRefund: notice.excessRefund,
       jobTitle: notice.jobTitle,
     );
   }
@@ -698,7 +696,6 @@ class JobWorkflowService {
     String jobId, {
     String? employerId,
     double totalActualPayment = 0.0,
-    double excessRefund = 0.0,
     String jobTitle = '',
   }) async {
     if (jobId.isEmpty) return;
@@ -746,30 +743,6 @@ class JobWorkflowService {
         'createdAt': FieldValue.serverTimestamp(),
         'completedAt': FieldValue.serverTimestamp(),
       });
-
-      if (excessRefund > 0) {
-        final refundTxRef = _db.collection('walletTransactions').doc();
-        batch.set(refundTxRef, {
-          'userId': employerId,
-          'type': 'refund',
-          'amount': excessRefund,
-          'description': 'Hoàn tiền giải ngân dư cho "$jobTitle"',
-          'status': 'completed',
-          'paymentMethod': 'wallet',
-          'jobId': jobId,
-          'createdAt': FieldValue.serverTimestamp(),
-          'completedAt': FieldValue.serverTimestamp(),
-        });
-
-        await _notif.create(
-          recipientId: employerId,
-          type: 'disbursement_refund',
-          title: 'Hoàn tiền dư',
-          body:
-              'Bạn được hoàn lại ${excessRefund.toStringAsFixed(0)}₫ tiền thừa sau khi giải ngân cho "$jobTitle".',
-          data: {'jobId': jobId},
-        );
-      }
 
       await batch.commit();
     } else if (depositHeld &&

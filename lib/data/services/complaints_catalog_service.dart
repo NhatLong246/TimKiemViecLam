@@ -99,4 +99,15 @@ class ComplaintsCatalogService {
     items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return items;
   }
+
+  Future<void> submitWarningAppeal({
+    required String warningId,
+    required String appealText,
+  }) async {
+    await _db.collection('adminWarnings').doc(warningId).update({
+      'appealStatus': 'pending',
+      'appealText': appealText,
+      'appealedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }

@@ -193,11 +193,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       const SizedBox(height: 3),
-                      const Icon(
-                        Icons.visibility_outlined,
-                        color: Colors.white,
-                        size: 15,
-                      ),
+                      Obx(() {
+                        final count = _homeController.interestCount.value;
+                        return Row(
+                          children: [
+                            const Icon(
+                              Icons.visibility_outlined,
+                              color: Colors.white,
+                              size: 15,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$count',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
                     ],
                   ),
                 ),

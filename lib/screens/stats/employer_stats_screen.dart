@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../common/styles/app_colors.dart';
 import '../../controller/employer_stats_controller.dart';
 import '../../data/models/employer_stats_model.dart';
+import '../../common/widgets/animated_number_text.dart';
 
 class EmployerStatsScreen extends StatelessWidget {
   const EmployerStatsScreen({super.key});
@@ -38,6 +39,8 @@ class EmployerStatsScreen extends StatelessWidget {
                           ),
                         )
                       else ...[
+                        _InsightCard(ctrl: ctrl),
+                        const SizedBox(height: 16),
                         _SummaryGrid(ctrl: ctrl),
                         const SizedBox(height: 20),
                         _ChartCard(
@@ -324,7 +327,8 @@ class _SummaryGrid extends StatelessWidget {
                 iconColor: const Color(0xFF4CAF50),
                 iconBg: const Color(0xFFE8F5E9),
                 label: 'Bài đăng đã duyệt',
-                value: '${s.approvedPosts}',
+                value: s.approvedPosts.toDouble(),
+                format: (v) => v.toInt().toString(),
               ),
             ),
             const SizedBox(width: 12),
@@ -334,7 +338,8 @@ class _SummaryGrid extends StatelessWidget {
                 iconColor: const Color(0xFFF44336),
                 iconBg: const Color(0xFFFFEBEE),
                 label: 'Bài đăng quá hạn',
-                value: '${s.cancelledPosts}',
+                value: s.cancelledPosts.toDouble(),
+                format: (v) => v.toInt().toString(),
               ),
             ),
           ],
@@ -348,7 +353,8 @@ class _SummaryGrid extends StatelessWidget {
                 iconColor: AppColors.employerPrimary,
                 iconBg: const Color(0xFFF3E5F5),
                 label: 'Số người đã thuê',
-                value: '${s.totalHired}',
+                value: s.totalHired.toDouble(),
+                format: (v) => v.toInt().toString(),
               ),
             ),
             const SizedBox(width: 12),
@@ -358,7 +364,8 @@ class _SummaryGrid extends StatelessWidget {
                 iconColor: AppColors.employerSecondary,
                 iconBg: const Color(0xFFE3F2FD),
                 label: 'Tổng tiền đã chi',
-                value: ctrl.formatVnd(s.totalSpent),
+                value: s.totalSpent,
+                format: (v) => ctrl.formatVnd(v),
                 valueSize: 18,
               ),
             ),
@@ -373,7 +380,8 @@ class _SummaryGrid extends StatelessWidget {
                 iconColor: const Color(0xFF009688),
                 iconBg: const Color(0xFFE0F2F1),
                 label: 'Tổng tiền đã nạp',
-                value: ctrl.formatVnd(s.totalDeposited),
+                value: s.totalDeposited,
+                format: (v) => ctrl.formatVnd(v),
                 valueSize: 18,
               ),
             ),
@@ -384,14 +392,75 @@ class _SummaryGrid extends StatelessWidget {
                 iconColor: const Color(0xFFFF9800),
                 iconBg: const Color(0xFFFFF3E0),
                 label: 'Hiệu suất chi',
-                value: s.totalDeposited > 0
-                    ? '${(s.totalSpent / s.totalDeposited * 100).toStringAsFixed(0)}%'
-                    : '—',
+                value: s.totalDeposited > 0 ? (s.totalSpent / s.totalDeposited * 100) : 0,
+                format: (v) => s.totalDeposited > 0 ? '${v.toStringAsFixed(0)}%' : '—',
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({required this.ctrl});
+  final EmployerStatsController ctrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.purple.shade50, Colors.blue.shade50],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.purple.shade100, width: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: Colors.purple.shade200.withOpacity(0.4), blurRadius: 8),
+              ],
+            ),
+            child: Icon(Icons.auto_awesome, color: Colors.purple.shade400, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đánh giá thông minh',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple.shade800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  ctrl.insightMessage.value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -403,13 +472,15 @@ class _StatCard extends StatelessWidget {
     required this.iconBg,
     required this.label,
     required this.value,
+    required this.format,
     this.valueSize = 22,
   });
   final IconData icon;
   final Color iconColor;
   final Color iconBg;
   final String label;
-  final String value;
+  final double value;
+  final String Function(double) format;
   final double valueSize;
 
   @override
@@ -452,8 +523,9 @@ class _StatCard extends StatelessWidget {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 4),
-                Text(
+                AnimatedNumberText(
                   value,
+                  format: format,
                   style: TextStyle(
                     fontSize: valueSize,
                     fontWeight: FontWeight.bold,
