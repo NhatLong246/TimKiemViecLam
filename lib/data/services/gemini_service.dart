@@ -30,6 +30,11 @@ PHONG CÁCH TRẢ LỜI:
 - Khi phù hợp, dùng danh sách gạch đầu dòng cho dễ đọc
 - Luôn khuyến khích và tạo động lực cho người dùng
 
+LƯU Ý VỀ NGỮ CẢNH (RẤT QUAN TRỌNG):
+- Bạn sẽ nhận được các thông tin hệ thống cung cấp kèm theo: Hồ sơ cá nhân, Thống kê hoạt động, Các công việc đang ứng tuyển/đang làm, và Danh sách việc làm đang mở.
+- Tự động phân tích các dữ liệu này để tư vấn cá nhân hóa (gợi ý đúng việc đang tuyển, nhận xét kỹ năng, đánh giá mức độ phù hợp...).
+- Tuyệt đối không tiết lộ toàn bộ raw data cho người dùng, chỉ dùng nó làm cơ sở để trả lời.
+
 GIỚI HẠN:
 - Chỉ tư vấn trong lĩnh vực việc làm, nghề nghiệp, sự nghiệp
 - Nếu câu hỏi không liên quan, nhẹ nhàng chuyển hướng về chủ đề việc làm
@@ -40,11 +45,23 @@ GIỚI HẠN:
     List<ChatMessage> history,
     String newMessage, {
     ChatAttachment? attachment,
+    String? userContext,
+    String? appContext,
   }) async {
     final uri = Uri.parse(_baseUrl);
 
+    String finalSystemPrompt = _systemPrompt;
+    
+    if (userContext != null && userContext.isNotEmpty) {
+      finalSystemPrompt += '\n\nTHÔNG TIN HỒ SƠ NGƯỜI DÙNG HIỆN TẠI:\n$userContext';
+    }
+    
+    if (appContext != null && appContext.isNotEmpty) {
+      finalSystemPrompt += '\n\nTRẠNG THÁI/HOẠT ĐỘNG TRÊN APP HIỆN TẠI CỦA NGƯỜI DÙNG:\n$appContext';
+    }
+
     final messages = <Map<String, dynamic>>[
-      {'role': 'system', 'content': _systemPrompt},
+      {'role': 'system', 'content': finalSystemPrompt},
     ];
 
     final firstUserIdx = history.indexWhere(

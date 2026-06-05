@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,7 +10,8 @@ import 'package:viecnow/data/models/chat_message.dart';
 import 'package:viecnow/data/services/gemini_service.dart';
 
 class ChatbotScreen extends StatefulWidget {
-  const ChatbotScreen({super.key});
+  final String? appContext;
+  const ChatbotScreen({super.key, this.appContext});
 
   @override
   State<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -192,10 +195,73 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _scrollToBottom();
 
     try {
+      // Tự động lấy hồ sơ người dùng và thống kê từ Firebase
+      String? userContext;
+      String dynamicAppContext = widget.appContext ?? '';
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          if (doc.exists) {
+            final data = doc.data()!;
+            // Lọc bỏ thông tin ảnh hoặc quá dài
+            data.remove('avatarBase64');
+            data.remove('cccdImageUrl');
+            data.remove('cccdBackImageUrl');
+            userContext = data.entries.map((e) {
+              final val = e.value;
+              if (val is Timestamp) return '${e.key}: ${val.toDate()}';
+              return '${e.key}: $val';
+            }).join('\n');
+          }
+
+          // Lấy danh sách các công việc đang ứng tuyển hoặc đang làm
+          final appsSnap = await FirebaseFirestore.instance
+              .collection('applications')
+              .where('candidateId', isEqualTo: user.uid)
+              .get();
+          
+          List<String> pendingJobIds = [];
+          List<String> acceptedJobIds = [];
+          for (final appDoc in appsSnap.docs) {
+            final status = appDoc.data()['status'] as String?;
+            final jobId = appDoc.data()['jobId'] as String?;
+            if (jobId != null) {
+              if (status == 'pending') pendingJobIds.add(jobId);
+              if (status == 'accepted') acceptedJobIds.add(jobId);
+            }
+          }
+
+          if (pendingJobIds.isNotEmpty || acceptedJobIds.isNotEmpty) {
+            dynamicAppContext += '\n\n[Dữ liệu hoạt động]:';
+            dynamicAppContext += '\n- Các công việc đang chờ duyệt (Job IDs): ${pendingJobIds.join(", ")}';
+            dynamicAppContext += '\n- Các công việc đang làm (Job IDs): ${acceptedJobIds.join(", ")}';
+          }
+        }
+
+        // Lấy 10 công việc mới nhất đang tuyển để AI dễ gợi ý
+        final jobsSnap = await FirebaseFirestore.instance
+            .collection('jobPosts')
+            .where('status', isEqualTo: 'approved')
+            .limit(10)
+            .get();
+        
+        if (jobsSnap.docs.isNotEmpty) {
+          final jobSummaries = jobsSnap.docs.map((d) {
+            final data = d.data();
+            final loc = data['location'] is Map ? data['location']['city'] ?? '' : '';
+            return 'ID: ${d.id} | Tiêu đề: ${data['title']} | Lương: ${data['salary']} | Nơi làm: $loc';
+          }).join('\n');
+          dynamicAppContext += '\n\n[DANH SÁCH VIỆC LÀM ĐANG TUYỂN DỤNG TRÊN APP - Hãy gợi ý nếu phù hợp]:\n$jobSummaries';
+        }
+      } catch (_) {}
+
       final reply = await _service.sendMessage(
         prevHistory,
         trimmed,
         attachment: selectedAttachment,
+        userContext: userContext,
+        appContext: dynamicAppContext.trim(),
       );
       if (!mounted) return;
       setState(() {
@@ -334,26 +400,32 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Trợ lý ViecNow',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Trợ lý ViecNow',
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                'Tư vấn việc làm AI',
-                style: TextStyle(
-                  color: Color(0xFF4CAF50),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                Text(
+                  'Tư vấn việc làm AI',
+                  style: TextStyle(
+                    color: Color(0xFF4CAF50),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -691,7 +763,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         left: 16,
         right: 16,
         top: 10,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 14,
+        bottom: MediaQuery.of(context).padding.bottom + 14,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
