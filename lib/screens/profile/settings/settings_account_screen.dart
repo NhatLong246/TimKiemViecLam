@@ -20,9 +20,17 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
   static const Color _verified = Color(0xFF37B96B);
   static const Color _delete = Color(0xFFE53935);
 
+  late final Stream<DocumentSnapshot> _userDataStream;
+
   @override
   void initState() {
     super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _userDataStream = FirebaseFirestore.instance.collection('users').doc(uid).snapshots();
+    } else {
+      _userDataStream = const Stream.empty();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await Get.find<UpdateAccountController>().syncEmailAfterVerification();
@@ -32,8 +40,6 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(UpdateAccountController());
-
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -55,7 +61,7 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
         ),
       ),
       body: StreamBuilder(
-        stream: controller.getUserData(),
+        stream: _userDataStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {

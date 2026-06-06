@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/controller/update_account_controller.dart';
@@ -33,8 +35,12 @@ class _SkillsScreenState extends State<SkillsScreen> {
 
   Future<void> _load() async {
     try {
-      final snap =
-          await Get.put(UpdateAccountController()).getUserData().first;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      final snap = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (!mounted) return;
       final data = snap.exists
           ? snap.data() as Map<String, dynamic>

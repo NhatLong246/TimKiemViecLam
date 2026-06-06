@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/theme_colors.dart';
 import 'package:get/get.dart';
@@ -15,18 +16,34 @@ import 'skills_screen.dart';
 import 'work_experience_screen.dart';
 import 'settings/settings_account_screen.dart';
 
-class MyProfileScreen extends StatelessWidget {
+class MyProfileScreen extends StatefulWidget {
   const MyProfileScreen({super.key});
 
+  @override
+  State<MyProfileScreen> createState() => _MyProfileScreenState();
+}
+
+class _MyProfileScreenState extends State<MyProfileScreen> {
   static const Color _primary = Color(0xFF2E7D32);
   static const Color _iconBg = Color(0xFFE8F5E9);
   static const Color _border = Color(0xFFE2E2E2);
 
+  late final Stream<DocumentSnapshot> _userDataStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _userDataStream = FirebaseFirestore.instance.collection('users').doc(uid).snapshots();
+    } else {
+      _userDataStream = const Stream.empty();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final UpdateAccountController controller = Get.put(
-      UpdateAccountController(),
-    );
+    final controller = Get.put(UpdateAccountController());
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -45,7 +62,7 @@ class MyProfileScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: StreamBuilder(
-          stream: controller.getUserData(),
+          stream: _userDataStream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {

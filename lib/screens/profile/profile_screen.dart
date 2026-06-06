@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../common/styles/app_colors.dart';
@@ -31,6 +33,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _updatingVisibility = false;
   bool _uploadingAvatar = false;
+  late final Stream<DocumentSnapshot> _userDataStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _userDataStream = FirebaseFirestore.instance.collection('users').doc(uid).snapshots();
+    } else {
+      _userDataStream = const Stream.empty();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -590,10 +604,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     BuildContext context,
     AuthController authController,
   ) {
-    final updateController = Get.put(UpdateAccountController());
-
     return StreamBuilder(
-      stream: updateController.getUserData(),
+      stream: _userDataStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -645,12 +657,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     20 + bottomNavPadding + bottomInset,
                   ),
                   children: [
-                    _buildOverviewCard(),
-                    _buildVisibilityCard(),
+                    const SizedBox(height: 12),
+                    _buildOverviewCard(data),
+                    _buildVisibilityCard(data),
                     const SizedBox(height: 22),
                     _buildAlarmCard(context),
                     const SizedBox(height: 22),
-                    _buildJobCriteriaCard(),
+                    _buildJobCriteriaCard(data),
+                    const SizedBox(height: bottomNavPadding),
                   ],
                 ),
               ),
@@ -708,19 +722,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildOverviewCard() {
-    final controller = Get.put(UpdateAccountController());
-
-    return StreamBuilder(
-      stream: controller.getUserData(),
-      builder: (context, snapshot) {
-        final data = snapshot.hasData && snapshot.data!.exists
-            ? snapshot.data!.data() as Map<String, dynamic>
-            : <String, dynamic>{};
-        final hasExperience =
-            WorkExperienceModel.listFromUserData(data).isNotEmpty;
-        final declaredNo =
-            WorkExperienceModel.hasDeclaredNoExperience(data);
+  Widget _buildOverviewCard(Map<String, dynamic> data) {
+    final hasExperience = WorkExperienceModel.listFromUserData(data).isNotEmpty;
+    final declaredNo = WorkExperienceModel.hasDeclaredNoExperience(data);
 
         if (hasExperience || declaredNo) {
           return const SizedBox.shrink();
@@ -785,8 +789,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 22),
           ],
         );
-      },
-    );
   }
 
   Future<void> _openWorkExperienceScreen() async {
@@ -796,16 +798,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildVisibilityCard() {
+  Widget _buildVisibilityCard(Map<String, dynamic> data) {
     final controller = Get.put(UpdateAccountController());
-
-    return StreamBuilder(
-      stream: controller.getUserData(),
-      builder: (context, snapshot) {
-        final data = snapshot.hasData && snapshot.data!.exists
-            ? snapshot.data!.data() as Map<String, dynamic>
-            : <String, dynamic>{};
-        final allowFind = data['allowEmployerDiscovery'] == true;
+    final allowFind = data['allowEmployerDiscovery'] == true;
 
         return _ProfileCard(
           child: Column(
@@ -860,8 +855,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         );
-      },
-    );
   }
 
   Future<void> _pickAndUploadAvatar(AuthController authController) async {
@@ -971,16 +964,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildJobCriteriaCard() {
-    final controller = Get.put(UpdateAccountController());
-
-    return StreamBuilder(
-      stream: controller.getUserData(),
-      builder: (context, snapshot) {
-        final data = snapshot.hasData && snapshot.data!.exists
-            ? snapshot.data!.data() as Map<String, dynamic>
-            : <String, dynamic>{};
-        final criteria = JobCriteriaModel.fromUserData(data);
+  Widget _buildJobCriteriaCard(Map<String, dynamic> data) {
+    final criteria = JobCriteriaModel.fromUserData(data);
 
         return InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -1064,8 +1049,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         );
-      },
-    );
   }
 
   Widget _buildCriteriaLine(IconData icon, String text, {bool bold = false}) {
