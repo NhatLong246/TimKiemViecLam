@@ -24,6 +24,7 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 1;
   int _previousIndex = 1;
+  int _chatbotKey = 0;
 
   static const Color _primary = Color(0xFF2E7D32);
 
@@ -33,16 +34,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     MessagingBootstrap.startIfLoggedIn();
   }
 
+  void _resetChatbot() {
+    setState(() => _chatbotKey++);
+  }
+
   Widget _screenForIndex(int index) {
     switch (index) {
       case 0:
         return const _DashboardPlaceholder();
       case 1:
-        return const HomeScreen();
+        return HomeScreen(onRefresh: _resetChatbot);
       case 2:
         return const ProfileScreen();
       default:
-        return const HomeScreen();
+        return HomeScreen(onRefresh: _resetChatbot);
     }
   }
 
@@ -53,7 +58,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         children: [
           _screenForIndex(_currentIndex),
           const FloatingMessageBubble(),
-          const FloatingChatButton(),
+          FloatingChatButton(refreshCounter: _chatbotKey),
         ],
       ),
       extendBody: true,
@@ -117,10 +122,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
           ),
-          GestureDetector(
-            onTap: () => setState(() => _currentIndex = 1),
-            child: Transform.translate(
-              offset: const Offset(0, -26),
+          Transform.translate(
+            offset: const Offset(0, -26),
+            child: GestureDetector(
+              onTap: () => setState(() => _currentIndex = 1),
               child: Container(
                 width: 72,
                 height: 72,

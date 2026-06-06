@@ -28,6 +28,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
   bool _sortByEndingSoon = true;
   late final JobPostController _controller;
   late final TabController _tabController;
+  String? _highlightJobId;
 
   @override
   void initState() {
@@ -39,9 +40,10 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     int initialIndex = 0;
     if (Get.arguments is Map) {
       initialIndex = Get.arguments['initialTab'] ?? 0;
+      _highlightJobId = Get.arguments['highlightJobId'];
     }
     
-    _tabController = TabController(length: 6, vsync: this, initialIndex: initialIndex);
+    _tabController = TabController(length: 5, vsync: this, initialIndex: initialIndex);
     _tabController.addListener(_syncSortWithActiveTab);
   }
 
@@ -136,6 +138,10 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     final sorted = List<JobPostModel>.from(posts);
     if (_sortByEndingSoon) {
       sorted.sort((a, b) {
+        if (_highlightJobId != null) {
+          if (a.jobId == _highlightJobId && b.jobId != _highlightJobId) return -1;
+          if (b.jobId == _highlightJobId && a.jobId != _highlightJobId) return 1;
+        }
         final aEnd = a.endDate ?? DateTime(2999);
         final bEnd = b.endDate ?? DateTime(2999);
         final byEnd = aEnd.compareTo(bEnd);
@@ -145,6 +151,10 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       return sorted;
     }
     sorted.sort((a, b) {
+      if (_highlightJobId != null) {
+        if (a.jobId == _highlightJobId && b.jobId != _highlightJobId) return -1;
+        if (b.jobId == _highlightJobId && a.jobId != _highlightJobId) return 1;
+      }
       final aCreated = a.createdAt ?? a.startDate;
       final bCreated = b.createdAt ?? b.startDate;
       return bCreated.compareTo(aCreated);
@@ -192,11 +202,6 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                   _buildPostList(
                     _sorted(_filter(_controller.pendingPosts)),
                     'pending',
-                    _controller,
-                  ),
-                  _buildPostList(
-                    _sorted(_filter(_controller.draftPosts)),
-                    'draft',
                     _controller,
                   ),
                   _buildPostList(
@@ -556,7 +561,6 @@ class _PostManagementScreenState extends State<PostManagementScreen>
           tabs: [
             Tab(text: 'Đã đăng (${_controller.publishedPosts.length})'),
             Tab(text: 'Chờ duyệt (${_controller.pendingPosts.length})'),
-            Tab(text: 'Bản nháp (${_controller.draftPosts.length})'),
             Tab(text: 'Quá hạn (${_controller.expiredPosts.length})'),
             Tab(text: 'Chờ GN (${_controller.pendingDisbursementPosts.length})'),
             Tab(text: 'Đã HT (${_controller.completedPosts.length})'),
@@ -587,34 +591,35 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     final messages = {
       'published': 'Chưa có bài đăng nào được duyệt',
       'pending': 'Không có bài đăng chờ duyệt',
-      'draft': 'Chưa có bản nháp nào',
       'expired': 'Không có bài đăng quá hạn',
       'pendingDisbursement': 'Chưa có công việc nào đang chờ giải ngân',
       'completed': 'Chưa có công việc nào hoàn thành',
     };
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inbox_rounded, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 12),
-          Text(
-            query.isNotEmpty
-                ? 'Không tìm thấy bài đăng phù hợp'
-                : (messages[tabType] ?? 'Không có dữ liệu'),
-            style: TextStyle(color: context.textSecondary, fontSize: 14),
-          ),
-          if (query.isNotEmpty) ...[
-            const SizedBox(height: 6),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_rounded, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
             Text(
-              'Từ khóa: "$query"',
-              style: TextStyle(
-                color: context.textSecondary.withValues(alpha: 0.8),
-                fontSize: 12,
-              ),
+              query.isNotEmpty
+                  ? 'Không tìm thấy bài đăng phù hợp'
+                  : (messages[tabType] ?? 'Không có dữ liệu'),
+              style: TextStyle(color: context.textSecondary, fontSize: 14),
             ),
+            if (query.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Từ khóa: "$query"',
+                style: TextStyle(
+                  color: context.textSecondary.withValues(alpha: 0.8),
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1042,34 +1047,8 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       _menuItem('view', 'Xem chi tiết', icon: Icons.visibility_outlined),
     );
 
-    if (tabType == 'draft') {
+    if (tabType == 'pending') {
       items.add(_menuItem('edit', 'Chỉnh sửa', icon: Icons.edit_outlined));
-      items.add(_menuItem('submit', 'Gửi duyệt', icon: Icons.send_outlined));
-      items.add(
-        _menuItem(
-          'duplicate',
-          'Sao chép bản nháp',
-          icon: Icons.content_copy_outlined,
-        ),
-      );
-      items.add(
-        _menuItem(
-          'delete',
-          'Xóa',
-          icon: Icons.delete_outline,
-          textColor: Colors.red,
-        ),
-      );
-    } else if (tabType == 'pending') {
-      items.add(_menuItem('edit', 'Chỉnh sửa', icon: Icons.edit_outlined));
-      items.add(
-        _menuItem(
-          'duplicate',
-          'Sao chép thành nháp',
-          icon: Icons.content_copy_outlined,
-        ),
-      );
-      items.add(_menuItem('retract', 'Rút về nháp', icon: Icons.undo_outlined));
       if (JobTimeHelper.startsAfterNow(post)) {
         items.add(
           _menuItem(
@@ -1085,14 +1064,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         _menuItem('candidates', 'Xem DS ứng tuyển', icon: Icons.people_outline),
       );
       items.add(
-        _menuItem('extend7', 'Gia hạn thêm 7 ngày', icon: Icons.update_rounded),
-      );
-      items.add(
-        _menuItem(
-          'duplicate',
-          'Sao chép thành nháp',
-          icon: Icons.content_copy_outlined,
-        ),
+        _menuItem('extend', 'Gia hạn bài đăng', icon: Icons.update_rounded),
       );
       if (hasGroup) {
         items.add(
@@ -1161,16 +1133,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       }
       items.add(
         _menuItem(
-          'extend30',
-          'Gia hạn thêm 30 ngày',
+          'extend',
+          'Gia hạn bài đăng',
           icon: Icons.calendar_month_outlined,
-        ),
-      );
-      items.add(
-        _menuItem(
-          'duplicate',
-          'Sao chép thành nháp',
-          icon: Icons.content_copy_outlined,
         ),
       );
       items.add(
@@ -1252,14 +1217,25 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       case 'submit':
         await controller.submitForReview(post.jobId);
         break;
-      case 'duplicate':
-        await controller.duplicateAsDraft(post);
-        break;
-      case 'extend7':
-        await controller.extendPostDuration(post, days: 7);
-        break;
-      case 'extend30':
-        await controller.extendPostDuration(post, days: 30);
+      case 'extend':
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final initialDate = (post.endDate != null && post.endDate!.isAfter(today))
+            ? post.endDate!.add(const Duration(days: 1))
+            : today.add(const Duration(days: 1));
+            
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: initialDate,
+          firstDate: today,
+          lastDate: today.add(const Duration(days: 365)),
+          helpText: 'CHỌN NGÀY HẾT HẠN MỚI',
+          cancelText: 'HỦY',
+          confirmText: 'GIA HẠN',
+        );
+        if (picked != null) {
+          await controller.extendPostDurationToDate(post, picked);
+        }
         break;
       case 'reopen':
         await controller.reopenPost(post);

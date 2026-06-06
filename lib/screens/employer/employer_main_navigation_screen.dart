@@ -113,10 +113,10 @@ class _EmployerMainNavigationScreenState extends State<EmployerMainNavigationScr
               ),
             ),
           ),
-          GestureDetector(
-            onTap: () => setState(() => _currentIndex = 1),
-            child: Transform.translate(
-              offset: const Offset(0, -28),
+          Transform.translate(
+            offset: const Offset(0, -28),
+            child: GestureDetector(
+              onTap: () => setState(() => _currentIndex = 1),
               child: Container(
                 width: 58,
                 height: 58,

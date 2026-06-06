@@ -186,16 +186,17 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Center(
                 child: Container(
                   width: 40,
@@ -260,7 +261,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
               TextField(
                 controller: _noteCtrl,
                 decoration: InputDecoration(
-                  labelText: 'Ghi ch\u00fa (t\u00f9y ch\u1ecdn)',
+                  labelText: 'Ghi chú (không bắt buộc)',
                   prefixIcon: const Icon(
                     Icons.note_outlined,
                     color: Color(0xFF9E9E9E),
@@ -321,6 +322,7 @@ class _EmployerWalletScreenState extends State<EmployerWalletScreen>
               ),
             ],
           ),
+        ),
         ),
       ),
     );

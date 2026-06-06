@@ -8,16 +8,20 @@ class FloatingMessageBubblePreferences {
   static String _msgHiddenUnreadKey(String userId, bool isEmployer) =>
       'floating_msg_bubble_hidden_unread_${userId}_${isEmployer ? 'employer' : 'candidate'}';
 
-  static Future<({bool hidden, int hiddenWhileUnread})> loadMessageBubble(
+  static String _msgHiddenLastAtKey(String userId, bool isEmployer) =>
+      'floating_msg_bubble_hidden_last_at_${userId}_${isEmployer ? 'employer' : 'candidate'}';
+
+  static Future<({bool hidden, int hiddenWhileUnread, int? lastMessageAtMs})> loadMessageBubble(
     String userId,
     bool isEmployer,
   ) async {
-    if (userId.isEmpty) return (hidden: false, hiddenWhileUnread: 0);
+    if (userId.isEmpty) return (hidden: false, hiddenWhileUnread: 0, lastMessageAtMs: null);
     final prefs = await SharedPreferences.getInstance();
+    final ms = prefs.getInt(_msgHiddenLastAtKey(userId, isEmployer));
     return (
       hidden: prefs.getBool(_msgHiddenKey(userId, isEmployer)) ?? false,
-      hiddenWhileUnread:
-          prefs.getInt(_msgHiddenUnreadKey(userId, isEmployer)) ?? 0,
+      hiddenWhileUnread: prefs.getInt(_msgHiddenUnreadKey(userId, isEmployer)) ?? 0,
+      lastMessageAtMs: ms,
     );
   }
 
@@ -25,11 +29,17 @@ class FloatingMessageBubblePreferences {
     String userId,
     bool isEmployer, {
     required int unreadAtDismiss,
+    int? lastMessageAtMs,
   }) async {
     if (userId.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_msgHiddenKey(userId, isEmployer), true);
     await prefs.setInt(_msgHiddenUnreadKey(userId, isEmployer), unreadAtDismiss);
+    if (lastMessageAtMs != null) {
+      await prefs.setInt(_msgHiddenLastAtKey(userId, isEmployer), lastMessageAtMs);
+    } else {
+      await prefs.remove(_msgHiddenLastAtKey(userId, isEmployer));
+    }
   }
 
   static Future<void> clearMessageBubbleDismissed(
@@ -40,6 +50,7 @@ class FloatingMessageBubblePreferences {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_msgHiddenKey(userId, isEmployer));
     await prefs.remove(_msgHiddenUnreadKey(userId, isEmployer));
+    await prefs.remove(_msgHiddenLastAtKey(userId, isEmployer));
   }
 
   static String _chatbotHiddenKey(String userId) =>

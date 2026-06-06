@@ -91,19 +91,12 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     setState(() {
       _isHidden = state.hidden;
       _hiddenWhileUnread = state.hiddenWhileUnread;
-      // Không chặn hiện lại vì snapshot — sẽ chụp ngay frame đầu nếu cần.
+      if (state.lastMessageAtMs != null) {
+        _hiddenLastMessageAt = DateTime.fromMillisecondsSinceEpoch(state.lastMessageAtMs!);
+      }
       _hiddenSnapshotPending = false;
       _prefsLoaded = true;
     });
-    if (state.hidden) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_isHidden) return;
-        if (!Get.isRegistered<MessagingController>()) return;
-        setState(
-          () => _captureHiddenSnapshot(Get.find<MessagingController>()),
-        );
-      });
-    }
   }
 
   void _captureHiddenSnapshot(MessagingController mc) {
@@ -117,11 +110,13 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     _isHidden = true;
     _hiddenSnapshotPending = true;
     final uid = Get.find<AuthController>().currentUser?.id ?? '';
+    final lastAt = mc.primaryUnreadThread?.lastMessageAt;
     unawaited(
       FloatingMessageBubblePreferences.saveMessageBubbleDismissed(
         uid,
         widget.isEmployer,
         unreadAtDismiss: mc.bubbleUnreadCount,
+        lastMessageAtMs: lastAt?.millisecondsSinceEpoch,
       ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -239,6 +234,19 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     );
   }
 
+  bool _isOverCloseTarget(Size size, double x, double y, bool showAlert) {
+    final targetCenterX = (size.width - 78) / 2 + 34.0;
+    const bottomNav = 88.0;
+    final targetCenterY = size.height - bottomNav - 34.0;
+
+    final bubbleCenterX = x + _bubbleWidth(showAlert) - 29.0;
+    final bubbleCenterY = y + 29.0;
+
+    final dx = targetCenterX - bubbleCenterX;
+    final dy = targetCenterY - bubbleCenterY;
+    return (dx * dx + dy * dy) < 6400.0; // distance < 80
+  }
+
   @override
   Widget build(BuildContext context) {
     return GetBuilder<AuthController>(
@@ -265,14 +273,33 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
           final thread = messaging.primaryUnreadThread;
 
           // Hết tin chưa đọc → luôn hiện lại icon (không giữ trạng thái ẩn cũ).
-          if (_isHidden && total == 0 && inboxUnread == 0) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || !_isHidden) return;
-              unawaited(_restoreFromNewMessage(0));
-            });
-          }
+          // Removed auto-restore when total == 0 because it prevents dismissing the bubble when there are no unread messages.
+          // if (_isHidden && total == 0 && inboxUnread == 0) {
+          //   WidgetsBinding.instance.addPostFrameCallback((_) {
+          //     if (!mounted || !_isHidden) return;
+          //     unawaited(_restoreFromNewMessage(0));
+          //   });
+          // }
 
           if (_isHidden) {
+            // Nếu người dùng đã đọc hết tin nhắn (total == 0) mà bong bóng vẫn đang ẩn,
+            // ta reset lại trạng thái "ẩn khi có N tin nhắn" về 0 để khi có tin mới (total > 0),
+            // nó sẽ tự động hiện lên lại thay vì so sánh với con số N cũ.
+            if (total == 0 && _hiddenWhileUnread > 0) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _hiddenWhileUnread = 0;
+                _hiddenLastMessageAt = null;
+                _hiddenNotifGroups.clear();
+                final uid = Get.find<AuthController>().currentUser?.id ?? '';
+                FloatingMessageBubblePreferences.saveMessageBubbleDismissed(
+                  uid,
+                  widget.isEmployer,
+                  unreadAtDismiss: 0,
+                );
+              });
+            }
+
             if (_hasNewMessageSinceDismiss(messaging)) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted || !_isHidden) return;
@@ -347,7 +374,7 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     return Positioned.fill(
       child: Stack(
         children: [
-          if (_isDragging) _buildCloseTarget(size),
+          if (_isDragging) _buildCloseTarget(size, showAlert),
           Positioned(
             left: _userMoved ? _x : null,
             right: _userMoved ? null : FloatingOverlayLayout.rightMargin,
@@ -378,7 +405,7 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
                 });
               },
               onPanEnd: (_) {
-                final shouldHide = _y > size.height - 140;
+                final shouldHide = _isOverCloseTarget(size, _x, _y, showAlert);
                 setState(() {
                   _isDragging = false;
                   if (shouldHide) {
@@ -524,11 +551,11 @@ class _FloatingMessageBubbleState extends State<FloatingMessageBubble>
     );
   }
 
-  Widget _buildCloseTarget(Size size) {
+  Widget _buildCloseTarget(Size size, bool showAlert) {
     const bottomNav = 88.0;
     final dismissZoneTop = size.height - 140;
     final isVisible = _y > dismissZoneTop - 80;
-    final isNearBottom = _y > dismissZoneTop;
+    final isNearBottom = _isOverCloseTarget(size, _x, _y, showAlert);
 
     return Positioned(
       left: (size.width - 78) / 2,

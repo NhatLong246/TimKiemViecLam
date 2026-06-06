@@ -323,10 +323,27 @@ class MessagingController extends GetxController {
     }
   }
 
+  String? _boundUid;
+
   void bindInboxStream() {
     final uid = currentUid;
-    if (uid.isEmpty || _inboxBound) return;
+    if (uid.isEmpty) return;
+    if (_inboxBound && _boundUid == uid) return;
+    
+    if (_boundUid != null && _boundUid != uid) {
+      conversations.clear();
+      _groupsWithUnreadNotif.clear();
+      _inboxMessageHints.clear();
+      _legacyMessageHints.clear();
+      _unreadMessageHints.clear();
+      _optimisticReadGroupIds.clear();
+      _readWatermarks.clear();
+      unreadTotal.value = 0;
+      activeThread.value = null;
+    }
+    
     _inboxBound = true;
+    _boundUid = uid;
 
     _inboxSub?.cancel();
     _employerOwnedInboxSub?.cancel();

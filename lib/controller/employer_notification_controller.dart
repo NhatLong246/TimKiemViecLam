@@ -39,6 +39,8 @@ class EmployerNotificationController extends GetxController {
   final Set<String> _knownAppIds = {};
   bool _appInitialLoad = true;
 
+  String? _boundUid;
+
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   int get unreadCount => unreadBadgeCount.value;
@@ -84,8 +86,13 @@ class EmployerNotificationController extends GetxController {
       });
       return;
     }
-    if (_streamsStarted) return;
-    _streamsStarted = true;
+    if (_boundUid == uid) return;
+    _boundUid = uid;
+
+    _legacyList.clear();
+    _inboxList.clear();
+    _chatUnreadList.clear();
+    notifications.clear();
 
     // 1. Gộp thông báo legacy (`notifications`) + hộp thư (`users/.../notifications`)
     _notifSub?.cancel();

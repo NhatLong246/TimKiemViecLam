@@ -11,6 +11,7 @@ import '../data/services/schedule_lock_service.dart';
 import '../routes/app_routes.dart';
 import '../utils/job_time_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class JobPostController extends GetxController {
   final JobPostService _service = JobPostService();
@@ -378,64 +379,16 @@ class JobPostController extends GetxController {
     }
   }
 
-  Future<void> duplicateAsDraft(JobPostModel source) async {
+
+
+  Future<void> extendPostDurationToDate(JobPostModel post, DateTime newEndDate) async {
     try {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final baseStart = source.startDate.isBefore(today)
-          ? today
-          : source.startDate;
-      final newStart = baseStart.add(const Duration(days: 1));
-      DateTime? newEnd;
-      if (source.endDate != null) {
-        final span = source.endDate!.difference(source.startDate).inDays;
-        newEnd = newStart.add(Duration(days: span < 0 ? 0 : span));
-      }
-
-      final draft = source.copyWith(
-        jobId: '',
-        title: '${source.title} (Bản sao)',
-        status: 'draft',
-        filledSlots: 0,
-        groupChatId: null,
-        underfilledAccepted: false,
-        startDate: newStart,
-        endDate: newEnd,
-        createdAt: null,
-        updatedAt: null,
-      );
-
-      await _service.createJobPost(draft);
-      Get.snackbar(
-        'Đã sao chép',
-        'Đã tạo 1 bản nháp mới từ bài đăng này',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Không thể sao chép',
-        e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    }
-  }
-
-  Future<void> extendPostDuration(JobPostModel post, {int days = 7}) async {
-    try {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final base = (post.endDate == null || post.endDate!.isBefore(today))
-          ? today
-          : DateTime(
-              post.endDate!.year,
-              post.endDate!.month,
-              post.endDate!.day,
-            );
-      final updated = post.copyWith(endDate: base.add(Duration(days: days)));
+      final updated = post.copyWith(endDate: newEndDate);
       await _service.updateJobPost(updated);
+      final format = DateFormat('dd/MM/yyyy').format(newEndDate);
       Get.snackbar(
         'Đã gia hạn',
-        'Bài đăng được gia hạn thêm $days ngày',
+        'Bài đăng được gia hạn đến ngày $format',
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
