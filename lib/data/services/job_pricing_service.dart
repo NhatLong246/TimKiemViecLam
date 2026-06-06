@@ -30,7 +30,24 @@ class JobDepositQuote {
 class JobPricingService {
   const JobPricingService._();
 
+  static const double fullTimeReferralFeePerSlot = 100000;
+
   static JobDepositQuote quote(JobPostModel post) {
+    if (post.isFullTimeReferral) {
+      if (post.slots <= 0) {
+        throw Exception('Số lượng tuyển phải lớn hơn 0.');
+      }
+      final total = _ceilVnd(fullTimeReferralFeePerSlot * post.slots);
+      return JobDepositQuote(
+        requiresDeposit: true,
+        totalBudget: total,
+        depositAmount: total,
+        workDays: 0,
+        payableUnitsPerWorker: post.slots.toDouble(),
+        calculationUnit: 'full_time_referral_fee',
+      );
+    }
+
     if (!post.isPartTimeManaged) {
       final estimatedBudget = _ceilVnd(post.salary * post.slots);
       return JobDepositQuote(

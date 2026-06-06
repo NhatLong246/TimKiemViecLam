@@ -115,6 +115,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final description = job.description;
     final requirements = job.requirements;
     final hideBottomActions = _historyMode || _readOnlyNoBottom;
+    final isFullTimeReferral = job.isFullTimeReferral;
 
     // Format dates
     final dateFormat = DateFormat('dd/MM/yyyy');
@@ -126,6 +127,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final workHoursStr = job.workHoursPerDay != null
         ? '${job.workHoursPerDay} tiếng'
         : 'Không rõ';
+    final dateLabel = isFullTimeReferral ? 'Ngày hẹn phỏng vấn:' : 'Ngày làm:';
+    final dateValue = isFullTimeReferral
+        ? startDateStr
+        : '$startDateStr - $endDateStr';
+    final timeLabel = isFullTimeReferral ? 'Giờ hẹn:' : 'Thời gian:';
+    final timeValue = isFullTimeReferral
+        ? startTimeStr
+        : '$startTimeStr ($workHoursStr/ngày)';
 
     final slotsStr = '${job.filledSlots} / ${job.slots} người';
 
@@ -365,15 +374,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       const SizedBox(height: 12),
                       _buildDetailRow(
                         Icons.calendar_today,
-                        'Ngày làm:',
-                        '$startDateStr - $endDateStr',
+                        dateLabel,
+                        dateValue,
                       ),
                       const SizedBox(height: 8),
-                      _buildDetailRow(
-                        Icons.access_time,
-                        'Thời gian:',
-                        '$startTimeStr ($workHoursStr/ngày)',
-                      ),
+                      _buildDetailRow(Icons.access_time, timeLabel, timeValue),
                       const SizedBox(height: 8),
                       _buildDetailRow(
                         Icons.people_outline,
@@ -450,10 +455,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.05),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.05,
+                                        ),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -464,15 +473,23 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                       ? Image.network(
                                           compLogo,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) =>
-                                              const Icon(Icons.business, color: Colors.grey),
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  const Icon(
+                                                    Icons.business,
+                                                    color: Colors.grey,
+                                                  ),
                                         )
-                                      : const Icon(Icons.business, color: Colors.grey),
+                                      : const Icon(
+                                          Icons.business,
+                                          color: Colors.grey,
+                                        ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -487,16 +504,21 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                             ),
                                           ),
                                           if (employer.isVerified)
-                                            const Icon(Icons.verified, color: Colors.blue, size: 18),
+                                            const Icon(
+                                              Icons.verified,
+                                              color: Colors.blue,
+                                              size: 18,
+                                            ),
                                         ],
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        employer.businessType == 'company' 
-                                            ? 'Doanh nghiệp' 
-                                            : employer.businessType == 'cooperative' 
-                                                ? 'Hợp tác xã' 
-                                                : 'Cá nhân',
+                                        employer.businessType == 'company'
+                                            ? 'Doanh nghiệp'
+                                            : employer.businessType ==
+                                                  'cooperative'
+                                            ? 'Hợp tác xã'
+                                            : 'Cá nhân',
                                         style: TextStyle(
                                           color: Colors.grey.shade600,
                                           fontSize: 13,
@@ -509,43 +531,67 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            if (employer.companyAddress != null && employer.companyAddress!.isNotEmpty) ...[
+                            if (employer.companyAddress != null &&
+                                employer.companyAddress!.isNotEmpty) ...[
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.location_on_outlined, size: 18, color: Colors.grey.shade600),
+                                  Icon(
+                                    Icons.location_on_outlined,
+                                    size: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       employer.companyAddress!,
-                                      style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade800,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                             ],
-                            if (employer.companyPhone != null && employer.companyPhone!.isNotEmpty) ...[
+                            if (employer.companyPhone != null &&
+                                employer.companyPhone!.isNotEmpty) ...[
                               Row(
                                 children: [
-                                  Icon(Icons.phone_outlined, size: 18, color: Colors.grey.shade600),
+                                  Icon(
+                                    Icons.phone_outlined,
+                                    size: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
                                     employer.companyPhone!,
-                                    style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade800,
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                             ],
-                            if (employer.companyWebsite != null && employer.companyWebsite!.isNotEmpty) ...[
+                            if (employer.companyWebsite != null &&
+                                employer.companyWebsite!.isNotEmpty) ...[
                               Row(
                                 children: [
-                                  Icon(Icons.language_outlined, size: 18, color: Colors.grey.shade600),
+                                  Icon(
+                                    Icons.language_outlined,
+                                    size: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
                                     employer.companyWebsite!,
-                                    style: TextStyle(fontSize: 14, color: Colors.blue.shade700),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.blue.shade700,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -553,19 +599,31 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             ],
                             Row(
                               children: [
-                                Icon(Icons.people_outline, size: 18, color: Colors.grey.shade600),
+                                Icon(
+                                  Icons.people_outline,
+                                  size: 18,
+                                  color: Colors.grey.shade600,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Quy mô: $compSize nhân viên',
-                                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade800,
+                                  ),
                                 ),
                               ],
                             ),
-                            if (employer.companyDescription != null && employer.companyDescription!.isNotEmpty) ...[
+                            if (employer.companyDescription != null &&
+                                employer.companyDescription!.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               Text(
                                 employer.companyDescription!,
-                                style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                  height: 1.4,
+                                ),
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -575,20 +633,26 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               width: double.infinity,
                               child: OutlinedButton.icon(
                                 onPressed: () {
-                                  Get.to(() => CandidateEmployerReviewsScreen(
-                                        employerId: employer.id,
-                                        employerName: compName,
-                                      ));
+                                  Get.to(
+                                    () => CandidateEmployerReviewsScreen(
+                                      employerId: employer.id,
+                                      employerName: compName,
+                                    ),
+                                  );
                                 },
                                 icon: const Icon(Icons.star_outline, size: 18),
-                                label: const Text('Xem đánh giá về nhà tuyển dụng'),
+                                label: const Text(
+                                  'Xem đánh giá về nhà tuyển dụng',
+                                ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: primaryColor,
                                   side: BorderSide(color: primaryColor),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                 ),
                               ),
                             ),
@@ -659,17 +723,25 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
                     String btnText;
                     if (jobStarted) {
-                      btnText = 'Công việc đã bắt đầu';
+                      btnText = job.isFullTimeReferral
+                          ? 'Đã qua giờ hẹn phỏng vấn'
+                          : 'Công việc đã bắt đầu';
                     } else if (isAccepted) {
-                      btnText = 'Hủy tham gia';
+                      btnText = job.isFullTimeReferral
+                          ? 'Hủy lịch phỏng vấn'
+                          : 'Hủy tham gia';
                     } else if (isPending) {
                       btnText = 'Hủy ứng tuyển';
                     } else if (isWithdrawn) {
-                      btnText = 'Không thể ứng tuyển';
+                      btnText = job.isFullTimeReferral
+                          ? 'Hồ sơ không còn hiệu lực'
+                          : 'Không thể ứng tuyển';
                     } else if (isFullForOtherUsers) {
                       btnText = 'Đã đủ người';
                     } else {
-                      btnText = 'Ứng tuyển ngay';
+                      btnText = job.isFullTimeReferral
+                          ? 'Nộp CV ứng tuyển'
+                          : 'Ứng tuyển ngay';
                     }
 
                     return Row(
@@ -713,10 +785,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                         if (_dialogShowing) return;
                                         _dialogShowing = true;
                                         Get.defaultDialog(
-                                          title: 'Xác nhận hủy ứng tuyển',
-                                          middleText: isAccepted
-                                              ? 'Bạn đã được nhận vào công việc này. Bạn có chắc chắn muốn hủy không?'
-                                              : 'Bạn có chắc chắn muốn hủy đơn ứng tuyển đang chờ duyệt không?',
+                                          title:
+                                              job.isFullTimeReferral &&
+                                                  isAccepted
+                                              ? 'Xác nhận hủy lịch phỏng vấn'
+                                              : 'Xác nhận hủy ứng tuyển',
+                                          middleText:
+                                              job.isFullTimeReferral &&
+                                                  isAccepted
+                                              ? 'CV của bạn đã được nhà tuyển dụng duyệt. Bạn có chắc chắn muốn hủy lịch phỏng vấn không?'
+                                              : (isAccepted
+                                                    ? 'Bạn đã được nhận vào công việc này. Bạn có chắc chắn muốn hủy không?'
+                                                    : 'Bạn có chắc chắn muốn hủy đơn ứng tuyển đang chờ duyệt không?'),
                                           textConfirm: 'Có',
                                           textCancel: 'Không',
                                           confirmTextColor: Colors.white,

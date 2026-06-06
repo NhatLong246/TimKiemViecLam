@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../models/job_post_model.dart';
 import '../../utils/job_time_helper.dart';
 import 'group_chat_service.dart';
+import 'full_time_referral_settlement_service.dart';
 import 'job_pricing_service.dart';
 import 'job_workflow_service.dart';
 import 'sqlite_cache_service.dart';
@@ -55,6 +56,13 @@ class JobPostService {
     return quote.requiresDeposit && post.status != 'draft';
   }
 
+  String _depositHoldDescription(JobPostModel post, JobDepositQuote quote) {
+    if (quote.calculationUnit == 'full_time_referral_fee') {
+      return 'Tạm giữ phí giới thiệu Full-time cho bài đăng "${post.title}"';
+    }
+    return 'Tạm giữ tiền ứng cho bài đăng "${post.title}"';
+  }
+
   Future<void> _createPostWithDepositHold(
     DocumentReference<Map<String, dynamic>> jobRef,
     JobPostModel post,
@@ -68,7 +76,7 @@ class JobPostService {
         amount: quote.depositAmount,
         jobId: jobRef.id,
         transactionId: txId,
-        description: 'Tạm giữ tiền ứng cho bài đăng "${post.title}"',
+        description: _depositHoldDescription(post, quote),
       );
 
       final data = post
@@ -397,6 +405,22 @@ class JobPostService {
       return;
     }
 
+    final snap = await _db.collection(_collection).doc(jobId).get();
+    if (snap.exists) {
+      final existing = JobPostModel.fromMap({
+        ...snap.data()!,
+        'jobId': snap.id,
+      });
+      if (existing.isFullTimeReferral && status == 'closed') {
+        await FullTimeReferralSettlementService().closeOrDeleteJob(
+          jobId,
+          requestedStatus: 'closed',
+          trigger: 'manual_close',
+        );
+        return;
+      }
+    }
+
     await _db.collection(_collection).doc(jobId).update({
       'status': status,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -433,7 +457,7 @@ class JobPostService {
           amount: quote.depositAmount,
           jobId: jobId,
           transactionId: txId,
-          description: 'Tạm giữ tiền ứng cho bài đăng "${existing.title}"',
+          description: _depositHoldDescription(existing, quote),
         );
         updates.addAll({
           'depositStatus': 'held',
@@ -481,8 +505,9 @@ class JobPostService {
               amount: delta,
               jobId: post.jobId,
               transactionId: txId,
-              description:
-                  'Tạm giữ bổ sung do cập nhật ngân sách "${post.title}"',
+              description: quote.calculationUnit == 'full_time_referral_fee'
+                  ? 'Tạm giữ bổ sung phí giới thiệu Full-time "${post.title}"'
+                  : 'Tạm giữ bổ sung do cập nhật ngân sách "${post.title}"',
             );
             data['lastDepositAdjustmentTransactionId'] = txId;
             data['depositAdjustedAt'] = FieldValue.serverTimestamp();
@@ -509,7 +534,7 @@ class JobPostService {
             amount: quote.depositAmount,
             jobId: post.jobId,
             transactionId: txId,
-            description: 'Tạm giữ tiền ứng cho bài đăng "${post.title}"',
+            description: _depositHoldDescription(post, quote),
           );
           data.addAll({
             'depositStatus': 'held',
@@ -547,6 +572,23 @@ class JobPostService {
         'Không thể xóa: còn thông báo giải ngân chưa được Admin và NTD xác nhận.',
       );
     }
+
+    final snap = await _db.collection(_collection).doc(jobId).get();
+    if (snap.exists) {
+      final existing = JobPostModel.fromMap({
+        ...snap.data()!,
+        'jobId': snap.id,
+      });
+      if (existing.isFullTimeReferral) {
+        await FullTimeReferralSettlementService().closeOrDeleteJob(
+          jobId,
+          requestedStatus: 'deleted',
+          trigger: 'manual_delete',
+        );
+        return;
+      }
+    }
+
     await _updateStatusAndMaybeReleaseDeposit(
       jobId,
       'deleted',
@@ -593,7 +635,7 @@ class JobPostService {
 
       transaction.update(jobRef, updates);
     });
-    
+
     if (['closed', 'completed', 'cancelled', 'deleted'].contains(status)) {
       await GroupChatService().closeGroupsForJob(jobId);
     }

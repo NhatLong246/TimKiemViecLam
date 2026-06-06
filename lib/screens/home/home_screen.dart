@@ -1010,21 +1010,29 @@ class _HomeScreenState extends State<HomeScreen> {
                             !cannotApply;
 
                         Color btnColor = _primary;
-                        String text = 'Ứng tuyển';
+                        String text = job.isFullTimeReferral
+                            ? 'Nộp CV'
+                            : 'Ứng tuyển';
                         VoidCallback? onPressed = () {
                           Get.toNamed(AppRoutes.jobDetail, arguments: job);
                         };
 
                         if (cannotApply) {
                           btnColor = Colors.grey.shade500;
-                          text = 'Không thể ứng tuyển';
+                          text = job.isFullTimeReferral
+                              ? 'Hồ sơ hết hiệu lực'
+                              : 'Không thể ứng tuyển';
                           onPressed = null;
                         } else if (isAccepted) {
                           btnColor = Colors.red;
-                          text = 'Đã được nhận';
+                          text = job.isFullTimeReferral
+                              ? 'CV đã duyệt'
+                              : 'Đã được nhận';
                         } else if (isPending) {
                           btnColor = Colors.amber.shade700;
-                          text = 'Đã ứng tuyển';
+                          text = job.isFullTimeReferral
+                              ? 'Đã nộp CV'
+                              : 'Đã ứng tuyển';
                         } else if (isFullForOtherUsers) {
                           btnColor = Colors.grey.shade500;
                           text = 'Đã đủ người';
@@ -1362,21 +1370,29 @@ class _JobCard extends StatelessWidget {
                             !cannotApply;
 
                         Color btnColor = _primary;
-                        String text = 'Ứng tuyển';
+                        String text = job.isFullTimeReferral
+                            ? 'Nộp CV'
+                            : 'Ứng tuyển';
                         VoidCallback? onPressed = () {
                           Get.toNamed(AppRoutes.jobDetail, arguments: job);
                         };
 
                         if (cannotApply) {
                           btnColor = Colors.grey.shade500;
-                          text = 'Không thể ứng tuyển';
+                          text = job.isFullTimeReferral
+                              ? 'Hồ sơ hết hiệu lực'
+                              : 'Không thể ứng tuyển';
                           onPressed = null;
                         } else if (isAccepted) {
                           btnColor = Colors.red;
-                          text = 'Đã được nhận';
+                          text = job.isFullTimeReferral
+                              ? 'CV đã duyệt'
+                              : 'Đã được nhận';
                         } else if (isPending) {
                           btnColor = Colors.amber.shade700;
-                          text = 'Đã ứng tuyển';
+                          text = job.isFullTimeReferral
+                              ? 'Đã nộp CV'
+                              : 'Đã ứng tuyển';
                         } else if (isFullForOtherUsers) {
                           btnColor = Colors.grey.shade500;
                           text = 'Đã đủ người';
