@@ -787,18 +787,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           }),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {},
-            child: const Text(
-              'Xem tất cả',
-              style: TextStyle(
-                color: _primary,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
         ],
       ),
     );
