@@ -17,7 +17,9 @@ const Color _primaryDark = Color(0xFF1B5E20);
 const Color _primaryLight = Color(0xFFE8F5E9);
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onRefresh;
+
+  const HomeScreen({super.key, this.onRefresh});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _onRefresh() async {
     await _homeController.refreshJobs();
+    widget.onRefresh?.call();
   }
 
   @override

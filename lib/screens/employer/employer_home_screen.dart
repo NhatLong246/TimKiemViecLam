@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../controller/employer_home_controller.dart';
 import '../../controller/employer_notification_controller.dart';
 import '../../controller/messaging_controller.dart';
+import '../../controller/job_post_controller.dart';
 import '../../utils/messaging_bootstrap.dart';
 import '../../controller/login_controller.dart';
 import '../../data/models/job_post_model.dart';
@@ -994,7 +995,30 @@ class EmployerHomeScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ElevatedButton(
-                onPressed: () => Get.toNamed(AppRoutes.postManagement),
+                onPressed: () {
+                  int tabIndex = 0;
+                  try {
+                    if (Get.isRegistered<JobPostController>()) {
+                      final ctrl = Get.find<JobPostController>();
+                      if (ctrl.pendingPosts.any((p) => p.jobId == job.jobId)) {
+                        tabIndex = 1;
+                      } else if (ctrl.expiredPosts.any((p) => p.jobId == job.jobId)) {
+                        tabIndex = 2;
+                      } else if (ctrl.pendingDisbursementPosts.any((p) => p.jobId == job.jobId)) {
+                        tabIndex = 3;
+                      } else if (ctrl.completedPosts.any((p) => p.jobId == job.jobId)) {
+                        tabIndex = 4;
+                      }
+                    }
+                  } catch (_) {}
+                  Get.toNamed(
+                    AppRoutes.postManagement,
+                    arguments: {
+                      'initialTab': tabIndex,
+                      'highlightJobId': job.jobId,
+                    },
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,

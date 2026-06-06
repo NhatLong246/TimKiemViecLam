@@ -8,7 +8,9 @@ import '../utils/floating_message_bubble_preferences.dart';
 import 'floating_overlay_layout.dart';
 
 class FloatingChatButton extends StatefulWidget {
-  const FloatingChatButton({super.key});
+  final int refreshCounter;
+
+  const FloatingChatButton({super.key, this.refreshCounter = 0});
 
   @override
   State<FloatingChatButton> createState() => _FloatingChatButtonState();
@@ -58,7 +60,7 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
     final uid = Get.find<AuthController>().currentUser?.id ?? '';
     if (uid.isNotEmpty) {
       _loadedForUserId = uid;
-      _loadDismissState(uid);
+      _prefsLoaded = true;
     }
   }
 
@@ -69,28 +71,8 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
     _initialized = true;
   }
 
-  Future<void> _loadDismissState(String uid) async {
-    final hidden = await FloatingMessageBubblePreferences.loadChatbotHidden(uid);
-    if (!mounted || _loadedForUserId != uid) return;
-    final size = MediaQuery.sizeOf(context);
-    setState(() {
-      _isHidden = hidden;
-      _prefsLoaded = true;
-      if (!_initialized) _applyDefaultPosition(size);
-    });
-  }
-
-  void _ensureDismissLoadedForUser(String uid) {
-    if (uid.isEmpty) return;
-    if (uid == _loadedForUserId && _prefsLoaded) return;
-    _loadedForUserId = uid;
-    _prefsLoaded = false;
-    _loadDismissState(uid);
-  }
-
-  Future<void> _persistDismiss() async {
-    final uid = Get.find<AuthController>().currentUser?.id ?? '';
-    await FloatingMessageBubblePreferences.saveChatbotDismissed(uid);
+  void _persistDismiss() {
+    // Do not save to preferences so it reappears on reload
   }
 
   @override
@@ -104,10 +86,37 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
     }
   }
 
+  @override
+  void didUpdateWidget(FloatingChatButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshCounter != oldWidget.refreshCounter && _isHidden) {
+      final size = MediaQuery.of(context).size;
+      setState(() {
+        _isHidden = false;
+        _userMoved = false;
+        _initialized = false;
+        _applyDefaultPosition(size);
+      });
+    }
+  }
+
   void _hideTooltip() {
     _tooltipCtrl.reverse().then((_) {
       if (mounted) setState(() => _showTooltip = false);
     });
+  }
+
+  bool _isOverCloseTarget(Size size, double x, double y) {
+    final targetCenterX = (size.width - 78) / 2 + 34.0;
+    const bottomNav = 76.0;
+    final targetCenterY = size.height - bottomNav - 34.0;
+
+    final bubbleCenterX = x + 28.0;
+    final bubbleCenterY = y + 28.0;
+
+    final dx = targetCenterX - bubbleCenterX;
+    final dy = targetCenterY - bubbleCenterY;
+    return (dx * dx + dy * dy) < 6400.0; // distance < 80
   }
 
   @override
@@ -122,7 +131,12 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
     final uid = Get.find<AuthController>().currentUser?.id ?? '';
     if (uid.isEmpty) return const SizedBox.shrink();
 
-    _ensureDismissLoadedForUser(uid);
+    if (_loadedForUserId != uid) {
+      _loadedForUserId = uid;
+      _isHidden = false;
+      _prefsLoaded = true;
+    }
+
     if (!_prefsLoaded) return const SizedBox.shrink();
 
     final size = MediaQuery.of(context).size;
@@ -166,12 +180,12 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
                 });
               },
               onPanEnd: (_) {
-                final shouldHide = _y > size.height - 140;
+                final shouldHide = _isOverCloseTarget(size, _x, _y);
                 setState(() {
                   _isDragging = false;
                   if (shouldHide) _isHidden = true;
                 });
-                if (shouldHide) unawaited(_persistDismiss());
+                if (shouldHide) _persistDismiss();
               },
               onPanCancel: () => setState(() => _isDragging = false),
               onTap: () {
@@ -201,7 +215,7 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
 
   Widget _buildCloseTarget(Size size) {
     final isVisible = _y > size.height - 220;
-    final isNearBottom = _y > size.height - 140;
+    final isNearBottom = _isOverCloseTarget(size, _x, _y);
 
     return Positioned(
       left: (size.width - 78) / 2,
