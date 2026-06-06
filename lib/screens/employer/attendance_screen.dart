@@ -243,7 +243,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     return Column(
       children: [
-        _buildDayEndBar(),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -343,110 +342,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             );
           }),
         ),
-        _buildDayEndBar(),
         _buildSaveBar(),
       ],
     );
   }
 
-  Widget _buildDayEndBar() {
-    final r = _readiness;
-    if (r == null) return const SizedBox.shrink();
-    if (!r.canRequestDisbursement && r.requiredDays == 0) return const SizedBox.shrink();
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            r.message,
-            style: TextStyle(
-              fontSize: 13,
-              color: r.canDisburse ? const Color(0xFF2E7D32) : Colors.grey.shade700,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (r.requiredDays > 1) ...[
-            const SizedBox(height: 6),
-            LinearProgressIndicator(
-              value: r.requiredDays > 0 ? r.completedDays / r.requiredDays : 0,
-              backgroundColor: Colors.grey.shade200,
-              color: AppColors.employerPrimary,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ],
-          const SizedBox(height: 8),
-          if (r.canDisburse)
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _openDisbursementFlow(),
-                icon: const Icon(Icons.payments_outlined),
-                label: Text(
-                  r.requiredDays == 1
-                      ? 'Giải ngân & đánh giá'
-                      : 'Giải ngân (${r.requiredDays} ngày đã xong)',
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.employerPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            )
-          else if (r.canRequestDisbursement)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _openDisbursementFlow(),
-                icon: const Icon(Icons.send_outlined),
-                label: const Text('Gửi yêu cầu giải ngân (Admin xem xét)'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.employerPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            )
-          else
-            OutlinedButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.lock_clock_outlined),
-              label: Text(
-                r.requiredDays == 1
-                    ? 'Chưa đủ điểm danh trong ngày'
-                    : 'Còn ${r.requiredDays - r.completedDays} ngày trong lịch',
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openDisbursementFlow() async {
-    if (_group == null) return;
-    await _refreshDisbursementReadiness();
-    final r = _readiness;
-    if (r == null || !r.canRequestDisbursement) {
-      Get.snackbar(
-        'Chưa thể giải ngân',
-        r?.message ?? 'Hoàn tất điểm danh trong thời hạn làm việc.',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 4),
-      );
-      return;
-    }
-    final lastDate = r.mandatoryDates.isNotEmpty
-        ? r.mandatoryDates.last
-        : DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final result = await Get.toNamed(
-      AppRoutes.jobDayEndFlow,
-      arguments: {'group': _group!, 'workDate': lastDate},
-    );
-    if (result == true && mounted) await _refreshDisbursementReadiness();
-  }
 
   Widget _buildSessionHeader() {
     final session = _ctrl.currentSession.value!;

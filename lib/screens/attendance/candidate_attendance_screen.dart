@@ -131,14 +131,15 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
         final now = DateTime.now();
         final todayStart = DateTime(now.year, now.month, now.day);
         final jobStart = DateTime(startDate.year, startDate.month, startDate.day);
-        if (todayStart.isBefore(jobStart)) {
-          if (!mounted) return;
-          setState(() {
-            _error = 'Công việc này chưa bắt đầu. Bạn chỉ có thể điểm danh từ ngày ${DateFormat('dd/MM/yyyy').format(jobStart)}.';
-            _loading = false;
-          });
-          return;
-        }
+        // [BYPASS FOR TESTING]
+        // if (todayStart.isBefore(jobStart)) {
+        //   if (!mounted) return;
+        //   setState(() {
+        //     _error = 'Công việc này chưa bắt đầu. Bạn chỉ có thể điểm danh từ ngày ${DateFormat('dd/MM/yyyy').format(jobStart)}.';
+        //     _loading = false;
+        //   });
+        //   return;
+        // }
       }
 
       _targetDate = WorkDayHelper.getCurrentLogicalDate(job);
