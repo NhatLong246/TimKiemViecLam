@@ -275,15 +275,17 @@ class CandidatesService {
         throw Exception('Thiếu thông tin ứng viên.');
       }
 
-      await _scheduleLocks.acquireLocksInTransaction(
-        tx: tx,
-        candidateId: candidateId,
-        appId: appId,
-        jobId: jobId,
-        employerId: employerId,
-        jobTitle: jobTitle,
-        windows: ScheduleLockService.buildShiftWindows(acceptedJob),
-      );
+      if (!acceptedJob.isFullTimeReferral) {
+        await _scheduleLocks.acquireLocksInTransaction(
+          tx: tx,
+          candidateId: candidateId,
+          appId: appId,
+          jobId: jobId,
+          employerId: employerId,
+          jobTitle: jobTitle,
+          windows: ScheduleLockService.buildShiftWindows(acceptedJob),
+        );
+      }
 
       tx.update(appRef, {
         'status': 'accepted',
@@ -296,17 +298,21 @@ class CandidatesService {
     });
 
     final jobType = (jobData['jobType'] ?? 'part_time').toString();
+    final isFullTimeReferral =
+        acceptedJob.isFullTimeReferral || jobType == 'full_time';
     Set<String> autoRejectedAppIds = const <String>{};
-    try {
-      autoRejectedAppIds = await _rejectPendingApplicationsOverlappingJob(
-        candidateId: candidateId,
-        acceptedAppId: appId,
-        acceptedJob: acceptedJob,
-      );
-    } catch (_) {}
+    if (!isFullTimeReferral) {
+      try {
+        autoRejectedAppIds = await _rejectPendingApplicationsOverlappingJob(
+          candidateId: candidateId,
+          acceptedAppId: appId,
+          acceptedJob: acceptedJob,
+        );
+      } catch (_) {}
+    }
 
     if (candidateId.isNotEmpty && employerId.isNotEmpty) {
-      if (jobType != 'full_time') {
+      if (!isFullTimeReferral) {
         await _groupChat.ensureJobGroup(
           jobId: jobId,
           jobTitle: jobTitle,
@@ -317,7 +323,10 @@ class CandidatesService {
       await NotificationService.notifyApplicationAccepted(
         candidateId: candidateId,
         jobTitle: jobTitle,
-        isFullTimeReferral: jobType == 'full_time',
+        isFullTimeReferral: isFullTimeReferral,
+        interviewAt: isFullTimeReferral ? _interviewAtFor(acceptedJob) : null,
+        interviewRequired:
+            acceptedJob.fullTimeDetails?.interviewRequired ?? true,
       );
     }
 
@@ -330,6 +339,7 @@ class CandidatesService {
     required String acceptedAppId,
     required JobPostModel acceptedJob,
   }) async {
+    if (acceptedJob.isFullTimeReferral) return const <String>{};
     if (candidateId.isEmpty) return const <String>{};
 
     final pendingSnap = await _db
@@ -460,12 +470,14 @@ class CandidatesService {
         ...jobSnap.data()!,
         'jobId': jobSnap.id,
       });
-      await _scheduleLocks.releaseLocksInTransaction(
-        tx: tx,
-        candidateId: (appData['candidateId'] ?? '').toString(),
-        appId: appId,
-        windows: ScheduleLockService.buildShiftWindows(job),
-      );
+      if (!job.isFullTimeReferral) {
+        await _scheduleLocks.releaseLocksInTransaction(
+          tx: tx,
+          candidateId: (appData['candidateId'] ?? '').toString(),
+          appId: appId,
+          windows: ScheduleLockService.buildShiftWindows(job),
+        );
+      }
 
       tx.update(appRef, {
         'status': 'pending',
@@ -476,5 +488,20 @@ class CandidatesService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  DateTime _interviewAtFor(JobPostModel job) {
+    final parts = (job.startTime ?? '').split(':');
+    if (parts.length < 2) return job.startDate;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return job.startDate;
+    return DateTime(
+      job.startDate.year,
+      job.startDate.month,
+      job.startDate.day,
+      hour,
+      minute,
+    );
   }
 }

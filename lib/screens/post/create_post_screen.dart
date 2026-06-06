@@ -310,15 +310,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     final shStr = _startHourCtrl.text.trim();
     final smStr = _startMinCtrl.text.trim();
+    final startActionText = _isFullTimeScreen ? 'hẹn phỏng vấn' : 'bắt đầu';
+    final startTargetText = _isFullTimeScreen
+        ? 'hẹn phỏng vấn'
+        : 'bắt đầu làm việc';
     if (shStr.isEmpty || smStr.isEmpty) {
-      return 'Vui lòng nhập đủ giờ và phút bắt đầu';
+      return 'Vui lòng nhập đủ giờ và phút $startActionText';
     }
 
     int? sh, sm;
     sh = int.tryParse(shStr);
     sm = int.tryParse(smStr);
     if (sh == null || sh < 0 || sh > 23 || sm == null || sm < 0 || sm > 59) {
-      return 'Giờ bắt đầu không hợp lệ (00:00 - 23:59)';
+      return 'Giờ $startActionText không hợp lệ (00:00 - 23:59)';
     }
 
     final fullStart = DateTime(
@@ -348,15 +352,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         sm,
       );
       if (startDateTime.difference(now).inMinutes < 60) {
-        return 'Nếu làm việc hôm nay, giờ bắt đầu phải cách hiện tại ít nhất 1 giờ';
+        return _isFullTimeScreen
+            ? 'Nếu hẹn phỏng vấn hôm nay, giờ hẹn phải cách hiện tại ít nhất 1 giờ'
+            : 'Nếu làm việc hôm nay, giờ bắt đầu phải cách hiện tại ít nhất 1 giờ';
       }
     }
 
     if (sameDate && !fullDeadline.isBefore(fullStart)) {
-      return 'Khi trùng ngày, giờ hạn ứng tuyển phải nhỏ hơn giờ bắt đầu';
+      return 'Khi trùng ngày, giờ hạn ứng tuyển phải nhỏ hơn giờ $startActionText';
     }
     if (!fullDeadline.isBefore(fullStart)) {
-      return 'Hạn ứng tuyển phải trước ngày/giờ bắt đầu làm việc';
+      return 'Hạn ứng tuyển phải trước ngày/giờ $startTargetText';
     }
     if (!_isEdit && fullDeadline.isBefore(now)) {
       return 'Hạn ứng tuyển không được nằm trong quá khứ';
@@ -410,6 +416,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   String _depositFormula(JobPostModel post, JobDepositQuote quote) {
+    if (quote.calculationUnit == 'full_time_referral_fee') {
+      return '${_money(JobPricingService.fullTimeReferralFeePerSlot)}/slot x ${post.slots} slot = ${_money(quote.depositAmount)}';
+    }
+
     final salary = _money(post.salary);
     final slots = post.slots;
     final days = quote.workDays;
@@ -427,8 +437,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<bool> _confirmDepositBeforeSubmit(JobPostModel post) async {
-    if (!post.isPartTimeManaged) return true;
-
     late final JobDepositQuote quote;
     try {
       quote = JobPricingService.quote(post);
@@ -440,19 +448,29 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return false;
     }
     if (!quote.requiresDeposit) return true;
+    final isFullTimeReferralQuote =
+        quote.calculationUnit == 'full_time_referral_fee';
 
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Xác nhận tiền ứng'),
+          title: Text(
+            isFullTimeReferralQuote
+                ? 'Xác nhận phí giới thiệu'
+                : 'Xác nhận tiền ứng',
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Số tiền cần ứng trước cho bài đăng này:'),
+                Text(
+                  isFullTimeReferralQuote
+                      ? 'Số tiền cần tạm giữ cho phí giới thiệu Full-time:'
+                      : 'Số tiền cần ứng trước cho bài đăng này:',
+                ),
                 const SizedBox(height: 10),
                 Text(
                   _money(quote.depositAmount),
@@ -471,7 +489,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 Text(_depositFormula(post, quote)),
                 const SizedBox(height: 12),
                 Text(
-                  'Tiền sẽ được trừ từ tiền app và tạm giữ khi bạn gửi duyệt.',
+                  isFullTimeReferralQuote
+                      ? 'Tiền sẽ được tạm giữ trong ví. Khi hết hạn ứng tuyển, ViecNow thu 100.000đ cho mỗi ứng viên đã được duyệt và hoàn phần còn lại.'
+                      : 'Tiền sẽ được trừ từ tiền app và tạm giữ khi bạn gửi duyệt.',
                   style: TextStyle(
                     color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                   ),
@@ -1003,7 +1023,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildFullTimeScheduleSection() {
-    return _buildSection('Lịch & ca làm việc', [
+    return _buildSection('Lịch phỏng vấn & ca làm việc', [
       Text(
         'Ngày làm trong tuần *',
         style: TextStyle(color: context.textSecondary, fontSize: 13),
@@ -1051,7 +1071,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       ),
       const SizedBox(height: 12),
       _buildDatePicker(
-        label: 'Ngày bắt đầu làm việc *',
+        label: 'Ngày hẹn phỏng vấn *',
         date: _startDate,
         onTap: () => _pickDate(isStart: true),
       ),
@@ -1060,7 +1080,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         children: [
           Expanded(
             child: _buildTimeBox(
-              label: 'Giờ bắt đầu *',
+              label: 'Giờ hẹn phỏng vấn *',
               hourCtrl: _startHourCtrl,
               minCtrl: _startMinCtrl,
             ),

@@ -27,7 +27,9 @@ class MessagingService {
 
   String _timeKey(DateTime dt) => DateFormat('HH:mm').format(dt);
 
-  Future<Map<String, ChatParticipant>> fetchParticipants(Set<String> uids) async {
+  Future<Map<String, ChatParticipant>> fetchParticipants(
+    Set<String> uids,
+  ) async {
     final result = <String, ChatParticipant>{};
     if (uids.isEmpty) return result;
 
@@ -60,7 +62,10 @@ class MessagingService {
     return result;
   }
 
-  Future<void> syncChatsFromAcceptedApplications(String uid, String role) async {
+  Future<void> syncChatsFromAcceptedApplications(
+    String uid,
+    String role,
+  ) async {
     Query<Map<String, dynamic>> query;
     if (role == 'employer') {
       query = _db
@@ -85,13 +90,17 @@ class MessagingService {
 
       final jobSnap = await _db.collection('jobPosts').doc(jobId).get();
       if (!jobSnap.exists) continue;
-      
+
       final jobData = jobSnap.data() ?? {};
       final status = (jobData['status'] ?? '').toString();
       if (status == 'closed' || status == 'cancelled' || status == 'rejected') {
         continue;
       }
-      
+      final jobType = (jobData['jobType'] ?? 'part_time').toString();
+      if (jobType == 'full_time') {
+        continue;
+      }
+
       final title = (jobData['title'] ?? 'Công việc').toString();
 
       await groupChat.ensureJobGroup(
@@ -112,7 +121,8 @@ class MessagingService {
     final chatType = (data['chatType'] ?? '').toString();
     if (chatType == 'group') return false;
 
-    final members = (data['memberIds'] as List?)
+    final members =
+        (data['memberIds'] as List?)
             ?.map((e) => e.toString())
             .where((id) => id.isNotEmpty)
             .toSet() ??
@@ -127,10 +137,13 @@ class MessagingService {
     required String employerId,
     required String candidateId,
     String? applicationId,
+
     /// Không dùng lại document nhóm việc đang mở (tránh nhầm nhóm ↔ chat riêng).
     String? excludeGroupId,
   }) async {
-    if (employerId.isEmpty || candidateId.isEmpty || employerId == candidateId) {
+    if (employerId.isEmpty ||
+        candidateId.isEmpty ||
+        employerId == candidateId) {
       throw ArgumentError('Thiếu hoặc trùng employerId / candidateId');
     }
 
@@ -183,11 +196,7 @@ class MessagingService {
     return ref.id;
   }
 
-  static String peerPairKey(
-    String jobId,
-    String memberAId,
-    String memberBId,
-  ) {
+  static String peerPairKey(String jobId, String memberAId, String memberBId) {
     final sorted = [memberAId, memberBId]..sort();
     return '${jobId}_${sorted[0]}_${sorted[1]}';
   }
@@ -219,7 +228,8 @@ class MessagingService {
 
     for (final doc in existing.docs) {
       if (excludeGroupId != null && doc.id == excludeGroupId) continue;
-      final members = (doc.data()['memberIds'] as List?)
+      final members =
+          (doc.data()['memberIds'] as List?)
               ?.map((e) => e.toString())
               .where((id) => id.isNotEmpty)
               .toSet() ??
@@ -268,12 +278,18 @@ class MessagingService {
   }
 
   /// Hội thoại user là thành viên (`memberIds`).
-  Stream<List<ConversationThread>> streamConversations(String uid, {bool isEmployer = false}) {
+  Stream<List<ConversationThread>> streamConversations(
+    String uid, {
+    bool isEmployer = false,
+  }) {
     return _db
         .collection(_groups)
         .where('memberIds', arrayContains: uid)
         .snapshots()
-        .asyncMap((snap) => _buildThreadsFromSnapshot(snap, uid, isEmployer: isEmployer));
+        .asyncMap(
+          (snap) =>
+              _buildThreadsFromSnapshot(snap, uid, isEmployer: isEmployer),
+        );
   }
 
   /// NTD: thêm nhóm theo `employerId` (nhóm cũ có thể thiếu NTD trong memberIds).
@@ -282,7 +298,9 @@ class MessagingService {
         .collection(_groups)
         .where('employerId', isEqualTo: uid)
         .snapshots()
-        .asyncMap((snap) => _buildThreadsFromSnapshot(snap, uid, isEmployer: true));
+        .asyncMap(
+          (snap) => _buildThreadsFromSnapshot(snap, uid, isEmployer: true),
+        );
   }
 
   Future<List<ConversationThread>> _buildThreadsFromSnapshot(
@@ -292,21 +310,22 @@ class MessagingService {
   }) async {
     final threads = <ConversationThread>[];
     final peerIds = <String>{};
+    final hiddenFullTimeJobIds = await _fullTimeJobIdsForGroups(snap.docs);
 
     for (final doc in snap.docs) {
       final data = doc.data();
       final status = (data['status'] ?? '').toString();
       final chatType = (data['chatType'] ?? '').toString();
-      final members = (data['memberIds'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [];
+      final jobId = (data['jobId'] ?? '').toString();
+      final members =
+          (data['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
       // Xác định có phải nhóm việc không: chỉ 'direct' và 'peer' mới là chat cá nhân
       final isGroup = chatType != 'direct' && chatType != 'peer';
 
       // Ẩn nhóm việc đã đóng với TẤT CẢ mọi người (chỉ ẩn group chat)
       if (status == 'closed' && isGroup) continue;
+      if (isGroup && hiddenFullTimeJobIds.contains(jobId)) continue;
 
       final peerId = _resolvePeerId(
         members: members,
@@ -322,17 +341,16 @@ class MessagingService {
     for (final doc in snap.docs) {
       final data = doc.data();
       final status = (data['status'] ?? '').toString();
-      final employerId = (data['employerId'] ?? '').toString();
       final chatType = (data['chatType'] ?? '').toString();
-      final members = (data['memberIds'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [];
+      final jobId = (data['jobId'] ?? '').toString();
+      final members =
+          (data['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
       final isGroup = chatType != 'direct' && chatType != 'peer';
 
       // Ẩn nhóm việc đã đóng với TẤT CẢ mọi người (chỉ ẩn group chat)
       if (status == 'closed' && isGroup) continue;
+      if (isGroup && hiddenFullTimeJobIds.contains(jobId)) continue;
 
       final peerId = _resolvePeerId(
         members: members,
@@ -360,13 +378,33 @@ class MessagingService {
     return threads;
   }
 
+  Future<Set<String>> _fullTimeJobIdsForGroups(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    final ids = docs
+        .map((doc) => (doc.data()['jobId'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final fullTimeIds = <String>{};
+    for (final id in ids) {
+      try {
+        final snap = await _db.collection('jobPosts').doc(id).get();
+        if (!snap.exists) continue;
+        final data = snap.data() ?? {};
+        if ((data['jobType'] ?? '').toString() == 'full_time') {
+          fullTimeIds.add(id);
+        }
+      } catch (_) {}
+    }
+    return fullTimeIds;
+  }
+
   /// Gọi sau mỗi tin gửi (job chat hoặc group chat NTD) — cập nhật badge + thông báo chuông.
   Future<void> recordOutgoingMessage({
     required String groupId,
     required String senderId,
     required String preview,
-  }) =>
-      _updatePreview(groupId, preview, senderId);
+  }) => _updatePreview(groupId, preview, senderId);
 
   Future<void> markConversationRead(String groupId, String userId) async {
     if (groupId.isEmpty || userId.isEmpty) return;
@@ -401,14 +439,15 @@ class MessagingService {
         );
   }
 
-  Future<ConversationThread?> getThread(String groupId, String currentUid) async {
+  Future<ConversationThread?> getThread(
+    String groupId,
+    String currentUid,
+  ) async {
     final doc = await _db.collection(_groups).doc(groupId).get();
     if (!doc.exists) return null;
     final data = doc.data()!;
-    final members = (data['memberIds'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+    final members =
+        (data['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final peerId = _resolvePeerId(
       members: members,
       currentUid: currentUid,
@@ -468,13 +507,18 @@ class MessagingService {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
 
-    final ref = _db.collection(_groups).doc(groupId).collection(_messages).doc(msgId);
+    final ref = _db
+        .collection(_groups)
+        .doc(groupId)
+        .collection(_messages)
+        .doc(msgId);
     final snap = await ref.get();
     if (!snap.exists) return;
 
     final data = snap.data() ?? {};
     final reactions = Map<String, dynamic>.from(
-      (data['reactions'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? {},
+      (data['reactions'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
+          {},
     );
 
     if (reactions[uid]?.toString() == emoji) {
@@ -494,7 +538,11 @@ class MessagingService {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
 
-    final ref = _db.collection(_groups).doc(groupId).collection(_messages).doc();
+    final ref = _db
+        .collection(_groups)
+        .doc(groupId)
+        .collection(_messages)
+        .doc();
     final content = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
     await ref.set({
       'msgId': ref.id,
@@ -515,9 +563,11 @@ class MessagingService {
       final snap = await _db.collection(_groups).doc(groupId).get();
       if (snap.exists) {
         final data = snap.data() ?? {};
-        final members = (data['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        final members =
+            (data['memberIds'] as List?)?.map((e) => e.toString()).toList() ??
+            [];
         final employerId = (data['employerId'] ?? '').toString();
-        
+
         final recipientIds = <String>{...members};
         if (employerId.isNotEmpty) recipientIds.add(employerId);
         recipientIds.remove(uid);
@@ -525,7 +575,9 @@ class MessagingService {
         final senderProfiles = await fetchParticipants({uid});
         final callerName = senderProfiles[uid]?.name ?? 'Ai đó';
         final jobTitle = (data['jobTitle'] ?? '').toString();
-        final finalCallerName = data['chatType'] == 'group' ? '$callerName (Nhóm $jobTitle)' : callerName;
+        final finalCallerName = data['chatType'] == 'group'
+            ? '$callerName (Nhóm $jobTitle)'
+            : callerName;
 
         for (final recipientId in recipientIds) {
           await _notifications.notifyIncomingCall(
@@ -564,7 +616,11 @@ class MessagingService {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
 
-    final ref = _db.collection(_groups).doc(groupId).collection(_messages).doc(msgId);
+    final ref = _db
+        .collection(_groups)
+        .doc(groupId)
+        .collection(_messages)
+        .doc(msgId);
     final snap = await ref.get();
     if (!snap.exists) return;
 
@@ -584,7 +640,11 @@ class MessagingService {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
 
-    final ref = _db.collection(_groups).doc(groupId).collection(_messages).doc(msgId);
+    final ref = _db
+        .collection(_groups)
+        .doc(groupId)
+        .collection(_messages)
+        .doc(msgId);
     final snap = await ref.get();
     if (!snap.exists) throw Exception('Không tìm thấy tin nhắn');
 
@@ -601,10 +661,7 @@ class MessagingService {
       throw Exception('Nội dung tin nhắn không được để trống');
     }
 
-    await ref.update({
-      'content': trimmed,
-      'edited': true,
-    });
+    await ref.update({'content': trimmed, 'edited': true});
     await _refreshGroupPreviewFromLatestMessage(groupId);
   }
 
@@ -615,7 +672,11 @@ class MessagingService {
     final uid = _uid;
     if (uid == null) throw Exception('Chưa đăng nhập');
 
-    final ref = _db.collection(_groups).doc(groupId).collection(_messages).doc(msgId);
+    final ref = _db
+        .collection(_groups)
+        .doc(groupId)
+        .collection(_messages)
+        .doc(msgId);
     final snap = await ref.get();
     if (!snap.exists) throw Exception('Không tìm thấy tin nhắn');
 
@@ -777,8 +838,7 @@ class MessagingService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    final content =
-        'Lịch ca: $jobTitle · $date ($startTime – $endTime)';
+    final content = 'Lịch ca: $jobTitle · $date ($startTime – $endTime)';
 
     await _sendMessageRaw(
       groupId,
@@ -938,8 +998,7 @@ class MessagingService {
     );
 
     final attSnap = await _db.collection('attendance').doc(attendanceId).get();
-    final employerId =
-        (attSnap.data()?['employerId'] ?? '').toString();
+    final employerId = (attSnap.data()?['employerId'] ?? '').toString();
 
     await _notifyEmployerAttendanceResult(
       employerId: employerId,
@@ -966,20 +1025,20 @@ class MessagingService {
     if (employerId.isEmpty) return;
 
     final label = isCheckIn ? 'đầu ca' : 'cuối ca';
-    final name = candidateName.trim().isNotEmpty ? candidateName.trim() : 'Nhân viên';
-    final lateNote = isCheckIn &&
-            record != null &&
-            record.status == 'late'
+    final name = candidateName.trim().isNotEmpty
+        ? candidateName.trim()
+        : 'Nhân viên';
+    final lateNote = isCheckIn && record != null && record.status == 'late'
         ? ' (trễ ${record.lateMinutes} phút)'
         : '';
 
     final body = StringBuffer()..writeln('$name đã điểm danh $label$lateNote.');
 
     if (record != null) {
-      final when =
-          isCheckIn ? record.checkInCapturedAt : record.checkOutCapturedAt;
-      final loc =
-          isCheckIn ? record.checkInLocation : record.checkOutLocation;
+      final when = isCheckIn
+          ? record.checkInCapturedAt
+          : record.checkOutCapturedAt;
+      final loc = isCheckIn ? record.checkInLocation : record.checkOutLocation;
       if (when != null && when.isNotEmpty) {
         body.writeln('🕐 $when');
       } else if (timeLabel != null && timeLabel.isNotEmpty) {
@@ -1020,7 +1079,11 @@ class MessagingService {
     Map<String, dynamic>? metadata,
     String? attachmentUrl,
   }) async {
-    final ref = _db.collection(_groups).doc(groupId).collection(_messages).doc();
+    final ref = _db
+        .collection(_groups)
+        .doc(groupId)
+        .collection(_messages)
+        .doc();
     await ref.set({
       'msgId': ref.id,
       'senderId': senderId,
@@ -1074,7 +1137,8 @@ class MessagingService {
       return;
     }
 
-    var members = (data['memberIds'] as List?)
+    var members =
+        (data['memberIds'] as List?)
             ?.map((e) => e.toString())
             .where((id) => id.isNotEmpty)
             .toList() ??
@@ -1091,12 +1155,11 @@ class MessagingService {
       members = [...members, employerId];
     }
 
-    final muted = (data['mutedBy'] as List?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+    final muted =
+        (data['mutedBy'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final jobTitle = (data['jobTitle'] ?? 'Nhóm chat').toString();
-    final isGroupChat = chatType == 'group' ||
+    final isGroupChat =
+        chatType == 'group' ||
         (chatType != 'peer' && chatType != 'direct' && members.length > 2);
     final rawUnread = data['unreadCounts'] as Map? ?? {};
 

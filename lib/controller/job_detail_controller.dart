@@ -212,8 +212,20 @@ class JobDetailController extends GetxController {
 
     if (JobTimeHelper.hasStarted(job)) {
       Get.snackbar(
-        'Không thể hủy',
-        'Công việc đã bắt đầu, không thể hủy ứng tuyển.',
+        job.isFullTimeReferral ? 'Không thể hủy lịch' : 'Không thể hủy',
+        job.isFullTimeReferral
+            ? 'Đã qua giờ hẹn phỏng vấn, vui lòng liên hệ nhà tuyển dụng.'
+            : 'Công việc đã bắt đầu, không thể hủy ứng tuyển.',
+      );
+      return;
+    }
+
+    if (job.isFullTimeReferral &&
+        applicationStatus.value == 'accepted' &&
+        job.depositStatus == 'released') {
+      Get.snackbar(
+        'Không thể hủy lịch',
+        'Lịch phỏng vấn đã được chốt phí giới thiệu. Vui lòng liên hệ nhà tuyển dụng.',
       );
       return;
     }
@@ -255,15 +267,31 @@ class JobDetailController extends GetxController {
               ...latestJob.data()!,
               'jobId': latestJob.id,
             });
-            await _scheduleLocks.releaseLocksInTransaction(
-              tx: tx,
-              candidateId: uid,
-              appId: appId,
-              windows: ScheduleLockService.buildShiftWindows(latestJobModel),
-            );
+            if (latestJobModel.isFullTimeReferral) {
+              if (JobTimeHelper.hasStarted(latestJobModel)) {
+                throw Exception(
+                  'Đã qua giờ hẹn phỏng vấn, vui lòng liên hệ nhà tuyển dụng.',
+                );
+              }
+              if (latestJobModel.depositStatus == 'released' ||
+                  latestJobModel.depositStatus == 'refunded') {
+                throw Exception(
+                  'Lịch phỏng vấn đã được chốt phí giới thiệu. Vui lòng liên hệ nhà tuyển dụng.',
+                );
+              }
+            } else {
+              await _scheduleLocks.releaseLocksInTransaction(
+                tx: tx,
+                candidateId: uid,
+                appId: appId,
+                windows: ScheduleLockService.buildShiftWindows(latestJobModel),
+              );
+            }
 
             tx.update(doc.reference, {
               'status': 'withdrawn',
+              if (latestJobModel.isFullTimeReferral)
+                'withdrawReason': 'candidate_cancelled_interview',
               'updatedAt': FieldValue.serverTimestamp(),
             });
             tx.update(jobRef, {
@@ -271,8 +299,10 @@ class JobDetailController extends GetxController {
               'updatedAt': FieldValue.serverTimestamp(),
             });
           });
-          await _cancelCandidateSchedules(job.jobId, uid);
-          await _leaveAcceptedJobGroup(job, uid);
+          if (!job.isFullTimeReferral) {
+            await _cancelCandidateSchedules(job.jobId, uid);
+            await _leaveAcceptedJobGroup(job, uid);
+          }
         } else {
           await doc.reference.delete();
         }
@@ -282,6 +312,7 @@ class JobDetailController extends GetxController {
           appId: appId,
           candidateId: uid,
           wasAccepted: wasAccepted,
+          isFullTimeReferral: job.isFullTimeReferral,
         );
 
         hasApplied.value = false;
@@ -299,7 +330,9 @@ class JobDetailController extends GetxController {
 
         Get.snackbar(
           'Thành công',
-          'Đã hủy ứng tuyển thành công!',
+          job.isFullTimeReferral && wasAccepted
+              ? 'Đã hủy lịch phỏng vấn thành công!'
+              : 'Đã hủy ứng tuyển thành công!',
           snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green.shade100,
           colorText: Colors.green.shade800,
@@ -308,7 +341,7 @@ class JobDetailController extends GetxController {
     } catch (e) {
       Get.snackbar(
         'Lỗi',
-        'Không thể hủy ứng tuyển.',
+        e.toString().replaceFirst('Exception: ', ''),
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade800,
@@ -367,6 +400,7 @@ class JobDetailController extends GetxController {
     required String appId,
     required String candidateId,
     required bool wasAccepted,
+    required bool isFullTimeReferral,
   }) async {
     try {
       final name = await _candidateDisplayName(candidateId);
@@ -378,6 +412,7 @@ class JobDetailController extends GetxController {
         jobId: job.jobId,
         appId: appId,
         candidateId: candidateId,
+        isFullTimeReferral: isFullTimeReferral,
       );
     } catch (_) {}
   }

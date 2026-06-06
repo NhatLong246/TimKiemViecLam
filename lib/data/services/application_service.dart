@@ -8,12 +8,13 @@ import 'schedule_service.dart';
 class ApplicationService {
   final _db = FirebaseFirestore.instance;
 
-  Future<void> _assertCandidateRole(String userId) async {
+  Future<Map<String, dynamic>> _loadCandidateData(String userId) async {
     final userDoc = await _db.collection('users').doc(userId).get();
     final role = (userDoc.data()?['role'] ?? 'candidate').toString();
     if (role != 'candidate') {
       throw Exception('Chỉ tài khoản ứng viên mới được ứng tuyển.');
     }
+    return Map<String, dynamic>.from(userDoc.data() ?? {});
   }
 
   /// Tạo đơn ứng tuyển mới
@@ -24,13 +25,15 @@ class ApplicationService {
     String? coverLetter,
     String? cvUrl,
   }) async {
-    await _assertCandidateRole(candidateId);
+    final candidateData = await _loadCandidateData(candidateId);
 
     final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
     if (!jobDoc.exists) {
       throw Exception('Công việc không tồn tại.');
     }
     final jobData = jobDoc.data() ?? {};
+    final jobType = (jobData['jobType'] ?? 'part_time').toString();
+    final isFullTime = jobType == 'full_time';
     final jobEmployerId = (jobData['employerId'] ?? employerId).toString();
     if (candidateId == jobEmployerId) {
       throw Exception('Không thể tự ứng tuyển vào bài đăng của chính mình.');
@@ -44,14 +47,22 @@ class ApplicationService {
     final now = DateTime.now();
     final startDate = (jobData['startDate'] as Timestamp?)?.toDate();
     if (startDate == null) {
-      throw Exception('Công việc thiếu ngày bắt đầu.');
+      throw Exception(
+        isFullTime
+            ? 'Công việc thiếu ngày hẹn phỏng vấn.'
+            : 'Công việc thiếu ngày bắt đầu.',
+      );
     }
     final startAt = JobTimeHelper.combineDateAndTime(
       startDate,
       jobData['startTime'] as String?,
     );
     if (!now.isBefore(startAt)) {
-      throw Exception('Công việc đã bắt đầu, không thể ứng tuyển.');
+      throw Exception(
+        isFullTime
+            ? 'Đã qua ngày/giờ hẹn phỏng vấn, không thể ứng tuyển.'
+            : 'Công việc đã bắt đầu, không thể ứng tuyển.',
+      );
     }
 
     final deadline = (jobData['applicationDeadline'] as Timestamp?)?.toDate();
@@ -68,8 +79,27 @@ class ApplicationService {
     jobData['jobId'] = jobDoc.id;
     final jobModel = JobPostModel.fromMap(jobData);
 
-    final scheduleService = ScheduleService();
-    await scheduleService.checkOverlap(candidateId, jobModel);
+    final fullTimeRaw = jobData['fullTimeDetails'];
+    final fullTimeDetails = fullTimeRaw is Map
+        ? Map<String, dynamic>.from(fullTimeRaw)
+        : const <String, dynamic>{};
+    final requiresCv =
+        isFullTime && (fullTimeDetails['requiresCv'] as bool? ?? true);
+    final profileCvUrl = (candidateData['cvUrl'] ?? '').toString().trim();
+    final requestedCvUrl = cvUrl?.trim() ?? '';
+    final effectiveCvUrl = requestedCvUrl.isNotEmpty
+        ? requestedCvUrl
+        : profileCvUrl;
+    if (requiresCv && effectiveCvUrl.isEmpty) {
+      throw Exception(
+        'Công việc Full-time này yêu cầu CV. Vui lòng tải CV trong hồ sơ trước khi ứng tuyển.',
+      );
+    }
+
+    if (!isFullTime) {
+      final scheduleService = ScheduleService();
+      await scheduleService.checkOverlap(candidateId, jobModel);
+    }
 
     // Check duplicate: candidateId + jobId
     final duplicateCheck = await _db
@@ -90,7 +120,7 @@ class ApplicationService {
       employerId: jobEmployerId,
       status: 'pending',
       coverLetter: coverLetter,
-      cvUrl: cvUrl,
+      cvUrl: effectiveCvUrl.isEmpty ? null : effectiveCvUrl,
     );
 
     await docRef.set(app.toMap());
@@ -99,13 +129,10 @@ class ApplicationService {
     var candidateName = 'Ứng viên';
     try {
       jobTitle = (jobData['title'] ?? jobTitle).toString();
-      final userDoc = await _db.collection('users').doc(candidateId).get();
-      if (userDoc.exists) {
-        final d = userDoc.data() ?? {};
-        final combined = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'
-            .trim();
-        if (combined.isNotEmpty) candidateName = combined;
-      }
+      final combined =
+          '${candidateData['firstName'] ?? ''} ${candidateData['lastName'] ?? ''}'
+              .trim();
+      if (combined.isNotEmpty) candidateName = combined;
     } catch (_) {}
 
     await NotificationService.notifyNewApplication(

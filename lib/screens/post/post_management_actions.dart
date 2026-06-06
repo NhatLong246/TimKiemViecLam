@@ -127,9 +127,15 @@ class PostManagementActions {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Đóng bài đăng?'),
+            title: Text(
+              post.isFullTimeReferral && post.filledSlots > 0
+                  ? 'Đóng bài & quyết toán?'
+                  : 'Đóng bài đăng?',
+            ),
             content: Text(
-              post.isFullTimeReferral
+              post.isFullTimeReferral && post.filledSlots > 0
+                  ? 'Bài đã có ứng viên được duyệt. Hệ thống sẽ thu phí giới thiệu theo số ứng viên đã duyệt và hoàn phần còn lại. Ứng viên đã duyệt vẫn giữ lịch phỏng vấn.'
+                  : post.isFullTimeReferral
                   ? 'Bài đăng sẽ không nhận ứng viên mới. '
                         'Ứng viên đã apply vẫn do NTD tự liên hệ — ViecNow không quản lý Full-time.'
                   : 'Bài đăng sẽ không nhận ứng viên mới. '
@@ -142,7 +148,11 @@ class PostManagementActions {
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Đóng'),
+                child: Text(
+                  post.isFullTimeReferral && post.filledSlots > 0
+                      ? 'Quyết toán'
+                      : 'Đóng',
+                ),
               ),
             ],
           ),
@@ -150,12 +160,23 @@ class PostManagementActions {
         false;
   }
 
-  static Future<bool> confirmDelete(BuildContext context) async {
+  static Future<bool> confirmDelete(
+    BuildContext context,
+    JobPostModel post,
+  ) async {
     return await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Xóa bài đăng?'),
-            content: const Text('Thao tác không thể hoàn tác.'),
+            title: Text(
+              post.isFullTimeReferral && post.filledSlots > 0
+                  ? 'Đóng bài & quyết toán?'
+                  : 'Xóa bài đăng?',
+            ),
+            content: Text(
+              post.isFullTimeReferral && post.filledSlots > 0
+                  ? 'Bài đã có ứng viên được duyệt nên không thể xóa trắng. Hệ thống sẽ đóng bài, thu phí giới thiệu theo số ứng viên đã duyệt và hoàn phần còn lại.'
+                  : 'Thao tác không thể hoàn tác.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -164,7 +185,11 @@ class PostManagementActions {
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Xóa'),
+                child: Text(
+                  post.isFullTimeReferral && post.filledSlots > 0
+                      ? 'Quyết toán'
+                      : 'Xóa',
+                ),
               ),
             ],
           ),

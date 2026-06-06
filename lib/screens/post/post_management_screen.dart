@@ -36,14 +36,18 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     _controller = Get.isRegistered<JobPostController>()
         ? Get.find<JobPostController>()
         : Get.put(JobPostController());
-    
+
     int initialIndex = 0;
     if (Get.arguments is Map) {
       initialIndex = Get.arguments['initialTab'] ?? 0;
       _highlightJobId = Get.arguments['highlightJobId'];
     }
-    
-    _tabController = TabController(length: 5, vsync: this, initialIndex: initialIndex);
+
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
     _tabController.addListener(_syncSortWithActiveTab);
   }
 
@@ -139,8 +143,12 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     if (_sortByEndingSoon) {
       sorted.sort((a, b) {
         if (_highlightJobId != null) {
-          if (a.jobId == _highlightJobId && b.jobId != _highlightJobId) return -1;
-          if (b.jobId == _highlightJobId && a.jobId != _highlightJobId) return 1;
+          if (a.jobId == _highlightJobId && b.jobId != _highlightJobId) {
+            return -1;
+          }
+          if (b.jobId == _highlightJobId && a.jobId != _highlightJobId) {
+            return 1;
+          }
         }
         final aEnd = a.endDate ?? DateTime(2999);
         final bEnd = b.endDate ?? DateTime(2999);
@@ -562,7 +570,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
             Tab(text: 'Đã đăng (${_controller.publishedPosts.length})'),
             Tab(text: 'Chờ duyệt (${_controller.pendingPosts.length})'),
             Tab(text: 'Quá hạn (${_controller.expiredPosts.length})'),
-            Tab(text: 'Chờ GN (${_controller.pendingDisbursementPosts.length})'),
+            Tab(
+              text: 'Chờ GN (${_controller.pendingDisbursementPosts.length})',
+            ),
             Tab(text: 'Đã HT (${_controller.completedPosts.length})'),
           ],
         ),
@@ -632,6 +642,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
   ) {
     final formatter = NumberFormat('#,###', 'vi_VN');
     final dateStr = DateFormat('dd/MM/yyyy').format(post.startDate);
+    final dateLabel = post.isFullTimeReferral ? 'PV $dateStr' : dateStr;
     final city = post.location['city'] as String? ?? '';
     final district = post.location['district'] as String? ?? '';
     final locationStr = [district, city].where((s) => s.isNotEmpty).join(', ');
@@ -685,7 +696,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '$dateStr${locationStr.isNotEmpty ? ' • $locationStr' : ''}',
+                            '$dateLabel${locationStr.isNotEmpty ? ' • $locationStr' : ''}',
                             style: TextStyle(
                               fontSize: 12,
                               color: context.textSecondary,
@@ -832,16 +843,20 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       label = 'Ưu tiên: Sửa và gửi lại';
       onTap = () => PostManagementActions.editPost(post);
     } else if (tabType == 'expired') {
-      if (post.isPartTimeManaged && post.groupChatId != null && post.groupChatId!.isNotEmpty) {
+      if (post.isPartTimeManaged &&
+          post.groupChatId != null &&
+          post.groupChatId!.isNotEmpty) {
         icon = Icons.payment_rounded;
         label = 'Ưu tiên: Xem & Giải ngân';
         onTap = () => PostManagementActions.openAttendance(post);
       } else {
         icon = Icons.delete_outline_rounded;
-        label = 'Ưu tiên: Xóa bài đăng';
+        label = post.isFullTimeReferral && post.filledSlots > 0
+            ? 'Ưu tiên: Đóng bài & quyết toán'
+            : 'Ưu tiên: Xóa bài đăng';
         destructive = true;
         onTap = () async {
-          final ok = await PostManagementActions.confirmDelete(context);
+          final ok = await PostManagementActions.confirmDelete(context, post);
           if (ok) {
             await controller.deletePost(post.jobId);
           }
@@ -849,10 +864,12 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       }
     } else {
       icon = Icons.delete_outline_rounded;
-      label = 'Ưu tiên: Xóa bài đăng';
+      label = post.isFullTimeReferral && post.filledSlots > 0
+          ? 'Ưu tiên: Đóng bài & quyết toán'
+          : 'Ưu tiên: Xóa bài đăng';
       destructive = true;
       onTap = () async {
-        final ok = await PostManagementActions.confirmDelete(context);
+        final ok = await PostManagementActions.confirmDelete(context, post);
         if (ok) {
           await controller.deletePost(post.jobId);
         }
@@ -1049,7 +1066,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
 
     if (tabType == 'pending') {
       items.add(_menuItem('edit', 'Chỉnh sửa', icon: Icons.edit_outlined));
-      if (JobTimeHelper.startsAfterNow(post)) {
+      if (!post.isFullTimeReferral && JobTimeHelper.startsAfterNow(post)) {
         items.add(
           _menuItem(
             'cancel',
@@ -1098,12 +1115,14 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       items.add(
         _menuItem(
           'close',
-          'Đóng bài đăng',
+          post.isFullTimeReferral && post.filledSlots > 0
+              ? 'Đóng bài & quyết toán'
+              : 'Đóng bài đăng',
           icon: Icons.block_flipped,
           textColor: Colors.orange,
         ),
       );
-      if (JobTimeHelper.startsAfterNow(post)) {
+      if (!post.isFullTimeReferral && JobTimeHelper.startsAfterNow(post)) {
         items.add(
           _menuItem(
             'cancel',
@@ -1149,7 +1168,9 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         items.add(
           _menuItem(
             'delete',
-            'Xóa bài đăng',
+            post.isFullTimeReferral && post.filledSlots > 0
+                ? 'Đóng bài & quyết toán'
+                : 'Xóa bài đăng',
             icon: Icons.delete_outline,
             textColor: Colors.red,
           ),
@@ -1220,10 +1241,11 @@ class _PostManagementScreenState extends State<PostManagementScreen>
       case 'extend':
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
-        final initialDate = (post.endDate != null && post.endDate!.isAfter(today))
+        final initialDate =
+            (post.endDate != null && post.endDate!.isAfter(today))
             ? post.endDate!.add(const Duration(days: 1))
             : today.add(const Duration(days: 1));
-            
+
         final picked = await showDatePicker(
           context: context,
           initialDate: initialDate,
@@ -1241,7 +1263,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
         await controller.reopenPost(post);
         break;
       case 'delete':
-        final ok = await PostManagementActions.confirmDelete(context);
+        final ok = await PostManagementActions.confirmDelete(context, post);
         if (ok) await controller.deletePost(post.jobId);
         break;
       case 'close':

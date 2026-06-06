@@ -5,6 +5,7 @@ import '../models/group_chat_model.dart';
 import '../models/job_post_model.dart';
 import '../../utils/job_time_helper.dart';
 import '../../utils/work_day_helper.dart';
+import 'full_time_referral_settlement_service.dart';
 import 'group_chat_service.dart';
 import 'job_attendance_completion_service.dart';
 import 'job_post_service.dart';
@@ -62,6 +63,10 @@ class JobDisbursementReminderService {
       final data = Map<String, dynamic>.from(doc.data());
       data['jobId'] = doc.id;
       final job = JobPostModel.fromMap(data);
+      if (job.isFullTimeReferral) {
+        await FullTimeReferralSettlementService().settleAfterDeadline(job);
+        continue;
+      }
       await _rejectPendingApplicationsAfterDeadline(job);
       if (!_shouldNotifyUnderfilledApplicationDeadline(job)) continue;
       if (!await _claimOnce(
@@ -134,6 +139,7 @@ class JobDisbursementReminderService {
       data['jobId'] = doc.id;
       final job = JobPostModel.fromMap(data);
       if (!_isActiveJob(job)) continue;
+      if (job.isFullTimeReferral) continue;
       if (!WorkDayHelper.isWorkPeriodEnded(job)) continue;
       if (await _workflow.hasCompletedDisbursement(job.jobId)) continue;
 
@@ -168,6 +174,7 @@ class JobDisbursementReminderService {
   ) async {
     final job = await _jobs.getJobPostById(group.jobId);
     if (job == null || !_isActiveJob(job)) return;
+    if (job.isFullTimeReferral) return;
     if (!WorkDayHelper.isWorkPeriodEnded(job)) return;
     if (await _workflow.hasCompletedDisbursement(job.jobId)) return;
 

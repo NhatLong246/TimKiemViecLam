@@ -109,11 +109,9 @@ class NotificationService {
     final uid = userId ?? _uid;
     if (uid == null) return Stream.value([]);
 
-    return _userNotificationsCol(uid)!
-        .orderBy('createdAt', descending: true)
-        .limit(80)
-        .snapshots()
-        .map((snap) {
+    return _userNotificationsCol(
+      uid,
+    )!.orderBy('createdAt', descending: true).limit(80).snapshots().map((snap) {
       final list =
           snap.docs
               .map((d) => AppNotificationItem.fromMap(d.id, d.data()))
@@ -483,21 +481,37 @@ class NotificationService {
     required String jobTitle,
     String? employerName,
     bool isFullTimeReferral = false,
+    DateTime? interviewAt,
+    bool interviewRequired = true,
   }) async {
     final svc = NotificationService();
     final name = employerName?.trim().isNotEmpty == true
         ? employerName!
         : 'Nhà tuyển dụng';
+    final interviewText = interviewRequired && interviewAt != null
+        ? ' Lịch hẹn phỏng vấn: ${_formatNotificationDateTime(interviewAt)}.'
+        : '';
     await svc.sendToUser(
       userId: candidateId,
       title: isFullTimeReferral
           ? 'NTD đã ghi nhận đơn Full-time'
           : 'Đơn ứng tuyển được chấp nhận',
       body: isFullTimeReferral
-          ? '$name đã ghi nhận bạn cho vị trí "$jobTitle". Họ sẽ liên hệ trực tiếp — ViecNow không quản lý việc Full-time.'
+          ? '$name đã duyệt hồ sơ của bạn cho vị trí "$jobTitle".$interviewText ViecNow chỉ hỗ trợ giới thiệu việc Full-time.'
           : '$name đã chấp nhận bạn cho vị trí "$jobTitle". Mở tin nhắn để trao đổi.',
       category: NotificationCategory.job,
+      data: {
+        'type': 'application_accepted',
+        if (isFullTimeReferral) 'jobType': 'full_time',
+        if (interviewAt != null) 'interviewAt': Timestamp.fromDate(interviewAt),
+        'interviewRequired': interviewRequired,
+      },
     );
+  }
+
+  static String _formatNotificationDateTime(DateTime dt) {
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(dt.day)}/${two(dt.month)}/${dt.year} ${two(dt.hour)}:${two(dt.minute)}';
   }
 
   static Future<void> notifyApplicationRejected({
@@ -518,6 +532,8 @@ class NotificationService {
         'Đơn ứng tuyển của bạn vào "$titleText" đã bị từ chối vì nhà tuyển dụng đã nhận đủ người.',
       'schedule_conflict' =>
         'Đơn ứng tuyển của bạn vào "$titleText" đã bị từ chối tự động vì bạn đã được nhận ở một công việc trùng lịch.',
+      'job_closed' =>
+        'Bài tuyển "$titleText" đã đóng trước khi hồ sơ của bạn được duyệt.',
       _ =>
         'Đơn ứng tuyển của bạn vào "$titleText" đã bị nhà tuyển dụng từ chối.',
     };
@@ -575,6 +591,7 @@ class NotificationService {
     required String jobTitle,
     required String candidateName,
     required bool wasAccepted,
+    bool isFullTimeReferral = false,
     String? jobId,
     String? appId,
     String? candidateId,
@@ -599,18 +616,52 @@ class NotificationService {
     await svc.notifyEmployer(
       employerId: employerId,
       type: 'application_withdrawn',
-      title: 'Ứng viên đã hủy ứng tuyển',
-      body: wasAccepted
-          ? '$name đã rút khỏi "$titleText".'
-          : '$name đã hủy đơn ứng tuyển vào "$titleText".',
+      title: isFullTimeReferral && wasAccepted
+          ? 'Ứng viên đã hủy lịch phỏng vấn'
+          : 'Ứng viên đã hủy ứng tuyển',
+      body: isFullTimeReferral && wasAccepted
+          ? '$name đã hủy lịch phỏng vấn cho "$titleText". Slot tuyển đã được mở lại.'
+          : (wasAccepted
+                ? '$name đã rút khỏi "$titleText".'
+                : '$name đã hủy đơn ứng tuyển vào "$titleText".'),
       category: NotificationCategory.job,
       data: {
         'type': 'application_withdrawn',
         'wasAccepted': wasAccepted,
+        if (isFullTimeReferral) 'jobType': 'full_time',
         if (jobId != null && jobId.isNotEmpty) 'jobId': jobId,
         if (appId != null && appId.isNotEmpty) 'appId': appId,
         if (candidateId != null && candidateId.isNotEmpty)
           'candidateId': candidateId,
+      },
+    );
+  }
+
+  static Future<void> notifyFullTimeAcceptedJobClosed({
+    required String candidateId,
+    required String jobTitle,
+    required String jobId,
+    DateTime? interviewAt,
+  }) async {
+    if (candidateId.isEmpty) return;
+    final svc = NotificationService();
+    final titleText = jobTitle.trim().isNotEmpty
+        ? jobTitle.trim()
+        : 'Công việc Full-time';
+    final interviewText = interviewAt != null
+        ? ' Lịch hẹn phỏng vấn: ${_formatNotificationDateTime(interviewAt)}.'
+        : '';
+    await svc.sendToUser(
+      userId: candidateId,
+      title: 'Đã chốt lịch phỏng vấn',
+      body:
+          'Bài tuyển "$titleText" đã đóng nhận thêm hồ sơ sau khi nhà tuyển dụng duyệt CV của bạn.$interviewText',
+      category: NotificationCategory.job,
+      data: {
+        'type': 'full_time_job_closed_after_acceptance',
+        'jobId': jobId,
+        'jobType': 'full_time',
+        if (interviewAt != null) 'interviewAt': Timestamp.fromDate(interviewAt),
       },
     );
   }

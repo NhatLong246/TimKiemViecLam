@@ -119,47 +119,61 @@ class ScheduleService {
     final jobs = await _loadJobs(jobIds);
     final employers = await _loadEmployerNames(employerIds);
 
-    final list = raw.where((s) {
-      final job = jobs[s.jobId];
-      if (job != null) {
-        final isInactive = ['closed', 'completed', 'cancelled', 'deleted'].contains(job.status);
-        final cutoffDate = job.closedAt ?? job.updatedAt ?? DateTime.now();
-        final cutoffKey = _dateKey(cutoffDate);
-        if (isInactive && s.date.compareTo(cutoffKey) > 0) {
-          return false;
-        }
-      }
-      return true;
-    }).map((s) {
-      final job = jobs[s.jobId];
-      String finalStatus = s.status;
-      if (job != null) {
-        final isInactive = ['closed', 'completed', 'cancelled', 'deleted'].contains(job.status);
-        if (isInactive) {
-          if (['closed', 'completed'].contains(job.status)) {
-            finalStatus = 'completed';
-          } else {
-            finalStatus = 'cancelled';
+    final list = raw
+        .where((s) {
+          final job = jobs[s.jobId];
+          if (job != null) {
+            if (job.isFullTimeReferral) return false;
+            final isInactive = [
+              'closed',
+              'completed',
+              'cancelled',
+              'deleted',
+            ].contains(job.status);
+            final cutoffDate = job.closedAt ?? job.updatedAt ?? DateTime.now();
+            final cutoffKey = _dateKey(cutoffDate);
+            if (isInactive && s.date.compareTo(cutoffKey) > 0) {
+              return false;
+            }
           }
-        }
-      }
+          return true;
+        })
+        .map((s) {
+          final job = jobs[s.jobId];
+          String finalStatus = s.status;
+          if (job != null) {
+            final isInactive = [
+              'closed',
+              'completed',
+              'cancelled',
+              'deleted',
+            ].contains(job.status);
+            if (isInactive) {
+              if (['closed', 'completed'].contains(job.status)) {
+                finalStatus = 'completed';
+              } else {
+                finalStatus = 'cancelled';
+              }
+            }
+          }
 
-      return ScheduleModel(
-        scheduleId: s.scheduleId,
-        jobId: s.jobId,
-        candidateId: s.candidateId,
-        employerId: s.employerId,
-        date: s.date,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        status: finalStatus,
-        jobTitle: s.jobTitle ?? job?.title ?? 'Công việc',
-        jobLocation: s.jobLocation ?? job?.locationDisplay ?? '',
-        employerName:
-            s.employerName ?? employers[s.employerId] ?? 'Nhà tuyển dụng',
-        createdAt: s.createdAt,
-      );
-    }).toList();
+          return ScheduleModel(
+            scheduleId: s.scheduleId,
+            jobId: s.jobId,
+            candidateId: s.candidateId,
+            employerId: s.employerId,
+            date: s.date,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            status: finalStatus,
+            jobTitle: s.jobTitle ?? job?.title ?? 'Công việc',
+            jobLocation: s.jobLocation ?? job?.locationDisplay ?? '',
+            employerName:
+                s.employerName ?? employers[s.employerId] ?? 'Nhà tuyển dụng',
+            createdAt: s.createdAt,
+          );
+        })
+        .toList();
 
     list.sort((a, b) {
       final d = a.date.compareTo(b.date);
@@ -194,6 +208,7 @@ class ScheduleService {
 
       final job = jobs[jobId];
       if (job == null) continue;
+      if (job.isFullTimeReferral) continue;
 
       final empName = employers[job.employerId] ?? 'Nhà tuyển dụng';
 
@@ -204,7 +219,12 @@ class ScheduleService {
       var current = DateTime(startDate.year, startDate.month, startDate.day);
       final end = DateTime(endDate.year, endDate.month, endDate.day);
 
-      final isInactive = ['closed', 'completed', 'cancelled', 'deleted'].contains(job.status);
+      final isInactive = [
+        'closed',
+        'completed',
+        'cancelled',
+        'deleted',
+      ].contains(job.status);
       final cutoffDate = job.closedAt ?? job.updatedAt ?? DateTime.now();
       final cutoffKey = _dateKey(cutoffDate);
 
@@ -367,6 +387,8 @@ class ScheduleService {
   /// Kiểm tra lịch làm việc của candidate có bị trùng với job này không.
   /// Throws Exception nếu bị trùng.
   Future<void> checkOverlap(String candidateId, JobPostModel newJob) async {
+    if (newJob.isFullTimeReferral) return;
+
     final existingSchedules = await fetchAllSchedules(candidateId);
 
     // Tạo danh sách ngày dự kiến cho newJob

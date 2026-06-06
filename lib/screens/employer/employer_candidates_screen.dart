@@ -6,8 +6,10 @@ import '../../data/constants/full_time_policy.dart';
 import '../../common/styles/app_colors.dart';
 import '../../controller/candidates_controller.dart';
 import '../../data/models/application_model.dart';
+import '../../data/models/candidate_profile_models.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
+import '../../data/models/work_experience_model.dart';
 import '../../data/services/candidate_discovery_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'employer_reviews_screen.dart';
@@ -1069,6 +1071,7 @@ class _CandidateProfileSheet extends StatefulWidget {
 
 class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
   UserModel? _fullUser;
+  Map<String, dynamic>? _fullUserData;
   bool _isLoading = true;
 
   @override
@@ -1094,8 +1097,9 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
       if (doc.exists) {
         if (mounted) {
           setState(() {
-            final data = doc.data()!;
+            final data = Map<String, dynamic>.from(doc.data()!);
             data['uid'] = doc.id;
+            _fullUserData = data;
             _fullUser = UserModel.fromMap(data);
             _isLoading = false;
           });
@@ -1117,133 +1121,408 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            _CandidateAvatar(candidate: widget.candidateSnap),
-            const SizedBox(height: 16),
-            Text(
-              widget.candidateSnap.fullName.isNotEmpty
-                  ? widget.candidateSnap.fullName
-                  : 'Ứng viên',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StarRating(rating: widget.candidateSnap.averageRating),
-                const SizedBox(width: 8),
+              const SizedBox(height: 20),
+              _CandidateAvatar(candidate: widget.candidateSnap),
+              const SizedBox(height: 16),
+              Text(
+                widget.candidateSnap.fullName.isNotEmpty
+                    ? widget.candidateSnap.fullName
+                    : 'Ứng viên',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _StarRating(rating: widget.candidateSnap.averageRating),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${widget.candidateSnap.averageRating.toStringAsFixed(1)} sao • ${widget.candidateSnap.totalJobsDone} việc',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                )
+              else if (_fullUser != null) ...[
+                _buildInfoRow(
+                  Icons.email_outlined,
+                  'Email',
+                  _fullUser!.email.isNotEmpty
+                      ? _fullUser!.email
+                      : 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  Icons.phone_outlined,
+                  'Số điện thoại',
+                  _fullUser!.phone.isNotEmpty
+                      ? _fullUser!.phone
+                      : 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  Icons.person_outline,
+                  'Giới tính',
+                  _fullUser!.gender ?? 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  Icons.cake_outlined,
+                  'Ngày sinh',
+                  _fullUser!.dateOfBirth != null
+                      ? DateFormat('dd/MM/yyyy').format(_fullUser!.dateOfBirth!)
+                      : 'Chưa cập nhật',
+                ),
+                ..._buildProfileExtras(
+                  _fullUserData ?? const <String, dynamic>{},
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context); // Đóng bottom sheet
+                      Get.to(
+                        () => const EmployerReviewsScreen(),
+                        arguments: {
+                          'uid': widget.candidateSnap.uid,
+                          'title':
+                              'Đánh giá về ${widget.candidateSnap.fullName.isNotEmpty ? widget.candidateSnap.fullName : 'ứng viên'}',
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: const Text(
+                      'Xem đánh giá về ứng viên',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.employerPrimary,
+                      side: const BorderSide(color: AppColors.employerPrimary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ] else
                 Text(
-                  '${widget.candidateSnap.averageRating.toStringAsFixed(1)} sao • ${widget.candidateSnap.totalJobsDone} việc',
+                  'Không thể lấy thông tin chi tiết.',
                   style: TextStyle(color: Colors.grey.shade600),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(32.0),
-                child: CircularProgressIndicator(),
-              )
-            else if (_fullUser != null) ...[
-              _buildInfoRow(
-                Icons.email_outlined,
-                'Email',
-                _fullUser!.email.isNotEmpty
-                    ? _fullUser!.email
-                    : 'Chưa cập nhật',
-              ),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                Icons.phone_outlined,
-                'Số điện thoại',
-                _fullUser!.phone.isNotEmpty
-                    ? _fullUser!.phone
-                    : 'Chưa cập nhật',
-              ),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                Icons.person_outline,
-                'Giới tính',
-                _fullUser!.gender ?? 'Chưa cập nhật',
-              ),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                Icons.cake_outlined,
-                'Ngày sinh',
-                _fullUser!.dateOfBirth != null
-                    ? DateFormat('dd/MM/yyyy').format(_fullUser!.dateOfBirth!)
-                    : 'Chưa cập nhật',
-              ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context); // Đóng bottom sheet
-                    Get.to(
-                      () => const EmployerReviewsScreen(),
-                      arguments: {
-                        'uid': widget.candidateSnap.uid,
-                        'title':
-                            'Đánh giá về ${widget.candidateSnap.fullName.isNotEmpty ? widget.candidateSnap.fullName : 'ứng viên'}',
-                      },
-                    );
-                  },
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text(
-                    'Xem đánh giá về ứng viên',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.employerPrimary,
-                    side: const BorderSide(color: AppColors.employerPrimary),
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.employerPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                ),
-              ),
-            ] else
-              Text(
-                'Không thể lấy thông tin chi tiết.',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.employerPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text(
-                  'Đóng',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  child: const Text(
+                    'Đóng',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  String get _effectiveCvUrl {
+    final appCv = widget.app.cvUrl?.trim() ?? '';
+    if (appCv.isNotEmpty) return appCv;
+    return (_fullUserData?['cvUrl'] ?? '').toString().trim();
+  }
+
+  List<Widget> _buildProfileExtras(Map<String, dynamic> data) {
+    final widgets = <Widget>[];
+    final cvUrl = _effectiveCvUrl;
+    if (cvUrl.isNotEmpty) {
+      widgets.addAll([const SizedBox(height: 16), _buildCvAction(cvUrl)]);
+    }
+
+    final introduction = selfIntroductionFromUserData(data);
+    if (introduction.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileTextBlock('Giới thiệu', introduction),
+      ]);
+    }
+
+    final skills = skillsFromUserData(data);
+    if (skills.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileChips('Kỹ năng', skills),
+      ]);
+    }
+
+    final experiences = WorkExperienceModel.listFromUserData(data);
+    if (experiences.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileLineList(
+          'Kinh nghiệm',
+          experiences
+              .map(
+                (item) => _ProfileLine(
+                  title: [
+                    item.position,
+                    item.company,
+                  ].where((v) => v.trim().isNotEmpty).join(' - '),
+                  subtitle: [
+                    item.dateRange,
+                    item.description,
+                  ].where((v) => v.trim().isNotEmpty).join('\n'),
+                ),
+              )
+              .toList(),
+        ),
+      ]);
+    } else if (WorkExperienceModel.hasDeclaredNoExperience(data)) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileTextBlock(
+          'Kinh nghiệm',
+          'Ứng viên khai báo chưa có kinh nghiệm.',
+        ),
+      ]);
+    }
+
+    final educations = EducationModel.listFromUserData(data);
+    if (educations.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileLineList(
+          'Học vấn',
+          educations
+              .map(
+                (item) => _ProfileLine(
+                  title: [
+                    item.school,
+                    item.major,
+                  ].where((v) => v.trim().isNotEmpty).join(' - '),
+                  subtitle: [
+                    item.degree,
+                    item.yearRange,
+                    item.description,
+                  ].where((v) => v.trim().isNotEmpty).join('\n'),
+                ),
+              )
+              .toList(),
+        ),
+      ]);
+    }
+
+    final projects = ProjectModel.listFromUserData(data);
+    if (projects.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileLineList(
+          'Dự án',
+          projects
+              .map(
+                (item) => _ProfileLine(
+                  title: item.name,
+                  subtitle: [
+                    item.dateRange,
+                    item.description,
+                  ].where((v) => v.trim().isNotEmpty).join('\n'),
+                ),
+              )
+              .toList(),
+        ),
+      ]);
+    }
+
+    final certificates = CertificateModel.listFromUserData(data);
+    if (certificates.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileLineList(
+          'Chứng chỉ',
+          certificates
+              .map((item) => _ProfileLine(title: item.name, subtitle: ''))
+              .toList(),
+        ),
+      ]);
+    }
+
+    final languages = LanguageModel.listFromUserData(data);
+    if (languages.isNotEmpty) {
+      widgets.addAll([
+        const SizedBox(height: 18),
+        _buildProfileLineList(
+          'Ngoại ngữ',
+          languages
+              .map(
+                (item) =>
+                    _ProfileLine(title: item.language, subtitle: item.level),
+              )
+              .toList(),
+        ),
+      ]);
+    }
+
+    return widgets;
+  }
+
+  Widget _buildCvAction(String url) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final uri = Uri.tryParse(url);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        icon: const Icon(Icons.description_outlined),
+        label: const Text(
+          'Xem CV ứng viên',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.employerPrimary,
+          side: const BorderSide(color: AppColors.employerPrimary),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileTextBlock(String title, String value) {
+    return _buildProfileSection(
+      title,
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey.shade700,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileChips(String title, List<String> values) {
+    return _buildProfileSection(
+      title,
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: values
+            .map(
+              (item) => Chip(
+                label: Text(item),
+                backgroundColor: Colors.blue.shade50,
+                labelStyle: const TextStyle(
+                  color: AppColors.employerPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(color: Colors.blue.shade100),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildProfileLineList(String title, List<_ProfileLine> lines) {
+    return _buildProfileSection(
+      title,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: lines.map((line) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  line.title.isNotEmpty ? line.title : 'Chưa cập nhật',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (line.subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    line.subtitle,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: Colors.grey.shade600,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildProfileSection(String title, Widget child) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
       ),
     );
   }
@@ -1277,6 +1556,13 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
       ],
     );
   }
+}
+
+class _ProfileLine {
+  final String title;
+  final String subtitle;
+
+  const _ProfileLine({required this.title, required this.subtitle});
 }
 
 class _CandidateAvatar extends StatelessWidget {

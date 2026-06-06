@@ -185,8 +185,8 @@ class JobPostController extends GetxController {
     try {
       await _service.deleteJobPost(jobId);
       Get.snackbar(
-        'Đã xóa',
-        'Bài đăng đã được xóa',
+        'Đã xử lý',
+        'Bài đăng đã được cập nhật theo trạng thái phù hợp',
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
@@ -346,8 +346,8 @@ class JobPostController extends GetxController {
     try {
       await _service.updateStatus(jobId, 'closed');
       Get.snackbar(
-        'Đã đóng',
-        'Bài đăng đã được đóng',
+        'Đã xử lý',
+        'Bài đăng đã được đóng/quyết toán nếu cần',
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
@@ -379,9 +379,10 @@ class JobPostController extends GetxController {
     }
   }
 
-
-
-  Future<void> extendPostDurationToDate(JobPostModel post, DateTime newEndDate) async {
+  Future<void> extendPostDurationToDate(
+    JobPostModel post,
+    DateTime newEndDate,
+  ) async {
     try {
       final updated = post.copyWith(endDate: newEndDate);
       await _service.updateJobPost(updated);
