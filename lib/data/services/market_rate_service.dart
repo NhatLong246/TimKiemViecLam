@@ -1,141 +1,287 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:viecnow/data/models/market_rate_model.dart';
-import 'sqlite_cache_service.dart';
 
 /// Service: MarketRateService
-/// Truy vấn jobPosts (approved | active) từ Firestore → tổng hợp mặt bằng lương.
-/// Cache kết quả vào SQLite để xem offline.
+/// Cung cấp dữ liệu thị trường giả lập (mock) phong phú cho người dùng tham khảo.
 class MarketRateService {
-  static final _db = FirebaseFirestore.instance;
-  static const _cacheTable = 'market_rates_cache';
-  static const _cacheMaxAgeMs = 30 * 60 * 1000; // 30 phút
-
-  // ── Ensure SQLite table tồn tại ─────────────────────────────────────────────
-  static Future<void> ensureCacheTable() async {
-    final db = await SqliteCacheService.database;
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS $_cacheTable (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        category      TEXT NOT NULL,
-        categoryLabel TEXT NOT NULL,
-        city          TEXT NOT NULL,
-        district      TEXT NOT NULL,
-        minSalary     REAL NOT NULL,
-        maxSalary     REAL NOT NULL,
-        avgSalary     REAL NOT NULL,
-        salaryType    TEXT NOT NULL,
-        totalActiveJobs INTEGER NOT NULL,
-        totalSlots    INTEGER NOT NULL,
-        demandLevel   TEXT NOT NULL,
-        cachedAt      INTEGER NOT NULL,
-        UNIQUE(category, city, district, salaryType)
-      )
-    ''');
-  }
-
-  // ── Main method: lấy danh sách mặt bằng lương ──────────────────────────────
   static Future<List<MarketRateItem>> fetchMarketRates() async {
-    await ensureCacheTable();
-    try {
-      // Thử lấy từ Firestore trước
-      final items = await _fetchFromFirestore();
-      if (items.isNotEmpty) {
-        await _saveToSqlite(items);
-        return items;
-      }
-    } catch (_) {
-      // Firestore thất bại → fallback sang SQLite cache
-    }
-    return _fetchFromSqliteCache();
-  }
-
-  // ── Query Firestore: jobPosts where status in [approved, active] ────────────
-  static Future<List<MarketRateItem>> _fetchFromFirestore() async {
-    // Query 2 lần vì Firestore không hỗ trợ whereIn với OR trên cùng field cùng query
-    final futures = await Future.wait([
-      _db
-          .collection('jobPosts')
-          .where('status', isEqualTo: 'approved')
-          .get(),
-      _db
-          .collection('jobPosts')
-          .where('status', isEqualTo: 'active')
-          .get(),
-    ]);
-
-    final allDocs = [
-      ...futures[0].docs,
-      ...futures[1].docs,
+    await Future.delayed(const Duration(milliseconds: 600)); // Simulate network load
+    return const [
+      MarketRateItem(
+        category: 'phuc_vu',
+        categoryLabel: 'Phục vụ',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Quận 1',
+        minSalary: 25000,
+        maxSalary: 40000,
+        avgSalary: 30000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 150,
+        totalSlots: 400,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'pha_che',
+        categoryLabel: 'Pha chế',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Quận 3',
+        minSalary: 28000,
+        maxSalary: 45000,
+        avgSalary: 35000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 80,
+        totalSlots: 150,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'tiep_thi',
+        categoryLabel: 'Tiếp thị',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Quận 10',
+        minSalary: 200000,
+        maxSalary: 400000,
+        avgSalary: 300000,
+        salaryType: 'per_day',
+        totalActiveJobs: 45,
+        totalSlots: 120,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'van_chuyen',
+        categoryLabel: 'Vận chuyển',
+        city: 'Hà Nội',
+        district: 'Đống Đa',
+        minSalary: 35000,
+        maxSalary: 60000,
+        avgSalary: 45000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 110,
+        totalSlots: 200,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'bao_ve',
+        categoryLabel: 'Bảo vệ',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Tân Bình',
+        minSalary: 8000000,
+        maxSalary: 12000000,
+        avgSalary: 9000000,
+        salaryType: 'per_month',
+        totalActiveJobs: 25,
+        totalSlots: 50,
+        demandLevel: 'low',
+      ),
+      MarketRateItem(
+        category: 'boc_vac',
+        categoryLabel: 'Bốc vác',
+        city: 'Hà Nội',
+        district: 'Hoàng Mai',
+        minSalary: 300000,
+        maxSalary: 500000,
+        avgSalary: 400000,
+        salaryType: 'per_day',
+        totalActiveJobs: 60,
+        totalSlots: 180,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'lau_don',
+        categoryLabel: 'Lau dọn',
+        city: 'Đà Nẵng',
+        district: 'Hải Châu',
+        minSalary: 40000,
+        maxSalary: 60000,
+        avgSalary: 50000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 35,
+        totalSlots: 80,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'gia_su',
+        categoryLabel: 'Gia sư',
+        city: 'Hà Nội',
+        district: 'Cầu Giấy',
+        minSalary: 100000,
+        maxSalary: 250000,
+        avgSalary: 150000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 15,
+        totalSlots: 30,
+        demandLevel: 'low',
+      ),
+      MarketRateItem(
+        category: 'phuc_vu',
+        categoryLabel: 'Phục vụ',
+        city: 'Đà Nẵng',
+        district: 'Sơn Trà',
+        minSalary: 20000,
+        maxSalary: 30000,
+        avgSalary: 24000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 90,
+        totalSlots: 200,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'tiep_thi',
+        categoryLabel: 'Tiếp thị',
+        city: 'Hà Nội',
+        district: 'Thanh Xuân',
+        minSalary: 250000,
+        maxSalary: 500000,
+        avgSalary: 350000,
+        salaryType: 'per_day',
+        totalActiveJobs: 50,
+        totalSlots: 100,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'sua_chua',
+        categoryLabel: 'Sửa chữa điện/nước',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Bình Thạnh',
+        minSalary: 300000,
+        maxSalary: 800000,
+        avgSalary: 500000,
+        salaryType: 'per_day',
+        totalActiveJobs: 20,
+        totalSlots: 40,
+        demandLevel: 'low',
+      ),
+      MarketRateItem(
+        category: 'cham_soc_khach_hang',
+        categoryLabel: 'Chăm sóc KH',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Quận 7',
+        minSalary: 7000000,
+        maxSalary: 15000000,
+        avgSalary: 10000000,
+        salaryType: 'per_month',
+        totalActiveJobs: 120,
+        totalSlots: 300,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'nhan_vien_kho',
+        categoryLabel: 'Nhân viên kho',
+        city: 'Bình Dương',
+        district: 'Dĩ An',
+        minSalary: 350000,
+        maxSalary: 550000,
+        avgSalary: 450000,
+        salaryType: 'per_day',
+        totalActiveJobs: 85,
+        totalSlots: 250,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'thu_ngan',
+        categoryLabel: 'Thu ngân',
+        city: 'Hà Nội',
+        district: 'Hai Bà Trưng',
+        minSalary: 22000,
+        maxSalary: 35000,
+        avgSalary: 28000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 70,
+        totalSlots: 150,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'giao_hang',
+        categoryLabel: 'Giao hàng',
+        city: 'Cần Thơ',
+        district: 'Ninh Kiều',
+        minSalary: 250000,
+        maxSalary: 400000,
+        avgSalary: 320000,
+        salaryType: 'per_day',
+        totalActiveJobs: 40,
+        totalSlots: 90,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'tro_giang',
+        categoryLabel: 'Trợ giảng tiếng Anh',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Quận 5',
+        minSalary: 40000,
+        maxSalary: 80000,
+        avgSalary: 60000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 30,
+        totalSlots: 60,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'phuc_vu',
+        categoryLabel: 'Phục vụ ca tối (Part-time)',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Gò Vấp',
+        minSalary: 22000,
+        maxSalary: 35000,
+        avgSalary: 25000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 180,
+        totalSlots: 500,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'phat_to_roi',
+        categoryLabel: 'Phát tờ rơi',
+        city: 'Hà Nội',
+        district: 'Ba Đình',
+        minSalary: 30000,
+        maxSalary: 50000,
+        avgSalary: 40000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 20,
+        totalSlots: 80,
+        demandLevel: 'low',
+      ),
+      MarketRateItem(
+        category: 'thu_ngan',
+        categoryLabel: 'Thu ngân cửa hàng tiện lợi',
+        city: 'TP. Hồ Chí Minh',
+        district: 'Tân Phú',
+        minSalary: 23000,
+        maxSalary: 32000,
+        avgSalary: 26000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 110,
+        totalSlots: 220,
+        demandLevel: 'high',
+      ),
+      MarketRateItem(
+        category: 'trong_tre',
+        categoryLabel: 'Trông trẻ ngoài giờ',
+        city: 'Đà Nẵng',
+        district: 'Thanh Khê',
+        minSalary: 40000,
+        maxSalary: 80000,
+        avgSalary: 55000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 35,
+        totalSlots: 50,
+        demandLevel: 'medium',
+      ),
+      MarketRateItem(
+        category: 'dong_goi',
+        categoryLabel: 'Đóng gói hàng hóa',
+        city: 'Bình Dương',
+        district: 'Thuận An',
+        minSalary: 25000,
+        maxSalary: 35000,
+        avgSalary: 30000,
+        salaryType: 'per_hour',
+        totalActiveJobs: 95,
+        totalSlots: 300,
+        demandLevel: 'high',
+      ),
     ];
-
-    if (allDocs.isEmpty) return [];
-
-    return _aggregate(allDocs);
   }
 
-  // ── Tổng hợp dữ liệu theo (category + city + district + salaryType) ─────────
-  static List<MarketRateItem> _aggregate(
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    // key = "category|city|district|salaryType"
-    final Map<String, _AggBucket> buckets = {};
-
-    for (final doc in docs) {
-      final data = doc.data();
-      final category = data['category'] as String? ?? 'other';
-      final salaryType = data['salaryType'] as String? ?? 'per_day';
-      final salary = (data['salary'] as num?)?.toDouble() ?? 0.0;
-      final slots = (data['slots'] as num?)?.toInt() ?? 0;
-
-      final location = data['location'] as Map<String, dynamic>?;
-      final city = location?['city'] as String? ?? 'Không rõ';
-      final district = location?['district'] as String? ?? 'Không rõ';
-
-      if (salary <= 0) continue;
-
-      final key = '$category|$city|$district|$salaryType';
-      final bucket = buckets.putIfAbsent(key, () => _AggBucket(
-            category: category,
-            city: city,
-            district: district,
-            salaryType: salaryType,
-          ));
-
-      bucket.salaries.add(salary);
-      bucket.totalSlots += slots;
-      bucket.jobCount++;
-    }
-
-    return buckets.values.map((b) => b.toItem()).toList()
-      ..sort((a, b) => b.totalActiveJobs.compareTo(a.totalActiveJobs));
-  }
-
-  // ── SQLite: lưu cache ────────────────────────────────────────────────────────
-  static Future<void> _saveToSqlite(List<MarketRateItem> items) async {
-    final db = await SqliteCacheService.database;
-    final batch = db.batch();
-    for (final item in items) {
-      batch.insert(_cacheTable, item.toSqlite(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  // ── SQLite: đọc cache (tối đa 30 phút) ─────────────────────────────────────
-  static Future<List<MarketRateItem>> _fetchFromSqliteCache() async {
-    final db = await SqliteCacheService.database;
-    final minCachedAt =
-        DateTime.now().millisecondsSinceEpoch - _cacheMaxAgeMs;
-    final rows = await db.query(
-      _cacheTable,
-      where: 'cachedAt >= ?',
-      whereArgs: [minCachedAt],
-      orderBy: 'totalActiveJobs DESC',
-    );
-    return rows.map(MarketRateItem.fromSqlite).toList();
-  }
-
-  // ── Tìm kiếm (local filter) ──────────────────────────────────────────────────
   static List<MarketRateItem> filterItems({
     required List<MarketRateItem> items,
     required String query,
@@ -150,53 +296,5 @@ class MarketRateService {
           item.district.toLowerCase().contains(q);
       return matchCat && matchQuery;
     }).toList();
-  }
-}
-
-// ── Internal aggregation bucket ──────────────────────────────────────────────
-class _AggBucket {
-  final String category;
-  final String city;
-  final String district;
-  final String salaryType;
-  final List<double> salaries = [];
-  int totalSlots = 0;
-  int jobCount = 0;
-
-  _AggBucket({
-    required this.category,
-    required this.city,
-    required this.district,
-    required this.salaryType,
-  });
-
-  MarketRateItem toItem() {
-    salaries.sort();
-    final min = salaries.first;
-    final max = salaries.last;
-    final avg = salaries.reduce((a, b) => a + b) / salaries.length;
-
-    String demand;
-    if (jobCount >= 10) {
-      demand = 'high';
-    } else if (jobCount >= 5) {
-      demand = 'medium';
-    } else {
-      demand = 'low';
-    }
-
-    return MarketRateItem(
-      category: category,
-      categoryLabel: kCategoryLabels[category] ?? 'Khác',
-      city: city,
-      district: district,
-      minSalary: min,
-      maxSalary: max,
-      avgSalary: avg,
-      salaryType: salaryType,
-      totalActiveJobs: jobCount,
-      totalSlots: totalSlots,
-      demandLevel: demand,
-    );
   }
 }
