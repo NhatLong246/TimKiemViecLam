@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controller/search_controller.dart' as dashboard;
@@ -464,10 +465,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         Container(
                           width: double.infinity,
                           color: Colors.grey.shade200,
-                          child: Image.asset(
-                            'assets/images/banners/default_image.png',
-                            fit: BoxFit.cover,
-                          ),
+                          child: _buildJobImage(item.imageUrls),
                         ),
                         if (item.jobType == 'part_time')
                           Positioned(
@@ -555,5 +553,47 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         },
       );
     });
+  }
+
+  Widget _buildJobImage(List<String> imageUrls) {
+    if (imageUrls.isEmpty) {
+      return Image.asset(
+        'assets/images/banners/default_image.png',
+        fit: BoxFit.cover,
+      );
+    }
+    final img = imageUrls.first;
+    if (img.startsWith('http')) {
+      return Image.network(
+        img,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, stack) => Image.asset(
+          'assets/images/banners/default_image.png',
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    try {
+      var b64 = img;
+      if (b64.contains(',')) b64 = b64.split(',').last;
+      final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
+      final padded = sanitized.padRight(
+        sanitized.length + (4 - sanitized.length % 4) % 4,
+        '=',
+      );
+      return Image.memory(
+        base64Decode(padded),
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, stack) => Image.asset(
+          'assets/images/banners/default_image.png',
+          fit: BoxFit.cover,
+        ),
+      );
+    } catch (_) {
+      return Image.asset(
+        'assets/images/banners/default_image.png',
+        fit: BoxFit.cover,
+      );
+    }
   }
 }

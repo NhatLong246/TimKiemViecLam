@@ -386,7 +386,8 @@ class EmployerMarketRateScreen extends StatelessWidget {
 
   // ── SORT BAR ─────────────────────────────────────────────────────────────────
   Widget _buildSortBar(EmployerReferenceController c) {
-    return Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
         children: [
@@ -397,7 +398,7 @@ class EmployerMarketRateScreen extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF424242)),
               )),
-          const Spacer(),
+          const SizedBox(width: 16),
           Obx(() => _buildSortChip(
                 c,
                 sort: 'demand',
