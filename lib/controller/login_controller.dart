@@ -11,8 +11,14 @@ import '../routes/app_routes.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/services/alarm_manager_service.dart';
 
+import 'employer_profile_controller.dart';
+import 'job_post_controller.dart';
+import 'employer_notification_controller.dart';
+import 'employer_home_controller.dart';
+import 'messaging_controller.dart';
 class AuthController extends GetxController {
   final LoginAuthService _authService = LoginAuthService();
   UserModel? currentUser;
@@ -321,6 +327,14 @@ class AuthController extends GetxController {
     AttendanceAutoNotifyService.instance.stopEmployerPolling();
     _userSubscription?.cancel();
     _userSubscription = null;
+    
+    // Clear state
+    Get.delete<EmployerProfileController>(force: true);
+    Get.delete<JobPostController>(force: true);
+    Get.delete<EmployerNotificationController>(force: true);
+    Get.delete<EmployerHomeController>(force: true);
+    Get.delete<MessagingController>(force: true);
+    
     update();
   }
 
@@ -372,8 +386,9 @@ class AuthController extends GetxController {
               }
 
               if (currentUser != null) {
-                data['uid'] = uid;
-                currentUser = UserModel.fromMap(data);
+                final mutableData = Map<String, dynamic>.from(data);
+                mutableData['uid'] = uid;
+                currentUser = UserModel.fromMap(mutableData);
                 update();
               }
             }

@@ -833,7 +833,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
     } else if (tabType == 'pendingDisbursement') {
       icon = Icons.hourglass_top_rounded;
       label = 'Ưu tiên: Xem yêu cầu';
-      onTap = () => PostManagementActions.openAttendance(post);
+      onTap = () => PostManagementActions.openDisbursement(post);
     } else if (tabType == 'completed') {
       icon = Icons.history_rounded;
       label = 'Ưu tiên: Xem lịch sử';
@@ -848,7 +848,7 @@ class _PostManagementScreenState extends State<PostManagementScreen>
           post.groupChatId!.isNotEmpty) {
         icon = Icons.payment_rounded;
         label = 'Ưu tiên: Xem & Giải ngân';
-        onTap = () => PostManagementActions.openAttendance(post);
+        onTap = () => PostManagementActions.openDisbursement(post);
       } else {
         icon = Icons.delete_outline_rounded;
         label = post.isFullTimeReferral && post.filledSlots > 0

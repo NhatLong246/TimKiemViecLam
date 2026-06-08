@@ -76,6 +76,20 @@ class EmployerProfileController extends GetxController {
           cccdBackImageUrl: cccdBackImageUrl ?? profile.value!.cccdBackImageUrl,
         );
       }
+      final authCtrl = Get.find<AuthController>();
+      if (authCtrl.currentUser != null) {
+        authCtrl.currentUser = authCtrl.currentUser!.copyWith(
+          firstName: firstName ?? authCtrl.currentUser!.firstName,
+          lastName: lastName ?? authCtrl.currentUser!.lastName,
+          phone: phone ?? authCtrl.currentUser!.phone,
+          gender: gender ?? authCtrl.currentUser!.gender,
+          dateOfBirth: dateOfBirth ?? authCtrl.currentUser!.dateOfBirth,
+          cccd: cccd ?? authCtrl.currentUser!.cccd,
+          cccdImageUrl: cccdImageUrl ?? authCtrl.currentUser!.cccdImageUrl,
+          cccdBackImageUrl: cccdBackImageUrl ?? authCtrl.currentUser!.cccdBackImageUrl,
+        );
+        authCtrl.update();
+      }
       _showSuccess('Cập nhật thông tin cá nhân thành công');
       return true;
     } catch (e) {
@@ -219,6 +233,20 @@ class EmployerProfileController extends GetxController {
           businessType: businessType ?? profile.value!.businessType,
           companyDescription: companyDescription ?? profile.value!.companyDescription,
         );
+      }
+      final authCtrl = Get.find<AuthController>();
+      if (authCtrl.currentUser != null) {
+        authCtrl.currentUser = authCtrl.currentUser!.copyWith(
+          companyName: companyName ?? authCtrl.currentUser!.companyName,
+          companyAddress: companyAddress ?? authCtrl.currentUser!.companyAddress,
+          companyPhone: companyPhone ?? authCtrl.currentUser!.companyPhone,
+          companyWebsite: companyWebsite ?? authCtrl.currentUser!.companyWebsite,
+          companyTaxCode: companyTaxCode ?? authCtrl.currentUser!.companyTaxCode,
+          companySize: companySize ?? authCtrl.currentUser!.companySize,
+          businessType: businessType ?? authCtrl.currentUser!.businessType,
+          companyDescription: companyDescription ?? authCtrl.currentUser!.companyDescription,
+        );
+        authCtrl.update();
       }
       _showSuccess('Cập nhật thông tin doanh nghiệp thành công');
       return true;

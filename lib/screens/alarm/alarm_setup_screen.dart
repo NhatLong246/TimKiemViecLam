@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../data/services/alarm_manager_service.dart';
 import '../../data/models/personal_alarm_model.dart';
+import 'package:jbh_ringtone/jbh_ringtone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AlarmSetupScreen extends StatefulWidget {
   const AlarmSetupScreen({super.key});
@@ -15,15 +17,190 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
   bool _isSyncing = false;
   List<PersonalAlarmModel> _personalAlarms = [];
   bool _isLoadingAlarms = true;
+  String _selectedRingtoneTitle = 'Mặc định';
+  String? _selectedRingtoneUri;
 
   @override
   void initState() {
     super.initState();
     _loadPersonalAlarms();
+    _loadCustomRingtone();
+  }
+
+  Future<void> _loadCustomRingtone() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uri = prefs.getString('custom_alarm_ringtone_uri');
+    final title = prefs.getString('custom_alarm_ringtone_title');
+    if (mounted) {
+      setState(() {
+        _selectedRingtoneUri = uri;
+        _selectedRingtoneTitle = title ?? 'Mặc định';
+      });
+    }
+  }
+
+  Future<void> _pickRingtone() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final ringtones = await JbhRingtone().getAlarmRingtones();
+      if (!mounted) return;
+      Navigator.pop(context); // close loading
+
+      if (ringtones.isEmpty) {
+        Get.snackbar('Thông báo', 'Không tìm thấy nhạc chuông trên thiết bị.');
+        return;
+      }
+
+      JbhRingtoneModel? tempSelected;
+      String? playingUri;
+      
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.6,
+                minChildSize: 0.4,
+                maxChildSize: 0.9,
+                expand: false,
+                builder: (_, controller) {
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Chọn nhạc chuông', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            TextButton(
+                              onPressed: () {
+                                JbhRingtone().stopRingtone();
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Đóng'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        title: const Text('Mặc định (Hệ thống)'),
+                        trailing: _selectedRingtoneUri == null ? const Icon(Icons.check, color: Colors.blue) : null,
+                        onTap: () async {
+                          JbhRingtone().stopRingtone();
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.remove('custom_alarm_ringtone_uri');
+                          await prefs.remove('custom_alarm_ringtone_title');
+                          setState(() {
+                            _selectedRingtoneUri = null;
+                            _selectedRingtoneTitle = 'Mặc định';
+                          });
+                          if (mounted) Navigator.pop(context);
+                        },
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: ListView.builder(
+                          controller: controller,
+                          itemCount: ringtones.length,
+                          itemBuilder: (context, index) {
+                            final r = ringtones[index];
+                            final isSelected = tempSelected?.uri == r.uri || (_selectedRingtoneUri == r.uri && tempSelected == null);
+                            
+                            return ListTile(
+                              leading: IconButton(
+                                icon: Icon(
+                                  playingUri == r.uri ? Icons.stop_circle : Icons.play_circle_outline,
+                                  color: playingUri == r.uri ? Colors.red : Colors.blue,
+                                  size: 32,
+                                ),
+                                onPressed: () {
+                                  if (playingUri == r.uri) {
+                                    JbhRingtone().stopRingtone();
+                                    setSheetState(() => playingUri = null);
+                                  } else {
+                                    JbhRingtone().playRingtone(r.uri);
+                                    setSheetState(() => playingUri = r.uri);
+                                  }
+                                },
+                              ),
+                              title: Text(r.title),
+                              trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
+                              onTap: () {
+                                setSheetState(() {
+                                  tempSelected = r;
+                                  playingUri = r.uri;
+                                });
+                                JbhRingtone().playRingtone(r.uri);
+                              },
+                              onLongPress: () async {
+                                JbhRingtone().stopRingtone();
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('custom_alarm_ringtone_uri', r.uri);
+                                await prefs.setString('custom_alarm_ringtone_title', r.title);
+                                setState(() {
+                                  _selectedRingtoneUri = r.uri;
+                                  _selectedRingtoneTitle = r.title;
+                                });
+                                if (mounted) Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            JbhRingtone().stopRingtone();
+                            if (tempSelected != null) {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setString('custom_alarm_ringtone_uri', tempSelected!.uri);
+                              await prefs.setString('custom_alarm_ringtone_title', tempSelected!.title);
+                              setState(() {
+                                _selectedRingtoneUri = tempSelected!.uri;
+                                _selectedRingtoneTitle = tempSelected!.title;
+                              });
+                            }
+                            if (mounted) Navigator.pop(context);
+                          },
+                          child: const Text('Lưu lựa chọn'),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          );
+        },
+      ).then((_) {
+        JbhRingtone().stopRingtone();
+      });
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      Get.snackbar('Lỗi', 'Không thể tải nhạc chuông: $e');
+    }
   }
 
   Future<void> _loadPersonalAlarms() async {
     final alarms = await AlarmManagerService.instance.getPersonalAlarms();
+    alarms.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
     if (mounted) {
       setState(() {
         _personalAlarms = alarms;
@@ -33,24 +210,61 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
   }
 
   Future<void> _addPersonalAlarm() async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (pickedDate == null || !mounted) return;
+
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
     if (pickedTime == null || !mounted) return;
 
+    final scheduledTime = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    if (scheduledTime.isBefore(DateTime.now())) {
+      Get.snackbar('Lỗi', 'Không thể chọn thời gian trong quá khứ.');
+      return;
+    }
+
     final TextEditingController titleController = TextEditingController();
+    final TextEditingController noteController = TextEditingController();
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Nhập tiêu đề báo thức'),
-          content: TextField(
-            controller: titleController,
-            decoration: const InputDecoration(
-              hintText: 'Ví dụ: Dậy chuẩn bị đi làm',
-            ),
-            autofocus: true,
+          title: const Text('Chi tiết báo thức'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Tiêu đề',
+                  hintText: 'Ví dụ: Dậy chuẩn bị đi làm',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  labelText: 'Ghi chú (tuỳ chọn)',
+                  hintText: 'Mang theo tài liệu...',
+                ),
+                maxLines: 2,
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -70,7 +284,8 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
       final alarm = PersonalAlarmModel(
         id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
         title: titleController.text.trim(),
-        time: pickedTime,
+        note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+        scheduledTime: scheduledTime,
         isActive: true,
       );
       await AlarmManagerService.instance.addPersonalAlarm(alarm);
@@ -98,27 +313,6 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
     } finally {
       setState(() => _isSyncing = false);
     }
-  }
-
-  Future<void> _testAlarm() async {
-    final testTime = DateTime.now().add(const Duration(seconds: 15));
-    await AlarmManagerService.instance.scheduleAlarm(
-      id: 9999,
-      title: 'Báo động Test!',
-      body: 'Đây là báo thức test (15s).',
-      scheduledDate: testTime,
-      payloadData: {
-        'title': 'BÁO ĐỘNG ĐỎ TEST',
-        'body': 'Báo thức hoạt động tốt!',
-      },
-    );
-    Get.snackbar(
-      'Đã lên lịch',
-      'Báo thức sẽ reo sau 15 giây nữa. Hãy thoát ra ngoài màn hình chính để test Full-screen Intent nhé!',
-      backgroundColor: Colors.blue.shade100,
-      colorText: Colors.blue.shade900,
-      duration: const Duration(seconds: 5),
-    );
   }
 
   @override
@@ -159,19 +353,19 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
             ),
             onPressed: _isSyncing ? null : _syncAlarms,
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.access_alarm),
-            label: const Text('Test Báo thức (sau 15 giây)'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.all(16),
-              textStyle: const TextStyle(fontSize: 18),
+          const SizedBox(height: 24),
+          Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              leading: const Icon(Icons.music_note, color: Colors.blue),
+              title: const Text('Nhạc chuông báo thức', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(_selectedRingtoneTitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _pickRingtone,
             ),
-            onPressed: _testAlarm,
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
           const Divider(),
           const Divider(),
           ListTile(
@@ -208,11 +402,52 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
               child: Card(
                 elevation: 0.5,
                 child: ListTile(
-                  title: Text(
-                    '${alarm.time.hour.toString().padLeft(2, '0')}:${alarm.time.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  title: Row(
+                    children: [
+                      Text(
+                        DateFormat('HH:mm').format(alarm.scheduledTime),
+                        style: TextStyle(
+                          fontSize: 24, 
+                          fontWeight: FontWeight.bold,
+                          color: alarm.scheduledTime.isBefore(DateTime.now()) && alarm.isActive 
+                              ? Colors.red : Colors.blue.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          DateFormat('dd/MM/yyyy').format(alarm.scheduledTime),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                        ),
+                      ),
+                    ],
                   ),
-                  subtitle: Text(alarm.title),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(alarm.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black87)),
+                        if (alarm.note != null && alarm.note!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.notes, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Expanded(child: Text(alarm.note!, style: const TextStyle(fontSize: 14, color: Colors.black54))),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   trailing: Switch(
                     value: alarm.isActive,
                     activeColor: Colors.blue,

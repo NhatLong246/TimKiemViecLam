@@ -28,13 +28,19 @@ class AlarmManagerService {
   }) async {
     if (scheduledDate.isBefore(DateTime.now())) return;
 
+    final prefs = await SharedPreferences.getInstance();
+    final customUri = prefs.getString('custom_alarm_ringtone_uri');
+    
+    final channelId = customUri != null ? 'alarm_channel_${customUri.hashCode}' : 'alarm_channel_v3';
+
     final androidDetails = AndroidNotificationDetails(
-      'alarm_channel_v2',
+      channelId,
       'Báo thức & Nhắc nhở',
       channelDescription: 'Báo động đỏ khi có ca làm việc sắp diễn ra',
       importance: Importance.max,
       priority: Priority.max,
       playSound: true,
+      sound: customUri != null ? UriAndroidNotificationSound(customUri) : null,
       enableVibration: true,
     );
 
@@ -96,21 +102,38 @@ class AlarmManagerService {
     final userDoc = await _db.collection('users').doc(uid).get();
     if ((userDoc.data()?['role'] ?? 'candidate') != 'candidate') return;
 
+    // Hủy tất cả các báo thức tự động cũ trước khi đồng bộ lại
+    final prefs = await SharedPreferences.getInstance();
+    final oldIds = prefs.getStringList('auto_alarm_ids') ?? [];
+    for (final idStr in oldIds) {
+      final id = int.tryParse(idStr);
+      if (id != null) {
+        await cancelAlarm(id);
+      }
+    }
+    
+    List<String> newScheduledIds = [];
+
     final appsSnap = await _db.collection('applications')
         .where('candidateId', isEqualTo: uid)
+        .where('status', isEqualTo: 'accepted') // Chỉ lấy job được nhận
         .get();
 
     for (final doc in appsSnap.docs) {
       final appData = doc.data();
       final jobId = (appData['jobId'] ?? '').toString();
-      final appStatus = (appData['status'] ?? '').toString();
-      
       if (jobId.isEmpty) continue;
 
       final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
       if (!jobDoc.exists) continue;
 
       final jobData = jobDoc.data()!;
+      // Nếu job đã hoàn thành, đóng, hủy, xóa thì bỏ qua không lên lịch
+      final status = jobData['status'] ?? '';
+      if (status == 'completed' || status == 'cancelled' || status == 'closed' || status == 'deleted') {
+        continue;
+      }
+
       jobData['jobId'] = jobId;
       final job = JobPostModel.fromMap(jobData);
 
@@ -119,7 +142,6 @@ class AlarmManagerService {
       final startParts = job.startTime!.split(':');
       if (startParts.length != 2) continue;
 
-      // Tính toán giờ làm việc mỗi ngày
       final startHours = int.parse(startParts[0]);
       final startMins = int.parse(startParts[1]);
       final workHours = job.workHoursPerDay ?? 8.0;
@@ -131,41 +153,17 @@ class AlarmManagerService {
       DateTime currentDay = DateTime(job.startDate.year, job.startDate.month, job.startDate.day);
       final endDay = job.endDate != null ? DateTime(job.endDate!.year, job.endDate!.month, job.endDate!.day) : currentDay;
 
-      // Nếu công việc đã kết thúc/hủy, hoặc ứng dụng không còn được chấp nhận, hủy toàn bộ báo thức
-      if (appStatus != 'accepted' || 
-          job.status == 'completed' || 
-          job.status == 'cancelled' || 
-          job.status == 'closed' || 
-          job.status == 'deleted') {
-        DateTime cancelDay = currentDay;
-        while (cancelDay.compareTo(endDay.add(const Duration(days: 1))) < 0) {
-          final startAlarmTime = DateTime(cancelDay.year, cancelDay.month, cancelDay.day, startHours, startMins);
-          await cancelAlarm((jobId + startAlarmTime.toIso8601String() + "_start").hashCode);
-
-          final endAlarmTime = DateTime(cancelDay.year, cancelDay.month, cancelDay.day, endHours, endMins);
-          final finalEndAlarmTime = endAlarmTime.isBefore(startAlarmTime) 
-              ? endAlarmTime.add(const Duration(days: 1)) 
-              : endAlarmTime;
-          await cancelAlarm((jobId + finalEndAlarmTime.toIso8601String() + "_end").hashCode);
-
-          cancelDay = cancelDay.add(const Duration(days: 1));
-        }
-        continue;
-      }
-
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       
-      // Bỏ qua nếu công việc đã hoàn toàn nằm trong quá khứ
       if (endDay.isBefore(today.subtract(const Duration(days: 1)))) continue;
 
-      // Fast-forward currentDay tới hôm nay nếu nó nằm quá xa trong quá khứ (để tránh lặp dư thừa)
       if (currentDay.isBefore(today)) {
         currentDay = today;
       }
 
       while (currentDay.compareTo(endDay.add(const Duration(days: 1))) < 0) {
-        // Báo thức ĐẦU CA (đúng giờ bắt đầu)
+        // Báo thức ĐẦU CA
         final startAlarmTime = DateTime(currentDay.year, currentDay.month, currentDay.day, startHours, startMins);
         if (startAlarmTime.isAfter(DateTime.now())) {
           final alarmId = (jobId + startAlarmTime.toIso8601String() + "_start").hashCode;
@@ -178,11 +176,11 @@ class AlarmManagerService {
               'jobId': jobId,
             },
           );
+          newScheduledIds.add(alarmId.toString());
         }
 
-        // Báo thức CUỐI CA (đúng giờ kết thúc)
+        // Báo thức CUỐI CA
         final endAlarmTime = DateTime(currentDay.year, currentDay.month, currentDay.day, endHours, endMins);
-        // Chú ý ca qua đêm: nếu giờ kết thúc < giờ bắt đầu thì cộng thêm 1 ngày
         final finalEndAlarmTime = endAlarmTime.isBefore(startAlarmTime) 
             ? endAlarmTime.add(const Duration(days: 1)) 
             : endAlarmTime;
@@ -198,11 +196,15 @@ class AlarmManagerService {
               'jobId': jobId,
             },
           );
+          newScheduledIds.add(alarmId.toString());
         }
 
         currentDay = currentDay.add(const Duration(days: 1));
       }
     }
+    
+    // Lưu lại danh sách ID mới
+    await prefs.setStringList('auto_alarm_ids', newScheduledIds);
   }
 
   // --- PERSONAL ALARM IMPLEMENTATION ---
@@ -252,23 +254,22 @@ class AlarmManagerService {
 
   Future<void> _schedulePersonalAlarm(PersonalAlarmModel alarm) async {
     final now = DateTime.now();
-    DateTime scheduledDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      alarm.time.hour,
-      alarm.time.minute,
-    );
+    DateTime scheduledDate = alarm.scheduledTime;
 
-    // Nếu giờ đã qua trong ngày, lên lịch vào ngày mai
+    // Không lên lịch cho báo thức đã qua trong quá khứ
     if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
+      return;
     }
+
+    final notifTitle = '⏰ ${alarm.title}';
+    final notifBody = (alarm.note != null && alarm.note!.trim().isNotEmpty) 
+        ? alarm.note! 
+        : 'Báo thức cá nhân';
 
     await scheduleAlarm(
       id: alarm.id,
-      title: '⏰ Báo thức cá nhân',
-      body: alarm.title,
+      title: notifTitle,
+      body: notifBody,
       scheduledDate: scheduledDate,
       payloadData: {
         'isPersonal': true,

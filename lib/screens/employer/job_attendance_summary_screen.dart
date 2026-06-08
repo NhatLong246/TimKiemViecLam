@@ -11,6 +11,8 @@ import '../../data/services/attendance_service.dart';
 import '../../data/services/job_post_service.dart';
 import '../../data/services/work_schedule_service.dart';
 import '../../utils/work_day_helper.dart';
+import '../../data/services/job_attendance_completion_service.dart';
+import '../../routes/app_routes.dart';
 
 /// Bảng điểm danh tổng hợp cho NTD sau khi đủ ngày làm bắt buộc.
 class JobAttendanceSummaryScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class _JobAttendanceSummaryScreenState extends State<JobAttendanceSummaryScreen>
   final _attendanceSvc = AttendanceService();
   final _scheduleSvc = WorkScheduleService();
   final _jobSvc = JobPostService();
+  final _completionSvc = JobAttendanceCompletionService();
   final _db = FirebaseFirestore.instance;
 
   late GroupChatModel _group;
@@ -32,6 +35,7 @@ class _JobAttendanceSummaryScreenState extends State<JobAttendanceSummaryScreen>
   List<String> _mandatoryDates = [];
   List<AttendanceModel> _sessions = [];
   Map<String, String> _candidateNames = {};
+  JobDisbursementReadiness? _readiness;
   bool _loading = true;
 
   @override
@@ -52,6 +56,15 @@ class _JobAttendanceSummaryScreenState extends State<JobAttendanceSummaryScreen>
         scheduledDates: scheduled,
       );
       _sessions = await _attendanceSvc.streamByJob(_group.jobId).first;
+      
+      final candidateIds = _group.memberIds
+          .where((id) => id.isNotEmpty && id != _group.employerId)
+          .toList();
+      _readiness = await _completionSvc.evaluate(
+        jobId: _group.jobId,
+        groupId: _group.groupId,
+        candidateIds: candidateIds,
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -135,6 +148,28 @@ class _JobAttendanceSummaryScreenState extends State<JobAttendanceSummaryScreen>
     if (pct >= 100) return const Color(0xFF2E7D32);
     if (pct >= 50) return const Color(0xFFFB8C00);
     return const Color(0xFFC62828);
+  }
+
+  Future<void> _openDisbursementFlow() async {
+    final r = _readiness;
+    if (r == null || !r.canRequestDisbursement) {
+      Get.snackbar(
+        'Chưa thể giải ngân',
+        r?.message ?? 'Hoàn tất điểm danh trong thời hạn làm việc.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+    final lastDate = r.mandatoryDates.isNotEmpty
+        ? r.mandatoryDates.last
+        : DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final result = await Get.toNamed(
+      AppRoutes.jobDayEndFlow,
+      arguments: {'group': _group, 'workDate': lastDate},
+    );
+    if (result == true && mounted) await _load();
   }
 
   @override
@@ -298,6 +333,80 @@ class _JobAttendanceSummaryScreenState extends State<JobAttendanceSummaryScreen>
                 ],
               ),
             ),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  Widget? _buildBottomBar() {
+    final r = _readiness;
+    if (r == null || _loading) return null;
+    if (!r.canRequestDisbursement && r.requiredDays == 0) return null;
+
+    return Container(
+      color: Theme.of(context).cardColor,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              r.message,
+              style: TextStyle(
+                fontSize: 13,
+                color: r.canDisburse ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (r.requiredDays > 1) ...[
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: r.requiredDays > 0 ? r.completedDays / r.requiredDays : 0,
+                backgroundColor: Colors.grey.shade200,
+                color: AppColors.employerPrimary,
+                minHeight: 6,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (r.canDisburse)
+              FilledButton.icon(
+                onPressed: _openDisbursementFlow,
+                icon: const Icon(Icons.payments_outlined),
+                label: Text(
+                  r.requiredDays == 1
+                      ? 'Giải ngân & đánh giá'
+                      : 'Giải ngân (${r.requiredDays} ngày đã xong)',
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.employerPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              )
+            else if (r.canRequestDisbursement)
+              OutlinedButton.icon(
+                onPressed: _openDisbursementFlow,
+                icon: const Icon(Icons.send_outlined),
+                label: const Text('Gửi yêu cầu giải ngân (Admin xem xét)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.employerPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: null,
+                icon: const Icon(Icons.lock_clock_outlined),
+                label: Text(
+                  r.requiredDays == 1
+                      ? 'Chưa đủ điểm danh trong ngày'
+                      : 'Còn ${r.requiredDays - r.completedDays} ngày trong lịch',
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
