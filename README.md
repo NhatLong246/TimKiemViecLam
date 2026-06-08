@@ -83,6 +83,21 @@ công GPS, thông báo đẩy, chatbot AI và ví thanh toán thử nghiệm.
 | AI và dữ liệu ngoài | OpenRouter, OpenWeatherMap |
 | Biểu đồ và thống kê | fl_chart |
 
+## Phiên bản và packages chính
+
+| Thành phần | Phiên bản |
+| --- | --- |
+| Dart SDK | `^3.11.0` |
+| Flutter SDK | Phiên bản hỗ trợ Dart `^3.11.0` |
+| Firebase Core | `^4.7.0` |
+| Firebase Authentication | `^6.4.0` |
+| Cloud Firestore | `^6.3.0` |
+| Firebase Storage | `^13.3.0` |
+| Firebase Messaging | `^16.2.0` |
+| GetX | `^4.7.3` |
+
+Danh sách dependencies đầy đủ nằm trong [`pubspec.yaml`](pubspec.yaml).
+
 ## Luồng nghiệp vụ chính
 
 ```text
@@ -137,7 +152,7 @@ ViecNow/
 - Android Studio hoặc Visual Studio Code có Flutter extension.
 - Android SDK và thiết bị thật hoặc emulator.
 - Node.js 20 và Firebase CLI nếu cần chạy hoặc triển khai Cloud Functions.
-- Một dự án Firebase đã bật Authentication, Firestore, Storage và Messaging.
+- Kết nối Internet để sử dụng Firebase và các dịch vụ API bên ngoài.
 
 Kiểm tra môi trường Flutter:
 
@@ -160,21 +175,78 @@ cd ViecNow
 flutter pub get
 ```
 
-3. Cấu hình Firebase cho dự án:
+3. Kiểm tra thiết bị hoặc emulator:
 
 ```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
+flutter devices
 ```
-
-Lệnh trên cần tạo hoặc cập nhật các tệp cấu hình như
-`lib/firebase_options.dart` và `android/app/google-services.json`.
 
 4. Chạy ứng dụng:
 
 ```bash
 flutter run
 ```
+
+Repository cung cấp sẵn cấu hình Firebase Android dành cho project demo. Nếu
+muốn sử dụng Firebase project khác, xem mục [Cấu hình Firebase](#cấu-hình-firebase).
+
+## Cấu hình Firebase
+
+### Cấu hình được cung cấp trong repository
+
+Các file cấu hình Firebase client sau được commit để người chấm có thể clone và
+chạy ứng dụng:
+
+- `android/app/google-services.json`: cấu hình ứng dụng Firebase Android.
+- `lib/firebase_options.dart`: cấu hình Firebase do FlutterFire CLI tạo.
+- `firebase.json`: cấu hình Firebase CLI và Cloud Functions.
+
+`google-services.json` và `firebase_options.dart` chứa thông tin nhận diện/API
+key phía client, không chứa private key quản trị Firebase. Các file này có thể
+commit cho Firebase project demo. Mức độ an toàn của dữ liệu phải được bảo vệ
+bằng Firebase Authentication, Firestore Rules, Storage Rules và giới hạn API
+key trên Google Cloud Console.
+
+### Sử dụng Firebase project khác
+
+1. Tạo Firebase project và bật Authentication, Cloud Firestore, Storage và
+   Cloud Messaging.
+2. Cài đặt Firebase CLI và FlutterFire CLI:
+
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure
+```
+
+3. Chọn Firebase project và Android app phù hợp. Lệnh sẽ tạo hoặc cập nhật
+   `lib/firebase_options.dart` và `android/app/google-services.json`.
+4. Tạo dữ liệu cần thiết theo [`database_schema.md`](database_schema.md).
+5. Cấu hình Firestore Rules và Storage Rules phù hợp trước khi sử dụng dữ liệu
+   thật hoặc phát hành ứng dụng.
+
+### Dữ liệu Firebase cần thiết
+
+- Cấu trúc collection/document được mô tả trong
+  [`database_schema.md`](database_schema.md).
+- Ứng dụng có thể tạo tài khoản và dữ liệu nghiệp vụ trực tiếp từ các màn hình
+  đăng ký, đăng tin, ứng tuyển và nhắn tin.
+- Project demo cần có ít nhất một tài khoản ứng viên, một tài khoản nhà tuyển
+  dụng và dữ liệu tin tuyển dụng để kiểm tra đầy đủ luồng nghiệp vụ.
+
+### Thông tin tuyệt đối không được commit
+
+Không commit các thông tin sau:
+
+- Firebase service-account JSON hoặc Firebase Admin SDK private key.
+- File `.env`, private key, signing key, `key.properties`, `*.jks`, `*.keystore`.
+- Secret key của OpenRouter, Agora, MoMo hoặc các dịch vụ backend.
+- Mật khẩu tài khoản thật và dữ liệu cá nhân thật.
+
+## Tài khoản kiểm thử
+
+Người kiểm thử có thể đăng ký tài khoản ứng viên hoặc nhà tuyển dụng trực tiếp
+trên ứng dụng. Chỉ sử dụng dữ liệu giả và không nhập thông tin cá nhân hoặc
+thông tin thanh toán thật trong quá trình kiểm thử.
 
 ## Cấu hình dịch vụ ngoài
 
@@ -255,7 +327,10 @@ Trạng thái chi tiết của từng tính năng được theo dõi trong
 
 ## Bảo mật
 
-- Không commit khóa API, secret key hoặc thông tin tài khoản thật.
+- Có thể commit cấu hình Firebase client dành cho project demo như
+  `google-services.json` và `firebase_options.dart`; không commit service-account
+  key hoặc private key quản trị.
+- Không commit secret key hoặc thông tin tài khoản thật.
 - Không sử dụng thông tin MoMo Sandbox hiện tại cho môi trường production.
 - Cần triển khai Firebase Security Rules theo vai trò người dùng trước khi phát
   hành ứng dụng.

@@ -50,10 +50,9 @@ android/.cxx/
 *.lock
 !.gitignore
 
-# Firebase - sensitive config files (chứa API keys)
-google-services.json
+# Firebase client configuration may be committed for the demo project.
+# Never commit service-account keys or Firebase Admin SDK private keys.
 **/GoogleService-Info.plist
-lib/firebase_options.dart
 
 # Local API keys
 api_keys.json

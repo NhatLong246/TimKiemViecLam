@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "630246371829",
+    "project_id": "timkiemvieclam-711c6",
+    "storage_bucket": "timkiemvieclam-711c6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:630246371829:android:1e6ef76a2d01b59a0630bc",
+        "android_client_info": {
+          "package_name": "com.example.viecnow"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "630246371829-mliv38st1jdiuvu9qjunvb7bnjl5lff5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.viecnow",
+            "certificate_hash": "04275e4f54c0ffde1513e81b83c73b1120f85fea"
+          }
+        },
+        {
+          "client_id": "630246371829-mmhsdui0l2ftauqh7co5pi0o00cfebcv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.viecnow",
+            "certificate_hash": "2ad9ee16aa3391f5d3829cb1b856bf1deeb7bf74"
+          }
+        },
+        {
+          "client_id": "630246371829-h6gobgkjqc6re38hnas9tpat38b1363p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUZMzGdvoSITFw0ObZrP9RPR0GBNuAhR8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "630246371829-h6gobgkjqc6re38hnas9tpat38b1363p.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "630246371829-mj05g4rlhl2frknd1lk8nghm3k2ej0ta.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.viecnow"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
