@@ -4,26 +4,30 @@ import 'package:flutter/material.dart';
 class PersonalAlarmModel {
   final int id;
   final String title;
-  final TimeOfDay time;
+  final DateTime scheduledTime;
+  final String? note;
   final bool isActive;
 
   PersonalAlarmModel({
     required this.id,
     required this.title,
-    required this.time,
+    required this.scheduledTime,
+    this.note,
     required this.isActive,
   });
 
   PersonalAlarmModel copyWith({
     int? id,
     String? title,
-    TimeOfDay? time,
+    DateTime? scheduledTime,
+    String? note,
     bool? isActive,
   }) {
     return PersonalAlarmModel(
       id: id ?? this.id,
       title: title ?? this.title,
-      time: time ?? this.time,
+      scheduledTime: scheduledTime ?? this.scheduledTime,
+      note: note ?? this.note,
       isActive: isActive ?? this.isActive,
     );
   }
@@ -32,20 +36,35 @@ class PersonalAlarmModel {
     return {
       'id': id,
       'title': title,
-      'hour': time.hour,
-      'minute': time.minute,
+      'scheduledTime': scheduledTime.millisecondsSinceEpoch,
+      'note': note,
       'isActive': isActive,
     };
   }
 
   factory PersonalAlarmModel.fromMap(Map<String, dynamic> map) {
+    DateTime parsedTime;
+    
+    if (map.containsKey('scheduledTime')) {
+      parsedTime = DateTime.fromMillisecondsSinceEpoch(map['scheduledTime']);
+    } else {
+      // Fallback cho dữ liệu cũ (TimeOfDay)
+      final now = DateTime.now();
+      final int hour = map['hour']?.toInt() ?? 0;
+      final int minute = map['minute']?.toInt() ?? 0;
+      parsedTime = DateTime(now.year, now.month, now.day, hour, minute);
+      
+      // Nếu là báo thức cũ và giờ đã qua trong ngày, dời sang ngày mai
+      if (parsedTime.isBefore(now)) {
+        parsedTime = parsedTime.add(const Duration(days: 1));
+      }
+    }
+
     return PersonalAlarmModel(
       id: map['id']?.toInt() ?? 0,
       title: map['title'] ?? '',
-      time: TimeOfDay(
-        hour: map['hour']?.toInt() ?? 0,
-        minute: map['minute']?.toInt() ?? 0,
-      ),
+      scheduledTime: parsedTime,
+      note: map['note'],
       isActive: map['isActive'] ?? true,
     );
   }

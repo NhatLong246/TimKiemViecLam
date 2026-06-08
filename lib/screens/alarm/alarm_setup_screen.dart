@@ -200,6 +200,7 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
 
   Future<void> _loadPersonalAlarms() async {
     final alarms = await AlarmManagerService.instance.getPersonalAlarms();
+    alarms.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
     if (mounted) {
       setState(() {
         _personalAlarms = alarms;
@@ -209,24 +210,61 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
   }
 
   Future<void> _addPersonalAlarm() async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (pickedDate == null || !mounted) return;
+
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
     if (pickedTime == null || !mounted) return;
 
+    final scheduledTime = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    if (scheduledTime.isBefore(DateTime.now())) {
+      Get.snackbar('Lỗi', 'Không thể chọn thời gian trong quá khứ.');
+      return;
+    }
+
     final TextEditingController titleController = TextEditingController();
+    final TextEditingController noteController = TextEditingController();
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Nhập tiêu đề báo thức'),
-          content: TextField(
-            controller: titleController,
-            decoration: const InputDecoration(
-              hintText: 'Ví dụ: Dậy chuẩn bị đi làm',
-            ),
-            autofocus: true,
+          title: const Text('Chi tiết báo thức'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Tiêu đề',
+                  hintText: 'Ví dụ: Dậy chuẩn bị đi làm',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  labelText: 'Ghi chú (tuỳ chọn)',
+                  hintText: 'Mang theo tài liệu...',
+                ),
+                maxLines: 2,
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -246,7 +284,8 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
       final alarm = PersonalAlarmModel(
         id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
         title: titleController.text.trim(),
-        time: pickedTime,
+        note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+        scheduledTime: scheduledTime,
         isActive: true,
       );
       await AlarmManagerService.instance.addPersonalAlarm(alarm);
@@ -363,11 +402,52 @@ class _AlarmSetupScreenState extends State<AlarmSetupScreen> {
               child: Card(
                 elevation: 0.5,
                 child: ListTile(
-                  title: Text(
-                    '${alarm.time.hour.toString().padLeft(2, '0')}:${alarm.time.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  title: Row(
+                    children: [
+                      Text(
+                        DateFormat('HH:mm').format(alarm.scheduledTime),
+                        style: TextStyle(
+                          fontSize: 24, 
+                          fontWeight: FontWeight.bold,
+                          color: alarm.scheduledTime.isBefore(DateTime.now()) && alarm.isActive 
+                              ? Colors.red : Colors.blue.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          DateFormat('dd/MM/yyyy').format(alarm.scheduledTime),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                        ),
+                      ),
+                    ],
                   ),
-                  subtitle: Text(alarm.title),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(alarm.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black87)),
+                        if (alarm.note != null && alarm.note!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.notes, size: 16, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Expanded(child: Text(alarm.note!, style: const TextStyle(fontSize: 14, color: Colors.black54))),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   trailing: Switch(
                     value: alarm.isActive,
                     activeColor: Colors.blue,

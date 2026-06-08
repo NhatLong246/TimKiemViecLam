@@ -254,23 +254,22 @@ class AlarmManagerService {
 
   Future<void> _schedulePersonalAlarm(PersonalAlarmModel alarm) async {
     final now = DateTime.now();
-    DateTime scheduledDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      alarm.time.hour,
-      alarm.time.minute,
-    );
+    DateTime scheduledDate = alarm.scheduledTime;
 
-    // Nếu giờ đã qua trong ngày, lên lịch vào ngày mai
+    // Không lên lịch cho báo thức đã qua trong quá khứ
     if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
+      return;
     }
+
+    final notifTitle = '⏰ ${alarm.title}';
+    final notifBody = (alarm.note != null && alarm.note!.trim().isNotEmpty) 
+        ? alarm.note! 
+        : 'Báo thức cá nhân';
 
     await scheduleAlarm(
       id: alarm.id,
-      title: '⏰ Báo thức cá nhân',
-      body: alarm.title,
+      title: notifTitle,
+      body: notifBody,
       scheduledDate: scheduledDate,
       payloadData: {
         'isPersonal': true,
