@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controller/search_controller.dart' as dashboard;
 import '../../routes/app_routes.dart';
+import '../../data/constants/job_categories.dart' as job_cats;
 
 class SearchResultsScreen extends StatefulWidget {
   const SearchResultsScreen({super.key});
@@ -198,6 +199,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     double? tempMaxSalary = _controller.maxSalary.value;
     String selectedLoc = _controller.selectedLocation.value;
     String selectedJobType = _controller.selectedJobType.value;
+    String selectedCategory = _controller.selectedCategory.value;
+    String selectedGender = _controller.selectedGender.value;
+    double? tempHeight = _controller.selectedHeight.value;
+    double? tempWeight = _controller.selectedWeight.value;
 
     // Convert old values from previous state
     if (selectedJobType == 'part_time') selectedJobType = 'Part-time';
@@ -205,6 +210,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
     final minCtrl = TextEditingController(text: tempMinSalary?.toInt().toString() ?? '');
     final maxCtrl = TextEditingController(text: tempMaxSalary?.toInt().toString() ?? '');
+    final heightCtrl = TextEditingController(text: tempHeight != null ? tempHeight.toInt().toString() : '');
+    final weightCtrl = TextEditingController(text: tempWeight != null ? tempWeight.toInt().toString() : '');
 
     Get.bottomSheet(
       isScrollControlled: true,
@@ -369,6 +376,152 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         buildChoiceChip('Full-time', selectedJobType, (val) => setState(() => selectedJobType = val)),
                       ],
                     ),
+                    const SizedBox(height: 24),
+
+                    const Text('Danh mục nghề nghiệp', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: job_cats.kCategoryLabels.containsKey(selectedCategory)
+                          ? selectedCategory
+                          : 'all',
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isExpanded: true,
+                      items: job_cats.kCategoryLabels.entries.map((entry) {
+                        return DropdownMenuItem<String>(
+                          value: entry.key,
+                          child: Text(entry.value, style: const TextStyle(fontSize: 14)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedCategory = val);
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text(
+                      'Yêu cầu giới tính',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        buildChoiceChip(
+                          'Tất cả',
+                          selectedGender,
+                          (val) => setState(() => selectedGender = val),
+                        ),
+                        buildChoiceChip(
+                          'Nam',
+                          selectedGender,
+                          (val) => setState(() => selectedGender = val),
+                        ),
+                        buildChoiceChip(
+                          'Nữ',
+                          selectedGender,
+                          (val) => setState(() => selectedGender = val),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Chiều cao của bạn (cm)',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: heightCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'Ví dụ: 165',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: Colors.green.shade200,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: Colors.green.shade200,
+                                    ),
+                                  ),
+                                ),
+                                onChanged: (val) =>
+                                    tempHeight = double.tryParse(val),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Cân nặng của bạn (kg)',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: weightCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'Ví dụ: 55',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: Colors.green.shade200,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: Colors.green.shade200,
+                                    ),
+                                  ),
+                                ),
+                                onChanged: (val) =>
+                                    tempWeight = double.tryParse(val),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 32),
 
                     SizedBox(
@@ -387,6 +540,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             tempMaxSalary,
                             selectedLoc,
                             selectedJobType,
+                            selectedCategory,
+                            selectedGender,
+                            tempHeight,
+                            tempWeight,
                           );
                           Get.back();
                         },

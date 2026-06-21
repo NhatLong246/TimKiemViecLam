@@ -5,8 +5,14 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
+import '../../data/models/job_criteria_model.dart';
 import '../../routes/app_routes.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../profile/cv_preview_screen.dart';
+import '../../data/services/candidate_discovery_service.dart';
+import '../profile/job_criteria_options.dart';
 import 'candidate_discovery_screen.dart';
+import 'employer_reviews_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerSearchScreen
@@ -33,6 +39,14 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
 
   // ── Bộ lọc người làm ─────────────────────────────────────────────────────
   String _workerSort = 'name';   // name|date
+  String _workerHired = 'all';   // all|hired|not_hired
+  String _workerLocation = 'Tất cả';
+  String _workerGender = 'Tất cả'; // Tất cả|male|female|other
+  String _workerCategory = 'Tất cả';
+  double? _workerMinHeight;
+  double? _workerMaxHeight;
+  double? _workerMinWeight;
+  double? _workerMaxWeight;
 
   // Firestore
   final _db = FirebaseFirestore.instance;
@@ -42,6 +56,7 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(() => setState(() {}));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
@@ -84,6 +99,14 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                 _WorkersTab(
                   query: _query,
                   sort: _workerSort,
+                  hired: _workerHired,
+                  location: _workerLocation,
+                  gender: _workerGender,
+                  category: _workerCategory,
+                  minHeight: _workerMinHeight,
+                  maxHeight: _workerMaxHeight,
+                  minWeight: _workerMinWeight,
+                  maxWeight: _workerMaxWeight,
                   uid: _uid ?? '',
                   db: _db,
                 ),
@@ -272,6 +295,15 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
 
   // ── Filter sheet ──────────────────────────────────────────────────────────
   void _showFilterSheet() {
+    final heightMinCtrl = TextEditingController(
+        text: _workerMinHeight != null ? _workerMinHeight!.toInt().toString() : '');
+    final heightMaxCtrl = TextEditingController(
+        text: _workerMaxHeight != null ? _workerMaxHeight!.toInt().toString() : '');
+    final weightMinCtrl = TextEditingController(
+        text: _workerMinWeight != null ? _workerMinWeight!.toInt().toString() : '');
+    final weightMaxCtrl = TextEditingController(
+        text: _workerMaxWeight != null ? _workerMaxWeight!.toInt().toString() : '');
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -279,10 +311,14 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
       useSafeArea: true,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => Container(
-          decoration: BoxDecoration(            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+          ),
+          padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,14 +350,40 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                   TextButton(
                     onPressed: () {
                       setS(() {
-                        _postStatus = 'all';
-                        _postJobType = 'all';
-                        _workerSort = 'name';
+                        if (_tab.index == 0) {
+                          _postStatus = 'all';
+                          _postJobType = 'all';
+                        } else {
+                          _workerSort = 'name';
+                          _workerHired = 'all';
+                          _workerLocation = 'Tất cả';
+                          _workerGender = 'Tất cả';
+                          _workerCategory = 'Tất cả';
+                          _workerMinHeight = null;
+                          _workerMaxHeight = null;
+                          _workerMinWeight = null;
+                          _workerMaxWeight = null;
+                          heightMinCtrl.clear();
+                          heightMaxCtrl.clear();
+                          weightMinCtrl.clear();
+                          weightMaxCtrl.clear();
+                        }
                       });
                       setState(() {
-                        _postStatus = 'all';
-                        _postJobType = 'all';
-                        _workerSort = 'name';
+                        if (_tab.index == 0) {
+                          _postStatus = 'all';
+                          _postJobType = 'all';
+                        } else {
+                          _workerSort = 'name';
+                          _workerHired = 'all';
+                          _workerLocation = 'Tất cả';
+                          _workerGender = 'Tất cả';
+                          _workerCategory = 'Tất cả';
+                          _workerMinHeight = null;
+                          _workerMaxHeight = null;
+                          _workerMinWeight = null;
+                          _workerMaxWeight = null;
+                        }
                       });
                     },
                     child: const Text('Đặt lại',
@@ -331,114 +393,411 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
               ),
               const SizedBox(height: 16),
 
-              // ─── Bài đăng filters ─────────────────────────────────────
-              _FilterSection(
-                title: 'Trạng thái bài đăng',
-                icon: Icons.work_outline_rounded,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final e in _postStatusOptions.entries)
-                      _FilterChip(
-                        label: e.value,
-                        selected: _postStatus == e.key,
-                        onTap: () => setS(() {
-                          _postStatus = e.key;
-                          setState(() => _postStatus = e.key);
-                        }),
-                        color: _postStatusColor(e.key),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              _FilterSection(
-                title: 'Loại công việc',
-                icon: Icons.schedule_rounded,
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    _FilterChip(
-                      label: 'Tất cả',
-                      selected: _postJobType == 'all',
-                      onTap: () => setS(() {
-                        _postJobType = 'all';
-                        setState(() => _postJobType = 'all');
-                      }),
-                      color: const Color(0xFF7B1FA2),
-                    ),
-                    _FilterChip(
-                      label: 'Full-time',
-                      selected: _postJobType == 'full_time',
-                      onTap: () => setS(() {
-                        _postJobType = 'full_time';
-                        setState(() => _postJobType = 'full_time');
-                      }),
-                      color: const Color(0xFF1565C0),
-                    ),
-                    _FilterChip(
-                      label: 'Part-time',
-                      selected: _postJobType == 'part_time',
-                      onTap: () => setS(() {
-                        _postJobType = 'part_time';
-                        setState(() => _postJobType = 'part_time');
-                      }),
-                      color: const Color(0xFF2E7D32),
-                    ),
-                  ],
-                ),
-              ),
-              if (_postJobType == 'full_time') ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.person_search_rounded, size: 20),
-                    label: const Text('Tìm ứng viên Full-time',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF1565C0),
-                      side: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      Get.back(); // close bottom sheet
-                      Get.to(() => const CandidateDiscoveryScreen());
-                    },
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_tab.index == 0) ...[
+                        // ─── Bài đăng filters ─────────────────────────────────────
+                        _FilterSection(
+                          title: 'Trạng thái bài đăng',
+                          icon: Icons.work_outline_rounded,
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final e in _postStatusOptions.entries)
+                                _FilterChip(
+                                  label: e.value,
+                                  selected: _postStatus == e.key,
+                                  onTap: () => setS(() {
+                                    _postStatus = e.key;
+                                    setState(() => _postStatus = e.key);
+                                  }),
+                                  color: _postStatusColor(e.key),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Loại công việc',
+                          icon: Icons.schedule_rounded,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              _FilterChip(
+                                label: 'Tất cả',
+                                selected: _postJobType == 'all',
+                                onTap: () => setS(() {
+                                  _postJobType = 'all';
+                                  setState(() => _postJobType = 'all');
+                                }),
+                                color: const Color(0xFF7B1FA2),
+                              ),
+                              _FilterChip(
+                                label: 'Full-time',
+                                selected: _postJobType == 'full_time',
+                                onTap: () => setS(() {
+                                  _postJobType = 'full_time';
+                                  setState(() => _postJobType = 'full_time');
+                                }),
+                                color: const Color(0xFF1565C0),
+                              ),
+                              _FilterChip(
+                                label: 'Part-time',
+                                selected: _postJobType == 'part_time',
+                                onTap: () => setS(() {
+                                  _postJobType = 'part_time';
+                                  setState(() => _postJobType = 'part_time');
+                                }),
+                                color: const Color(0xFF2E7D32),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_postJobType == 'full_time') ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.person_search_rounded, size: 20),
+                              label: const Text('Tìm ứng viên Full-time',
+                                  style: TextStyle(fontWeight: FontWeight.w700)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF1565C0),
+                                side: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                Get.back(); // close bottom sheet
+                                Get.to(() => const CandidateDiscoveryScreen());
+                              },
+                            ),
+                          ),
+                        ],
+                      ] else ...[
+                        // ─── Người làm filters ────────────────────────────────────
+                        _FilterSection(
+                          title: 'Sắp xếp người làm',
+                          icon: Icons.people_outline_rounded,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              _FilterChip(
+                                label: 'Tên A–Z',
+                                selected: _workerSort == 'name',
+                                onTap: () => setS(() {
+                                  _workerSort = 'name';
+                                  setState(() => _workerSort = 'name');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                              _FilterChip(
+                                label: 'Mới nhất',
+                                selected: _workerSort == 'date',
+                                onTap: () => setS(() {
+                                  _workerSort = 'date';
+                                  setState(() => _workerSort = 'date');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Trạng thái thuê',
+                          icon: Icons.check_circle_outline_rounded,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              _FilterChip(
+                                label: 'Tất cả',
+                                selected: _workerHired == 'all',
+                                onTap: () => setS(() {
+                                  _workerHired = 'all';
+                                  setState(() => _workerHired = 'all');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                              _FilterChip(
+                                label: 'Đã thuê',
+                                selected: _workerHired == 'hired',
+                                onTap: () => setS(() {
+                                  _workerHired = 'hired';
+                                  setState(() => _workerHired = 'hired');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                              _FilterChip(
+                                label: 'Chưa thuê',
+                                selected: _workerHired == 'not_hired',
+                                onTap: () => setS(() {
+                                  _workerHired = 'not_hired';
+                                  setState(() => _workerHired = 'not_hired');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Khu vực ứng viên',
+                          icon: Icons.location_on_outlined,
+                          child: DropdownButtonFormField<String>(
+                            value: _workerLocation,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_drop_down),
+                            isExpanded: true,
+                            items: ['Tất cả', ...JobCriteriaOptions.locations].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value, style: const TextStyle(fontSize: 14)),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setS(() {
+                                  _workerLocation = val;
+                                  setState(() => _workerLocation = val);
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Giới tính',
+                          icon: Icons.face_rounded,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              _FilterChip(
+                                label: 'Tất cả',
+                                selected: _workerGender == 'Tất cả',
+                                onTap: () => setS(() {
+                                  _workerGender = 'Tất cả';
+                                  setState(() => _workerGender = 'Tất cả');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                              _FilterChip(
+                                label: 'Nam',
+                                selected: _workerGender == 'male',
+                                onTap: () => setS(() {
+                                  _workerGender = 'male';
+                                  setState(() => _workerGender = 'male');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                              _FilterChip(
+                                label: 'Nữ',
+                                selected: _workerGender == 'female',
+                                onTap: () => setS(() {
+                                  _workerGender = 'female';
+                                  setState(() => _workerGender = 'female');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                              _FilterChip(
+                                label: 'Khác',
+                                selected: _workerGender == 'other',
+                                onTap: () => setS(() {
+                                  _workerGender = 'other';
+                                  setState(() => _workerGender = 'other');
+                                }),
+                                color: const Color(0xFF00695C),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Nghề nghiệp',
+                          icon: Icons.category_outlined,
+                          child: DropdownButtonFormField<String>(
+                            value: _workerCategory,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                            ),
+                            icon: const Icon(Icons.arrow_drop_down),
+                            isExpanded: true,
+                            items: ['Tất cả', ...JobCriteriaOptions.careers].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value, style: const TextStyle(fontSize: 14)),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setS(() {
+                                  _workerCategory = val;
+                                  setState(() => _workerCategory = val);
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Chiều cao (cm)',
+                          icon: Icons.height_rounded,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: heightMinCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tối thiểu',
+                                    filled: true,
+                                    fillColor: Colors.grey.shade50,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    setS(() {
+                                      _workerMinHeight = double.tryParse(val);
+                                      setState(() => _workerMinHeight = double.tryParse(val));
+                                    });
+                                  },
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text('-', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: heightMaxCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tối đa',
+                                    filled: true,
+                                    fillColor: Colors.grey.shade50,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    setS(() {
+                                      _workerMaxHeight = double.tryParse(val);
+                                      setState(() => _workerMaxHeight = double.tryParse(val));
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _FilterSection(
+                          title: 'Cân nặng (kg)',
+                          icon: Icons.monitor_weight_outlined,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: weightMinCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tối thiểu',
+                                    filled: true,
+                                    fillColor: Colors.grey.shade50,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    setS(() {
+                                      _workerMinWeight = double.tryParse(val);
+                                      setState(() => _workerMinWeight = double.tryParse(val));
+                                    });
+                                  },
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text('-', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: weightMaxCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    hintText: 'Tối đa',
+                                    filled: true,
+                                    fillColor: Colors.grey.shade50,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    setS(() {
+                                      _workerMaxWeight = double.tryParse(val);
+                                      setState(() => _workerMaxWeight = double.tryParse(val));
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-              ],
-              const SizedBox(height: 14),
-
-              // ─── Người làm filters ────────────────────────────────────
-              _FilterSection(
-                title: 'Sắp xếp người làm',
-                icon: Icons.people_outline_rounded,
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    _FilterChip(
-                      label: 'Tên A–Z',
-                      selected: _workerSort == 'name',
-                      onTap: () => setS(() {
-                        _workerSort = 'name';
-                        setState(() => _workerSort = 'name');
-                      }),
-                      color: const Color(0xFF00695C),
-                    ),
-                    _FilterChip(
-                      label: 'Mới nhất',
-                      selected: _workerSort == 'date',
-                      onTap: () => setS(() {
-                        _workerSort = 'date';
-                        setState(() => _workerSort = 'date');
-                      }),
-                      color: const Color(0xFF00695C),
-                    ),
-                  ],
                 ),
               ),
               const SizedBox(height: 20),
@@ -468,10 +827,21 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
     );
   }
 
-  bool _hasActiveFilter() =>
-      _postStatus != 'all' ||
-      _postJobType != 'all' ||
-      _workerSort != 'name';
+  bool _hasActiveFilter() {
+    if (_tab.index == 0) {
+      return _postStatus != 'all' || _postJobType != 'all';
+    } else {
+      return _workerSort != 'name' ||
+          _workerHired != 'all' ||
+          _workerLocation != 'Tất cả' ||
+          _workerGender != 'Tất cả' ||
+          _workerCategory != 'Tất cả' ||
+          _workerMinHeight != null ||
+          _workerMaxHeight != null ||
+          _workerMinWeight != null ||
+          _workerMaxWeight != null;
+    }
+  }
 
   static const _postStatusOptions = {
     'all': 'Tất cả',
@@ -592,107 +962,185 @@ class _WorkersTab extends StatelessWidget {
     required this.sort,
     required this.uid,
     required this.db,
+    required this.hired,
+    required this.location,
+    required this.gender,
+    required this.category,
+    this.minHeight,
+    this.maxHeight,
+    this.minWeight,
+    this.maxWeight,
   });
 
   final String query;
   final String sort;
   final String uid;
   final FirebaseFirestore db;
+  final String hired;
+  final String location;
+  final String gender;
+  final String category;
+  final double? minHeight;
+  final double? maxHeight;
+  final double? minWeight;
+  final double? maxWeight;
 
   @override
   Widget build(BuildContext context) {
     if (uid.isEmpty) return const SizedBox.shrink();
 
+    // Stream 1: Accepted applications to check hired status
     return StreamBuilder<QuerySnapshot>(
       stream: db
           .collection('applications')
           .where('employerId', isEqualTo: uid)
           .where('status', isEqualTo: 'accepted')
           .snapshots(),
-      builder: (ctx, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+      builder: (ctx, appsSnap) {
+        if (appsSnap.connectionState == ConnectionState.waiting && !appsSnap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final apps = snap.data?.docs ?? [];
-        if (apps.isEmpty) {
-          return _emptyState(
-            icon: Icons.people_outline_rounded,
-            title: 'Chưa có người làm nào',
-            sub: 'Người được bạn duyệt sẽ hiển thị ở đây',
-          );
-        }
-
-        // Lấy danh sách candidateId duy nhất
-        final ids = apps
-            .map((d) =>
-                (d.data() as Map<String, dynamic>)['candidateId'] as String? ??
-                '')
+        final appsDocs = appsSnap.data?.docs ?? [];
+        final hiredIds = appsDocs
+            .map((d) => (d.data() as Map<String, dynamic>)['candidateId'] as String? ?? '')
             .where((id) => id.isNotEmpty)
-            .toSet()
-            .toList();
+            .toSet();
 
-        return FutureBuilder<QuerySnapshot>(
-          future: db
+        // Stream 2: All candidates
+        return StreamBuilder<QuerySnapshot>(
+          stream: db
               .collection('users')
-              .where(FieldPath.documentId, whereIn: ids.take(10).toList())
-              .get(),
-          builder: (ctx2, userSnap) {
-            if (userSnap.connectionState == ConnectionState.waiting) {
+              .where('role', isEqualTo: 'candidate')
+              .snapshots(),
+          builder: (ctx2, usersSnap) {
+            if (usersSnap.connectionState == ConnectionState.waiting && !usersSnap.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            var workers = (userSnap.data?.docs ?? []).map((d) {
+            final userDocs = usersSnap.data?.docs ?? [];
+            
+            // Map raw documents to _WorkerEntry and pair with JobCriteriaModel
+            final parsedWorkers = userDocs.map((d) {
               final data = d.data() as Map<String, dynamic>;
               final first = data['firstName'] as String? ?? '';
               final last = data['lastName'] as String? ?? '';
               data['uid'] = d.id;
+              
               final userModel = UserModel.fromMap(data);
-              return _WorkerEntry(
-                uid: d.id,
-                name: '$first $last'.trim(),
-                avatarUrl: data['avatarUrl'] as String?,
-                phone: data['phoneNumber'] as String? ?? '',
-                rating: (data['averageRating'] as num?)?.toDouble() ?? 0.0,
-                jobsDone: (data['totalJobsDone'] as int?) ?? 0,
-                userModel: userModel,
+              final criteria = JobCriteriaModel.fromUserData(data);
+              
+              return _ParsedWorker(
+                worker: _WorkerEntry(
+                  uid: d.id,
+                  name: '$first $last'.trim(),
+                  avatarUrl: data['avatarUrl'] as String?,
+                  phone: data['phoneNumber'] as String? ?? data['phone'] as String? ?? '',
+                  rating: (data['averageRating'] as num?)?.toDouble() ?? 0.0,
+                  jobsDone: (data['totalJobsDone'] as int?) ?? 0,
+                  userModel: userModel,
+                  isHired: hiredIds.contains(d.id),
+                ),
+                criteria: criteria,
               );
             }).toList();
 
-            // Lọc theo query
+            var filtered = parsedWorkers;
+
+            // 1. Lọc theo trạng thái thuê
+            if (hired == 'hired') {
+              filtered = filtered.where((w) => hiredIds.contains(w.worker.uid)).toList();
+            } else if (hired == 'not_hired') {
+              filtered = filtered.where((w) => !hiredIds.contains(w.worker.uid)).toList();
+            }
+
+            // 2. Lọc theo khu vực
+            if (location != 'Tất cả') {
+              filtered = filtered.where((w) {
+                if (w.criteria == null) return false;
+                return w.criteria!.locations.any((loc) =>
+                    loc.toLowerCase().contains(location.toLowerCase()));
+              }).toList();
+            }
+
+            // 3. Lọc theo giới tính
+            if (gender != 'Tất cả') {
+              filtered = filtered.where((w) => w.worker.userModel.gender == gender).toList();
+            }
+
+            // 4. Lọc theo nghề nghiệp
+            if (category != 'Tất cả') {
+              filtered = filtered.where((w) {
+                if (w.criteria == null) return false;
+                return w.criteria!.careers.any((c) =>
+                    c.toLowerCase().contains(category.toLowerCase()));
+              }).toList();
+            }
+
+            // 5. Lọc theo chiều cao
+            if (minHeight != null) {
+              filtered = filtered.where((w) => w.worker.userModel.height != null && w.worker.userModel.height! >= minHeight!).toList();
+            }
+            if (maxHeight != null) {
+              filtered = filtered.where((w) => w.worker.userModel.height != null && w.worker.userModel.height! <= maxHeight!).toList();
+            }
+
+            // 6. Lọc theo cân nặng
+            if (minWeight != null) {
+              filtered = filtered.where((w) => w.worker.userModel.weight != null && w.worker.userModel.weight! >= minWeight!).toList();
+            }
+            if (maxWeight != null) {
+              filtered = filtered.where((w) => w.worker.userModel.weight != null && w.worker.userModel.weight! <= maxWeight!).toList();
+            }
+
+            // 7. Lọc theo query (Tên hoặc SĐT hoặc Vị trí mong muốn)
             if (query.isNotEmpty) {
               final q = query.toLowerCase();
-              workers = workers
-                  .where((w) =>
-                      w.name.toLowerCase().contains(q) ||
-                      w.phone.contains(q))
-                  .toList();
+              filtered = filtered.where((w) {
+                final nameMatches = w.worker.name.toLowerCase().contains(q);
+                final phoneMatches = w.worker.phone.contains(q);
+                final positionMatches = w.criteria?.position.toLowerCase().contains(q) ?? false;
+                return nameMatches || phoneMatches || positionMatches;
+              }).toList();
             }
 
-            // Sắp xếp
+            // 8. Sắp xếp
             if (sort == 'name') {
-              workers.sort((a, b) => a.name.compareTo(b.name));
+              filtered.sort((a, b) => a.worker.name.compareTo(b.worker.name));
+            } else if (sort == 'date') {
+              filtered.sort((a, b) {
+                final dateA = a.worker.userModel.createdAt ?? DateTime(2000);
+                final dateB = b.worker.userModel.createdAt ?? DateTime(2000);
+                return dateB.compareTo(dateA); // Mới nhất lên trước
+              });
             }
 
-            if (workers.isEmpty) {
+            if (filtered.isEmpty) {
               return _emptyState(
                 icon: Icons.search_off_rounded,
                 title: 'Không tìm thấy người làm',
-                sub: 'Thử tìm kiếm với tên hoặc số điện thoại khác',
+                sub: 'Thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm khác',
               );
             }
 
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              itemCount: workers.length,
+              itemCount: filtered.length,
               itemBuilder: (_, i) =>
-                  _WorkerCard(worker: workers[i], query: query),
+                  _WorkerCard(worker: filtered[i].worker, query: query),
             );
           },
         );
       },
     );
   }
+}
+
+// Wrapper class helper
+class _ParsedWorker {
+  final _WorkerEntry worker;
+  final JobCriteriaModel? criteria;
+  _ParsedWorker({required this.worker, this.criteria});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -871,7 +1319,12 @@ class _WorkerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {}, // TODO: mở profile ứng viên
+          onTap: () {
+            Get.bottomSheet(
+              _SearchCandidateProfileSheet(worker: worker),
+              isScrollControlled: true,
+            );
+          },
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -961,11 +1414,16 @@ class _WorkerCard extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.send_rounded, size: 16),
-                    label: const Text('Thuê lại',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    icon: Icon(
+                      worker.isHired ? Icons.send_rounded : Icons.person_add_alt_1_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      worker.isHired ? 'Thuê lại' : 'Thuê ngay',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1565C0),
+                      backgroundColor: worker.isHired ? const Color(0xFF1565C0) : const Color(0xFF2E7D32),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
@@ -1204,6 +1662,7 @@ class _WorkerEntry {
   final double rating;
   final int jobsDone;
   final UserModel userModel;
+  final bool isHired;
 
   const _WorkerEntry({
     required this.uid,
@@ -1213,5 +1672,328 @@ class _WorkerEntry {
     required this.rating,
     required this.jobsDone,
     required this.userModel,
+    required this.isHired,
   });
+}
+
+// ─── Search Candidate Profile Sheet ───────────────────────────────────────────
+class _SearchCandidateProfileSheet extends StatefulWidget {
+  final _WorkerEntry worker;
+
+  const _SearchCandidateProfileSheet({
+    required this.worker,
+  });
+
+  @override
+  State<_SearchCandidateProfileSheet> createState() => _SearchCandidateProfileSheetState();
+}
+
+class _SearchCandidateProfileSheetState extends State<_SearchCandidateProfileSheet> {
+  UserModel? _fullUser;
+  Map<String, dynamic>? _fullUserData;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordProfileView();
+    _fetchFullUser();
+  }
+
+  Future<void> _recordProfileView() async {
+    final empId = FirebaseAuth.instance.currentUser?.uid;
+    if (empId != null) {
+      await CandidateDiscoveryService().recordProfileView(
+        candidateId: widget.worker.uid,
+        employerId: empId,
+      );
+    }
+  }
+
+  Future<void> _fetchFullUser() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.worker.uid)
+          .get();
+      if (doc.exists) {
+        if (mounted) {
+          setState(() {
+            final data = Map<String, dynamic>.from(doc.data()!);
+            data['uid'] = doc.id;
+            _fullUserData = data;
+            _fullUser = UserModel.fromMap(data);
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _SearchCandidateAvatar(
+                avatarUrl: widget.worker.avatarUrl,
+                name: widget.worker.name,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.worker.name.isNotEmpty ? widget.worker.name : 'Ứng viên',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _SearchStarRating(rating: widget.worker.rating),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${widget.worker.rating.toStringAsFixed(1)} sao • ${widget.worker.jobsDone} việc',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                )
+              else if (_fullUser != null) ...[
+                _buildInfoRow(
+                  Icons.email_outlined,
+                  'Email',
+                  _fullUser!.email.isNotEmpty ? _fullUser!.email : 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  Icons.phone_outlined,
+                  'Số điện thoại',
+                  _fullUser!.phone.isNotEmpty ? _fullUser!.phone : 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  Icons.person_outline,
+                  'Giới tính',
+                  _fullUser!.gender ?? 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 16),
+                _buildInfoRow(
+                  Icons.cake_outlined,
+                  'Ngày sinh',
+                  _fullUser!.dateOfBirth != null
+                      ? DateFormat('dd/MM/yyyy').format(_fullUser!.dateOfBirth!)
+                      : 'Chưa cập nhật',
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      if (_fullUserData != null) {
+                        Get.to(() => CvPreviewScreen(userData: _fullUserData!));
+                      }
+                    },
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text(
+                      'Xem CV ứng viên',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF7B1FA2),
+                      side: const BorderSide(color: Color(0xFF7B1FA2)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Get.to(
+                        () => const EmployerReviewsScreen(),
+                        arguments: {
+                          'uid': widget.worker.uid,
+                          'title':
+                              'Đánh giá về ${widget.worker.name.isNotEmpty ? widget.worker.name : 'ứng viên'}',
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: const Text(
+                      'Xem đánh giá về ứng viên',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF7B1FA2),
+                      side: const BorderSide(color: Color(0xFF7B1FA2)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ] else
+                Text(
+                  'Không thể lấy thông tin chi tiết.',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7B1FA2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text(
+                    'Đóng',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: const Color(0xFF7B1FA2), size: 20),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SearchCandidateAvatar extends StatelessWidget {
+  final String? avatarUrl;
+  final String name;
+
+  const _SearchCandidateAvatar({this.avatarUrl, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: const Color(0xFF7B1FA2).withOpacity(0.12),
+      backgroundImage: avatarUrl?.isNotEmpty == true
+          ? NetworkImage(avatarUrl!)
+          : null,
+      child: avatarUrl?.isNotEmpty != true
+          ? Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: const TextStyle(
+                color: Color(0xFF7B1FA2),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+class _SearchStarRating extends StatelessWidget {
+  final double rating;
+
+  const _SearchStarRating({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        if (i < rating.floor()) {
+          return Icon(
+            Icons.star_rounded,
+            size: 13,
+            color: Colors.amber.shade500,
+          );
+        } else if (i < rating && rating - i >= 0.5) {
+          return Icon(
+            Icons.star_half_rounded,
+            size: 13,
+            color: Colors.amber.shade500,
+          );
+        }
+        return Icon(
+          Icons.star_outline_rounded,
+          size: 13,
+          color: Colors.grey.shade300,
+        );
+      }),
+    );
+  }
 }

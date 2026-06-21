@@ -23,6 +23,10 @@ class HomeController extends GetxController {
   final Rx<double?> filterMaxSalary = Rx<double?>(null);
   final RxString filterLocation = 'Tất cả'.obs;
   final RxString filterJobType = 'Tất cả'.obs;
+  final RxString filterCategory = 'all'.obs;
+  final RxString filterGender = 'Tất cả'.obs;
+  final Rx<double?> filterHeight = Rx<double?>(null);
+  final Rx<double?> filterWeight = Rx<double?>(null);
 
   StreamSubscription? _applicationsSub;
   StreamSubscription? _profileViewsSub;
@@ -228,11 +232,19 @@ class HomeController extends GetxController {
     double? maxSalary,
     required String location,
     required String jobType,
+    required String category,
+    required String gender,
+    double? height,
+    double? weight,
   }) {
     filterMinSalary.value = minSalary;
     filterMaxSalary.value = maxSalary;
     filterLocation.value = location;
     filterJobType.value = jobType;
+    filterCategory.value = category;
+    filterGender.value = gender;
+    filterHeight.value = height;
+    filterWeight.value = weight;
     _applyFilter();
   }
 
@@ -254,6 +266,9 @@ class HomeController extends GetxController {
         return false;
       }
 
+      if (filterCategory.value != 'all' && filterCategory.value != 'Tất cả') {
+        if (j.category != filterCategory.value) return false;
+      }
       return true;
     }).toList();
 

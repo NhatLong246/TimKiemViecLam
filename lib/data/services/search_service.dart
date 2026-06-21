@@ -55,10 +55,9 @@ class SearchService {
     double? maxSalary,
     String? location,
     String? jobType,
+    String? category,
   }) async {
-    // Để đơn giản và tránh lỗi index phức tạp, ta lấy tất cả job active/approved
-    // rồi thực hiện filter ở client side (vì dữ liệu hiện tại chưa lớn).
-    // Nếu ứng dụng lớn, cần dùng Algolia hoặc ElasticSearch.
+
     final allJobs = await _jobPostService.getLatestActiveJobs();
 
     final normalizedKeyword = _removeVietnameseTones(keyword).toLowerCase().trim();
@@ -100,10 +99,17 @@ class SearchService {
         matchesJobType = jType == jobType;
       }
 
+      // 5. Category filter
+      bool matchesCategory = true;
+      if (category != null && category.isNotEmpty && category != 'all' && category != 'Tất cả') {
+        matchesCategory = job.category == category;
+      }
+
       return matchesKeyword &&
           matchesSalary &&
           matchesLocation &&
-          matchesJobType;
+          matchesJobType &&
+          matchesCategory;
     }).toList();
 
     return filtered;
