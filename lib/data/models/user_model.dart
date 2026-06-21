@@ -18,6 +18,8 @@ class UserModel {
 	final String? cccd;
 	final String? cccdImageUrl;   // mặt trước CCCD
 	final String? cccdBackImageUrl; // mặt sau CCCD
+	final double? height;          // chiều cao (cm)
+	final double? weight;          // cân nặng (kg)
 	// Employer-only fields
 	final String? companyName;
 	final String? companyAddress;
@@ -54,6 +56,8 @@ class UserModel {
 		this.cccd,
 		this.cccdImageUrl,
 		this.cccdBackImageUrl,
+		this.height,
+		this.weight,
 		this.companyName,
 		this.companyAddress,
 		this.companyLogoUrl,
@@ -91,6 +95,8 @@ class UserModel {
 		String? cccd,
 		String? cccdImageUrl,
 		String? cccdBackImageUrl,
+		double? height,
+		double? weight,
 		String? companyName,
 		String? companyAddress,
 		String? companyLogoUrl,
@@ -125,6 +131,8 @@ class UserModel {
 			cccd: cccd ?? this.cccd,
 			cccdImageUrl: cccdImageUrl ?? this.cccdImageUrl,
 			cccdBackImageUrl: cccdBackImageUrl ?? this.cccdBackImageUrl,
+			height: height ?? this.height,
+			weight: weight ?? this.weight,
 			companyName: companyName ?? this.companyName,
 			companyAddress: companyAddress ?? this.companyAddress,
 			companyLogoUrl: companyLogoUrl ?? this.companyLogoUrl,
@@ -162,6 +170,8 @@ class UserModel {
 			if (cccd != null) 'cccd': cccd,
 			if (cccdImageUrl != null) 'cccdImageUrl': cccdImageUrl,
 			if (cccdBackImageUrl != null) 'cccdBackImageUrl': cccdBackImageUrl,
+			if (height != null) 'height': height,
+			if (weight != null) 'weight': weight,
 			if (companyName != null) 'companyName': companyName,
 			if (companyAddress != null) 'companyAddress': companyAddress,
 			if (companyLogoUrl != null) 'companyLogoUrl': companyLogoUrl,
@@ -197,6 +207,8 @@ class UserModel {
 			cccd: map['cccd']?.toString(),
 			cccdImageUrl: map['cccdImageUrl']?.toString(),
 			cccdBackImageUrl: map['cccdBackImageUrl']?.toString(),
+			height: _parseDouble(map['height']),
+			weight: _parseDouble(map['weight']),
 			companyName: map['companyName']?.toString(),
 			companyAddress: map['companyAddress']?.toString(),
 			companyLogoUrl: map['companyLogoUrl']?.toString(),
@@ -221,6 +233,12 @@ class UserModel {
 		if (value is DateTime) return value;
 		if (value is String) return DateTime.tryParse(value);
 		return null;
+	}
+
+	static double? _parseDouble(dynamic value) {
+		if (value == null) return null;
+		if (value is num) return value.toDouble();
+		return double.tryParse(value.toString());
 	}
 }
 
