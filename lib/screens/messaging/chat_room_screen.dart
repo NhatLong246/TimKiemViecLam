@@ -27,6 +27,7 @@ import '../../widgets/chat_wallpaper_picker_sheet.dart';
 import '../../widgets/swipe_to_reply.dart';
 import 'chat_room_media_mixin.dart';
 import 'widgets/job_message_media.dart';
+import '../employer/hire_request_sheet.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   const ChatRoomScreen({
@@ -52,8 +53,26 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
 
   static const _quickReactions = ['❤️', '😆', '😮', '😢', '😡', '👍'];
   static const _moreEmojis = [
-    '👍', '❤️', '😂', '😮', '😢', '😡', '🙏', '🔥', '👏', '🎉',
-    '💯', '😍', '🤔', '😎', '🥳', '😭', '🤣', '💪', '✨', '⭐',
+    '👍',
+    '❤️',
+    '😂',
+    '😮',
+    '😢',
+    '😡',
+    '🙏',
+    '🔥',
+    '👏',
+    '🎉',
+    '💯',
+    '😍',
+    '🤔',
+    '😎',
+    '🥳',
+    '😭',
+    '🤣',
+    '💪',
+    '✨',
+    '⭐',
   ];
 
   final _textCtrl = TextEditingController();
@@ -78,9 +97,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       if (!mounted) return;
       _ctrl.openChatByGroupId(widget.groupId);
     });
-    _groupNickSub = GroupChatService()
-        .streamGroup(widget.groupId)
-        .listen((g) {
+    _groupNickSub = GroupChatService().streamGroup(widget.groupId).listen((g) {
       if (g != null && mounted) {
         setState(() {
           _nicknames = Map<String, String>.from(g.nicknames);
@@ -114,9 +131,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       if (thread == null) {
         final err = _ctrl.errorMessage.value.trim();
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Tin nhắn'),
-          ),
+          appBar: AppBar(title: const Text('Tin nhắn')),
           body: Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -124,8 +139,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (err.isNotEmpty) ...[
-                    Icon(Icons.chat_bubble_outline,
-                        size: 48, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       err,
@@ -137,13 +155,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: () =>
-                          _ctrl.openChatByGroupId(widget.groupId),
+                      onPressed: () => _ctrl.openChatByGroupId(widget.groupId),
                       icon: const Icon(Icons.refresh),
                       label: const Text('Thử lại'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _primary,
-                      ),
+                      style: FilledButton.styleFrom(backgroundColor: _primary),
                     ),
                   ] else
                     CircularProgressIndicator(color: _primary),
@@ -162,75 +177,79 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           }
         },
         child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          backgroundColor: widget.isEmployer ? Colors.white : _primary,
-          flexibleSpace: widget.isEmployer
-              ? null
-              : Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF66BB6A), Color(0xFF2E7D32)],
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            backgroundColor: widget.isEmployer ? Colors.white : _primary,
+            flexibleSpace: widget.isEmployer
+                ? null
+                : Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF66BB6A), Color(0xFF2E7D32)],
+                      ),
                     ),
                   ),
+            elevation: widget.isEmployer ? 0.5 : 0,
+            iconTheme: IconThemeData(
+              color: widget.isEmployer ? Colors.black87 : Colors.white,
+            ),
+            title: _buildAppBarTitle(thread),
+            actions: [
+              if (widget.isEmployer && !thread.isGroupChat)
+                _topAction(
+                  Icons.handshake_outlined,
+                  () => _openHireRequest(thread),
+                  forEmployer: true,
                 ),
-          elevation: widget.isEmployer ? 0.5 : 0,
-          iconTheme: IconThemeData(
-            color: widget.isEmployer ? Colors.black87 : Colors.white,
-          ),
-          title: _buildAppBarTitle(thread),
-          actions: [
-            _topAction(
-              Icons.call_outlined,
-              () => _startCall(thread, isVideo: false),
-              forEmployer: widget.isEmployer,
-            ),
-            _topAction(
-              Icons.videocam_outlined,
-              () => _startCall(thread, isVideo: true),
-              forEmployer: widget.isEmployer,
-            ),
-            if (thread.isGroupChat)
               _topAction(
-                Icons.menu,
-                () => _openGroupManagement(thread),
+                Icons.call_outlined,
+                () => _startCall(thread, isVideo: false),
                 forEmployer: widget.isEmployer,
               ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: Stack(
-          children: [
-            ChatConversationBackground(
-              config: _wallpaper,
-              isCandidateTheme: !widget.isEmployer,
-            ),
-            Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      _buildMessageList(
-                        thread,
-                        dimmed: _actionMessage != null,
-                      ),
-                      if (_actionMessage != null)
-                        _buildMessageActionOverlay(thread),
-                    ],
-                  ),
+              _topAction(
+                Icons.videocam_outlined,
+                () => _startCall(thread, isVideo: true),
+                forEmployer: widget.isEmployer,
+              ),
+              if (thread.isGroupChat)
+                _topAction(
+                  Icons.menu,
+                  () => _openGroupManagement(thread),
+                  forEmployer: widget.isEmployer,
                 ),
-                if (_actionMessage == null)
-                  (isRecording
-                      ? buildRecordingBar()
-                      : _buildComposer(thread))
-                else
-                  _buildMessageActionToolbar(thread),
-              ],
-            ),
-            buildUploadOverlay(),
-          ],
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: Stack(
+            children: [
+              ChatConversationBackground(
+                config: _wallpaper,
+                isCandidateTheme: !widget.isEmployer,
+              ),
+              Column(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        _buildMessageList(
+                          thread,
+                          dimmed: _actionMessage != null,
+                        ),
+                        if (_actionMessage != null)
+                          _buildMessageActionOverlay(thread),
+                      ],
+                    ),
+                  ),
+                  if (_actionMessage == null)
+                    (isRecording ? buildRecordingBar() : _buildComposer(thread))
+                  else
+                    _buildMessageActionToolbar(thread),
+                ],
+              ),
+              buildUploadOverlay(),
+            ],
+          ),
         ),
-      ),
       );
     });
   }
@@ -360,12 +379,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         senderName: senderName,
         avatar: _messageAvatar(name: senderName, avatarUrl: senderAvatar),
         showSenderName: isGroup && !mine,
-        messageWrapper: (body) => _wrapSwipeToReply(
-          msg: msg,
-          uid: uid,
-          alignEnd: mine,
-          child: body,
-        ),
+        messageWrapper: (body) =>
+            _wrapSwipeToReply(msg: msg, uid: uid, alignEnd: mine, child: body),
       ),
     );
 
@@ -407,8 +422,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               alignEnd: mine,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment:
-                    mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: mine
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
                   if (!mine && isGroup)
                     Padding(
@@ -467,85 +483,86 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       constraints: BoxConstraints(maxWidth: maxBubbleW),
       child: IntrinsicWidth(
         child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: mine ? const Color(0xFF0084FF) : Theme.of(context).cardColor,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18),
-          topRight: const Radius.circular(18),
-          bottomLeft: Radius.circular(mine ? 18 : 4),
-          bottomRight: Radius.circular(mine ? 4 : 18),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: elevated
-                ? Colors.black.withValues(alpha: 0.18)
-                : Colors.black.withValues(alpha: 0.04),
-            blurRadius: elevated ? 12 : 4,
-            offset: const Offset(0, 2),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: mine ? const Color(0xFF0084FF) : Theme.of(context).cardColor,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(18),
+              topRight: const Radius.circular(18),
+              bottomLeft: Radius.circular(mine ? 18 : 4),
+              bottomRight: Radius.circular(mine ? 4 : 18),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: elevated
+                    ? Colors.black.withValues(alpha: 0.18)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: elevated ? 12 : 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (replyMap != null) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: mine
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-                border: Border(
-                  left: BorderSide(
-                    color: mine ? Colors.white70 : _primary,
-                    width: 3,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (replyMap != null) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: mine
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border(
+                      left: BorderSide(
+                        color: mine ? Colors.white70 : _primary,
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    (replyMap['content'] ?? '').toString(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: mine ? Colors.white70 : Colors.black54,
+                    ),
                   ),
                 ),
-              ),
-              child: Text(
-                (replyMap['content'] ?? '').toString(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              ],
+              Text(
+                msg.content,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: mine ? Colors.white70 : Colors.black54,
+                  color: msg.isRecalled
+                      ? (mine ? Colors.white70 : Colors.black45)
+                      : (mine
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface),
+                  fontSize: 15,
+                  height: 1.35,
+                  fontStyle: msg.isRecalled
+                      ? FontStyle.italic
+                      : FontStyle.normal,
                 ),
               ),
-            ),
-          ],
-          Text(
-            msg.content,
-            style: TextStyle(
-              color: msg.isRecalled
-                  ? (mine ? Colors.white70 : Colors.black45)
-                  : (mine
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.onSurface),
-              fontSize: 15,
-              height: 1.35,
-              fontStyle:
-                  msg.isRecalled ? FontStyle.italic : FontStyle.normal,
-            ),
+              if (msg.createdAt != null) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    DateFormat('HH:mm').format(msg.createdAt!),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: mine ? Colors.white70 : Colors.grey,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
-          if (msg.createdAt != null) ...[
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                DateFormat('HH:mm').format(msg.createdAt!),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: mine ? Colors.white70 : Colors.grey,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
         ),
       ),
     );
@@ -565,11 +582,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         children: msg.reactionCounts.entries.map((e) {
           final highlighted = msg.reactionBy(_ctrl.currentUid) == e.key;
           return GestureDetector(
-            onTap: () => _showReactionDetailsSheet(
-              msg,
-              thread,
-              initialEmoji: e.key,
-            ),
+            onTap: () =>
+                _showReactionDetailsSheet(msg, thread, initialEmoji: e.key),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -692,8 +706,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                                       );
                                     } catch (e) {
                                       if (mounted) {
-                                        ScaffoldMessenger.of(this.context)
-                                            .showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          this.context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               e.toString().replaceFirst(
@@ -774,9 +789,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                                 child: _reactionFilterChip(
                                   label: '${e.key} ${e.value}',
                                   selected: filterEmoji == e.key,
-                                  onTap: () => setSheetState(
-                                    () => filterEmoji = e.key,
-                                  ),
+                                  onTap: () =>
+                                      setSheetState(() => filterEmoji = e.key),
                                 ),
                               );
                             }),
@@ -800,9 +814,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     required VoidCallback onTap,
   }) {
     return Material(
-      color: selected
-          ? const Color(0xFF3A3A3C)
-          : Colors.transparent,
+      color: selected ? const Color(0xFF3A3A3C) : Colors.transparent,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -913,8 +925,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
               child: Align(
-                alignment:
-                    mine ? Alignment.centerRight : Alignment.centerLeft,
+                alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                 child: GestureDetector(
                   onTap: () {},
                   child: Column(
@@ -938,7 +949,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                           ],
                           ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width * 0.72,
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.72,
                             ),
                             child: _messageBubbleContent(
                               msg: msg,
@@ -1208,8 +1220,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 ),
               if (mine && !msg.isRecalled)
                 ListTile(
-                  leading: const Icon(Icons.undo_rounded,
-                      color: Color(0xFF7B1FA2)),
+                  leading: const Icon(
+                    Icons.undo_rounded,
+                    color: Color(0xFF7B1FA2),
+                  ),
                   title: const Text('Thu hồi'),
                   subtitle: const Text('Ẩn nội dung với mọi người'),
                   onTap: () async {
@@ -1334,8 +1348,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content:
-                          Text(e.toString().replaceFirst('Exception: ', '')),
+                      content: Text(
+                        e.toString().replaceFirst('Exception: ', ''),
+                      ),
                     ),
                   );
                 }
@@ -1398,7 +1413,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   Widget _attendanceBubble(JobChatMessage msg) {
     final isIn = msg.type == 'attendance_checkin';
     final meta = msg.metadata ?? {};
-    final photoB64 = (meta['photoBase64'] ?? msg.attachmentUrl ?? '').toString();
+    final photoB64 = (meta['photoBase64'] ?? msg.attachmentUrl ?? '')
+        .toString();
     final capturedAt = (meta['capturedAt'] ?? '').toString();
     final locationLabel = (meta['locationLabel'] ?? '').toString();
     final fileName = (meta['photoFileName'] ?? '').toString();
@@ -1595,7 +1611,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isCheckIn ? 'Đã gửi ảnh điểm danh đầu ca' : 'Đã gửi ảnh điểm danh cuối ca',
+            isCheckIn
+                ? 'Đã gửi ảnh điểm danh đầu ca'
+                : 'Đã gửi ảnh điểm danh cuối ca',
           ),
         ),
       );
@@ -1645,7 +1663,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 ],
               ),
               const SizedBox(height: 8),
-              Text(jobTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                jobTitle,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 4),
               Text('$date · $start – $end'),
               const SizedBox(height: 12),
@@ -1668,10 +1689,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Future<void> _addToCalendar(
-    Map<String, dynamic> meta,
-    String title,
-  ) async {
+  Future<void> _addToCalendar(Map<String, dynamic> meta, String title) async {
     final ok = await CalendarHelper.addShiftToDeviceCalendar(
       title: title,
       description: 'Ca làm trên ViecNow',
@@ -1683,7 +1701,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          ok ? 'Đã mở ứng dụng lịch để thêm sự kiện' : 'Không thể thêm vào lịch',
+          ok
+              ? 'Đã mở ứng dụng lịch để thêm sự kiện'
+              : 'Không thể thêm vào lịch',
         ),
       ),
     );
@@ -1708,9 +1728,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0F2F5),
-                  border: Border(
-                    left: BorderSide(color: _primary, width: 3),
-                  ),
+                  border: Border(left: BorderSide(color: _primary, width: 3)),
                 ),
                 child: Row(
                   children: [
@@ -1748,52 +1766,57 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 ),
               ),
             Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          CompositedTransformTarget(
-            link: _plusLayerLink,
-            child: _bottomAction(Icons.add, _togglePlusMenu),
-          ),
-          const SizedBox(width: 4),
-          _bottomAction(Icons.camera_alt_outlined, takePhotoAndSend),
-          const SizedBox(width: 4),
-          _bottomAction(Icons.mic_none_rounded, startRecording),
-          const SizedBox(width: 6),
-          Expanded(
-            child: TextField(
-              controller: _textCtrl,
-              minLines: 1,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'Nhắn tin...',
-                filled: true,
-                fillColor: Theme.of(context).inputDecorationTheme.fillColor ??
-                    const Color(0xFFF0F2F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                CompositedTransformTarget(
+                  link: _plusLayerLink,
+                  child: _bottomAction(Icons.add, _togglePlusMenu),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+                const SizedBox(width: 4),
+                _bottomAction(Icons.camera_alt_outlined, takePhotoAndSend),
+                const SizedBox(width: 4),
+                _bottomAction(Icons.mic_none_rounded, startRecording),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: TextField(
+                    controller: _textCtrl,
+                    minLines: 1,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      hintText: 'Nhắn tin...',
+                      filled: true,
+                      fillColor:
+                          Theme.of(context).inputDecorationTheme.fillColor ??
+                          const Color(0xFFF0F2F5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _primary,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: IconButton(
-              onPressed: _ctrl.isSending.value ? null : _sendText,
-              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-            ),
-          ),
-        ],
+                const SizedBox(width: 6),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _primary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: IconButton(
+                    onPressed: _ctrl.isSending.value ? null : _sendText,
+                    icon: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1808,8 +1831,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _hidePlusMenu();
     _closeMessageActions();
 
-    final callColor =
-        isVideo ? const Color(0xFF1565C0) : const Color(0xFF2E7D32);
+    final callColor = isVideo
+        ? const Color(0xFF1565C0)
+        : const Color(0xFF2E7D32);
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1878,15 +1902,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       if (!mounted) return;
 
       final auth = Get.find<AuthController>().currentUser;
-      final userName =
-          '${auth?.firstName ?? ''} ${auth?.lastName ?? ''}'.trim();
+      final userName = '${auth?.firstName ?? ''} ${auth?.lastName ?? ''}'
+          .trim();
 
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CallScreen(
             isVideo: isVideo,
-            groupName:
-                thread.isGroupChat ? thread.jobTitle : thread.peerName,
+            groupName: thread.isGroupChat ? thread.jobTitle : thread.peerName,
             userName: userName.isNotEmpty ? userName : 'Người dùng',
             userId: auth?.id ?? _ctrl.currentUid,
             callId: result.roomUrl,
@@ -1897,9 +1920,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-          ),
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
         );
       }
     }
@@ -1937,10 +1958,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final roomUrl = (meta['roomUrl'] ?? '').toString();
     final status = (meta['status'] ?? 'ongoing').toString();
     final isOngoing = status == 'ongoing';
-    final callColor =
-        isVideo ? const Color(0xFF1565C0) : const Color(0xFF2E7D32);
-    final callLight =
-        isVideo ? const Color(0xFFE3F2FD) : const Color(0xFFE8F5E9);
+    final callColor = isVideo
+        ? const Color(0xFF1565C0)
+        : const Color(0xFF2E7D32);
+    final callLight = isVideo
+        ? const Color(0xFFE3F2FD)
+        : const Color(0xFFE8F5E9);
     final callerName = _senderName(msg.senderId, thread);
 
     return Padding(
@@ -1969,27 +1992,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           child: Column(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isOngoing
                         ? [callColor, callColor.withValues(alpha: 0.75)]
                         : [Colors.grey.shade400, Colors.grey.shade300],
                   ),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(17)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(17),
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       isOngoing
                           ? (isVideo
-                              ? Icons.videocam_rounded
-                              : Icons.phone_rounded)
+                                ? Icons.videocam_rounded
+                                : Icons.phone_rounded)
                           : (isVideo
-                              ? Icons.videocam_off_rounded
-                              : Icons.phone_missed_rounded),
+                                ? Icons.videocam_off_rounded
+                                : Icons.phone_missed_rounded),
                       color: Colors.white,
                       size: 24,
                     ),
@@ -2074,7 +2100,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                             size: 18,
                           ),
                           label: Text(
-                            isVideo ? 'Tham gia video call' : 'Tham gia cuộc gọi',
+                            isVideo
+                                ? 'Tham gia video call'
+                                : 'Tham gia cuộc gọi',
                           ),
                           onPressed: () => _joinCall(
                             msg: msg,
@@ -2112,6 +2140,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         onPressed: onTap,
         icon: Icon(icon, color: forEmployer ? _primary : Colors.white),
       ),
+    );
+  }
+
+  void _openHireRequest(ConversationThread thread) {
+    final candidateId = thread.candidateId?.isNotEmpty == true
+        ? thread.candidateId!
+        : thread.peerId;
+    if (candidateId.isEmpty) {
+      Get.snackbar(
+        'Lỗi',
+        'Không xác định được người làm trong cuộc trò chuyện.',
+      );
+      return;
+    }
+    showHireRequestSheet(
+      context: context,
+      candidateId: candidateId,
+      candidateName: thread.peerName.isEmpty ? 'Người làm' : thread.peerName,
     );
   }
 
@@ -2158,9 +2204,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _hidePlusMenu,
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.25),
-                ),
+                child: Container(color: Colors.black.withValues(alpha: 0.25)),
               ),
             ),
             CompositedTransformFollower(
@@ -2344,9 +2388,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   // ignore: unused_element
   void _showComingSoon(String feature) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature sẽ cập nhật sớm')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$feature sẽ cập nhật sớm')));
   }
 
   Future<void> _sendText() async {
@@ -2357,9 +2401,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       await _ctrl.sendText(text);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
@@ -2528,9 +2572,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                     if (ctx.mounted) Navigator.pop(ctx);
                   } catch (e) {
                     if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text(e.toString())),
-                      );
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(SnackBar(content: Text(e.toString())));
                     }
                   }
                 },

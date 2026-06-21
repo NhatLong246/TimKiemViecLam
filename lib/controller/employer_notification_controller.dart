@@ -274,12 +274,25 @@ class EmployerNotificationController extends GetxController {
     if (n.type == 'interest_rejected') {
       final jobId = (n.data['jobId'] ?? '').toString();
       final candidateId = (n.data['candidateId'] ?? '').toString();
-      if (jobId.isNotEmpty && candidateId.isNotEmpty) return 'interest_rejected_${jobId}_$candidateId';
+      if (jobId.isNotEmpty && candidateId.isNotEmpty) {
+        return 'interest_rejected_${jobId}_$candidateId';
+      }
+    }
+    if (n.type == 'hire_request_accepted') {
+      final requestId = (n.data['requestId'] ?? '').toString();
+      if (requestId.isNotEmpty) return 'hire_request_accepted_$requestId';
+      final jobId = (n.data['jobId'] ?? '').toString();
+      final candidateId = (n.data['candidateId'] ?? '').toString();
+      if (jobId.isNotEmpty && candidateId.isNotEmpty) {
+        return 'hire_request_accepted_${jobId}_$candidateId';
+      }
     }
     if (n.type == 'application') {
       final jobId = (n.data['jobId'] ?? '').toString();
       final candidateId = (n.data['candidateId'] ?? '').toString();
-      if (jobId.isNotEmpty && candidateId.isNotEmpty) return 'application_${jobId}_$candidateId';
+      if (jobId.isNotEmpty && candidateId.isNotEmpty) {
+        return 'application_${jobId}_$candidateId';
+      }
     }
     if (n.type == 'review') {
       final jobId = (n.data['jobId'] ?? '').toString();

@@ -8,7 +8,7 @@ import 'notification_service.dart';
 /// Lưu thông tin ứng viên kèm tiêu chí tìm việc.
 class DiscoverableCandidate {
   final UserModel user;
-  final JobCriteriaModel criteria;
+  final JobCriteriaModel? criteria;
 
   const DiscoverableCandidate({required this.user, required this.criteria});
 }
@@ -17,12 +17,60 @@ class DiscoverableCandidate {
 class CandidateDiscoveryService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  /// All active workers who explicitly allow employer discovery.
+  Future<List<DiscoverableCandidate>> fetchPotentialCandidates({
+    String? keyword,
+    int limit = 50,
+  }) async {
+    final snap = await _db
+        .collection('users')
+        .where('allowEmployerDiscovery', isEqualTo: true)
+        .limit(limit)
+        .get();
+
+    final query = keyword?.trim().toLowerCase() ?? '';
+    final results = <DiscoverableCandidate>[];
+    for (final doc in snap.docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['uid'] = doc.id;
+      final user = UserModel.fromMap(data);
+      if (user.role != 'candidate' || !user.isActive) continue;
+
+      final criteria = JobCriteriaModel.fromUserData(data);
+      if (query.isNotEmpty) {
+        final matches =
+            user.fullName.toLowerCase().contains(query) ||
+            user.username.toLowerCase().contains(query) ||
+            user.email.toLowerCase().contains(query) ||
+            (criteria?.position.toLowerCase().contains(query) ?? false) ||
+            (criteria?.careers.any(
+                  (career) => career.toLowerCase().contains(query),
+                ) ??
+                false);
+        if (!matches) continue;
+      }
+
+      results.add(DiscoverableCandidate(user: user, criteria: criteria));
+    }
+
+    results.sort((a, b) {
+      final rating = b.user.averageRating.compareTo(a.user.averageRating);
+      if (rating != 0) return rating;
+      final jobs = b.user.totalJobsDone.compareTo(a.user.totalJobsDone);
+      if (jobs != 0) return jobs;
+      return a.user.fullName.compareTo(b.user.fullName);
+    });
+    return results;
+  }
+
   Future<void> recordProfileView({
     required String candidateId,
     required String employerId,
     String employerName = '',
   }) async {
-    if (candidateId.isEmpty || employerId.isEmpty || candidateId == employerId) {
+    if (candidateId.isEmpty ||
+        employerId.isEmpty ||
+        candidateId == employerId) {
       return;
     }
 
@@ -82,9 +130,11 @@ class CandidateDiscoveryService {
       if (criteria == null) continue;
 
       // Chỉ lấy ứng viên tìm Full-time
-      final hasFullTime = criteria.workTypes.any((t) =>
-          t.toLowerCase().contains('toàn thời gian') ||
-          t.toLowerCase().contains('full'));
+      final hasFullTime = criteria.workTypes.any(
+        (t) =>
+            t.toLowerCase().contains('toàn thời gian') ||
+            t.toLowerCase().contains('full'),
+      );
       if (!hasFullTime) continue;
 
       final user = UserModel.fromMap(data);
@@ -92,7 +142,8 @@ class CandidateDiscoveryService {
       // Lọc theo keyword (tên, email, username)
       if (keyword != null && keyword.trim().isNotEmpty) {
         final q = keyword.trim().toLowerCase();
-        final match = user.fullName.toLowerCase().contains(q) ||
+        final match =
+            user.fullName.toLowerCase().contains(q) ||
             user.username.toLowerCase().contains(q) ||
             user.email.toLowerCase().contains(q) ||
             criteria.position.toLowerCase().contains(q) ||
@@ -146,12 +197,16 @@ class CandidateDiscoveryService {
   }) async {
     final snap = await _db
         .collection('employerInterests')
-        .where('employerId', isEqualTo: employerId)
         .where('candidateId', isEqualTo: candidateId)
-        .where('jobId', isEqualTo: jobId)
-        .limit(1)
         .get();
-    return snap.docs.isNotEmpty;
+    return snap.docs.any((doc) {
+      final data = doc.data();
+      final sameRequest =
+          data['employerId']?.toString() == employerId &&
+          data['jobId']?.toString() == jobId;
+      final status = (data['status'] ?? 'pending').toString();
+      return sameRequest && (status == 'pending' || status == 'accepted');
+    });
   }
 
   /// Gửi thông báo quan tâm in-app cho ứng viên.
@@ -172,13 +227,17 @@ class CandidateDiscoveryService {
     if (alreadySent) return false;
 
     // 2. Lưu lịch sử gửi quan tâm
-    await _db.collection('employerInterests').add({
+    final requestRef = _db.collection('employerInterests').doc();
+    await requestRef.set({
+      'requestId': requestRef.id,
       'employerId': employerId,
       'candidateId': candidateId,
       'jobId': jobId,
       'jobTitle': jobTitle,
       'employerName': employerName,
+      'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
 
     // 3. Gửi thông báo in-app cho ứng viên
@@ -186,12 +245,13 @@ class CandidateDiscoveryService {
       final notifService = NotificationService();
       await notifService.sendToUser(
         userId: candidateId,
-        title: '🌟 Nhà tuyển dụng quan tâm đến bạn!',
+        title: 'Lời mời làm việc mới',
         body:
-            '$employerName đang quan tâm đến bạn cho vị trí "$jobTitle". Nhấn để xem chi tiết công việc!',
+            '$employerName mời bạn làm công việc "$jobTitle". Bạn có thể chấp nhận hoặc từ chối lời mời.',
         category: NotificationCategory.job,
         data: {
-          'type': 'employer_interest',
+          'type': 'hire_request',
+          'requestId': requestRef.id,
           'jobId': jobId,
           'employerId': employerId,
           'employerName': employerName,
@@ -199,8 +259,56 @@ class CandidateDiscoveryService {
       );
     } catch (e) {
       debugPrint('Error sending interest notification: $e');
+      try {
+        await requestRef.delete();
+      } catch (_) {}
+      rethrow;
     }
 
     return true;
+  }
+
+  /// Persists the worker response and supports legacy invitations without IDs.
+  Future<void> markHireRequestResponded({
+    String? requestId,
+    required String employerId,
+    required String candidateId,
+    required String jobId,
+    required String status,
+    String? applicationId,
+  }) async {
+    DocumentReference<Map<String, dynamic>>? ref;
+    if (requestId != null && requestId.isNotEmpty) {
+      final candidateRef = _db.collection('employerInterests').doc(requestId);
+      final snap = await candidateRef.get();
+      if (snap.exists) ref = candidateRef;
+    }
+
+    if (ref == null) {
+      final snap = await _db
+          .collection('employerInterests')
+          .where('candidateId', isEqualTo: candidateId)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final current = (data['status'] ?? 'pending').toString();
+        final sameRequest =
+            data['employerId']?.toString() == employerId &&
+            data['jobId']?.toString() == jobId;
+        if (sameRequest && current == 'pending') {
+          ref = doc.reference;
+          break;
+        }
+      }
+    }
+
+    if (ref == null) return;
+    await ref.update({
+      'status': status,
+      if (applicationId != null && applicationId.isNotEmpty)
+        'applicationId': applicationId,
+      'respondedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

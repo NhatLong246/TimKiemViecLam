@@ -2,15 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 
 import '../../data/models/job_criteria_model.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/candidate_discovery_service.dart';
+import 'candidate_profile_screen.dart';
+import 'hire_request_sheet.dart';
 
 class CandidateDiscoveryScreen extends StatefulWidget {
-  const CandidateDiscoveryScreen({super.key});
+  const CandidateDiscoveryScreen({super.key, this.fullTimeOnly = false});
+
+  final bool fullTimeOnly;
 
   @override
   State<CandidateDiscoveryScreen> createState() =>
@@ -42,7 +45,9 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
   Future<void> _loadCandidates() async {
     setState(() => _isLoading = true);
     try {
-      final list = await _service.fetchFullTimeCandidates(keyword: _query);
+      final list = widget.fullTimeOnly
+          ? await _service.fetchFullTimeCandidates(keyword: _query)
+          : await _service.fetchPotentialCandidates(keyword: _query);
       setState(() => _candidates = list);
     } catch (e) {
       Get.snackbar('Lỗi', 'Không thể tải danh sách ứng viên');
@@ -107,15 +112,20 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
                         color: Colors.white.withOpacity(0.18),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.arrow_back_rounded,
-                          color: Colors.white, size: 20),
+                      child: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Khám phá ứng viên Full-time',
-                      style: TextStyle(
+                      widget.fullTimeOnly
+                          ? 'Khám phá ứng viên Full-time'
+                          : 'Danh sách người làm tiềm năng',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -142,8 +152,11 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
                 child: Row(
                   children: [
                     const SizedBox(width: 12),
-                    Icon(Icons.search_rounded,
-                        color: Colors.grey.shade400, size: 20),
+                    Icon(
+                      Icons.search_rounded,
+                      color: Colors.grey.shade400,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
@@ -151,7 +164,9 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
                         focusNode: _focusNode,
                         onChanged: _onSearchChanged,
                         style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF1A1A2E)),
+                          fontSize: 14,
+                          color: Color(0xFF1A1A2E),
+                        ),
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -162,7 +177,9 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
                           contentPadding: EdgeInsets.zero,
                           hintText: 'Tìm theo tên, chuyên môn...',
                           hintStyle: TextStyle(
-                              color: Colors.grey.shade400, fontSize: 14),
+                            color: Colors.grey.shade400,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
@@ -174,8 +191,11 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(10),
-                          child: Icon(Icons.close_rounded,
-                              size: 16, color: Colors.grey.shade400),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: Colors.grey.shade400,
+                          ),
                         ),
                       ),
                   ],
@@ -195,17 +215,21 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.person_search_rounded,
-                size: 64, color: Colors.grey.shade300),
+            Icon(
+              Icons.person_search_rounded,
+              size: 64,
+              color: Colors.grey.shade300,
+            ),
             const SizedBox(height: 16),
             Text(
               _query.isNotEmpty
                   ? 'Không tìm thấy ứng viên phù hợp'
                   : 'Chưa có ứng viên nào công khai hồ sơ',
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
             ),
           ],
         ),
@@ -215,175 +239,245 @@ class _CandidateDiscoveryScreenState extends State<CandidateDiscoveryScreen> {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       itemCount: list.length,
-      itemBuilder: (_, i) => _CandidateCard(item: list[i]),
+      itemBuilder: (_, i) => _CandidateCard(
+        item: list[i],
+        jobTypeFilter: widget.fullTimeOnly ? 'full_time' : null,
+      ),
     );
   }
 }
 
 class _CandidateCard extends StatelessWidget {
-  const _CandidateCard({required this.item});
+  const _CandidateCard({required this.item, this.jobTypeFilter});
 
   final DiscoverableCandidate item;
+  final String? jobTypeFilter;
 
   @override
   Widget build(BuildContext context) {
     final user = item.user;
-    final crit = item.criteria;
+    final crit = item.criteria ?? const JobCriteriaModel();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final secondaryText = Theme.of(context).colorScheme.onSurfaceVariant;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Avatar & Name
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(40),
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    color: Colors.grey.shade200,
-                    child: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                        ? Image.network(
-                            user.avatarUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                _avatarFallback(user.fullName),
-                          )
-                        : _avatarFallback(user.fullName),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.fullName.isNotEmpty ? user.fullName : 'Chưa cập nhật tên',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1A2E),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.star_rounded,
-                              size: 14, color: Colors.orange.shade400),
-                          const SizedBox(width: 4),
-                          Text(
-                            user.averageRating > 0
-                                ? user.averageRating.toStringAsFixed(1)
-                                : 'Chưa có',
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(Icons.check_circle_outline_rounded,
-                              size: 14, color: Colors.green.shade500),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${user.totalJobsDone} việc',
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Criteria
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (crit.position.isNotEmpty) ...[
-                    Text('Vị trí mong muốn: ${crit.position}',
-                        style: const TextStyle(
-                            fontSize: 13.5, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                  ],
-                  if (crit.careers.isNotEmpty) ...[
-                    Text('Ngành nghề: ${crit.careers.join(", ")}',
-                        style: const TextStyle(fontSize: 13)),
-                    const SizedBox(height: 4),
-                  ],
-                  if (crit.locations.isNotEmpty) ...[
-                    Text('Khu vực: ${crit.locations.join(", ")}',
-                        style: const TextStyle(fontSize: 13)),
-                    const SizedBox(height: 4),
-                  ],
-                  if (crit.salaryDisplay != null) ...[
-                    Text('Mức lương: ${crit.salaryDisplay}',
-                        style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF7B1FA2), fontWeight: FontWeight.w600)),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Nút "Gửi quan tâm"
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.send_rounded, size: 18),
-                label: const Text('Gửi quan tâm',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1565C0),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-                onPressed: () async {
-                  final employerId = FirebaseAuth.instance.currentUser?.uid;
-                  if (employerId != null && employerId.isNotEmpty) {
-                    await CandidateDiscoveryService().recordProfileView(
-                      candidateId: user.id,
-                      employerId: employerId,
-                    );
-                  }
-                  Get.bottomSheet(
-                    SendInterestSheet(candidate: user),
-                    isScrollControlled: true,
-                  );
-                },
-              ),
+    return GestureDetector(
+      onTap: () => Get.to(() => CandidateProfileScreen(candidate: user)),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(2, 2, 2, 18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? const [Color(0xFF30203B), Color(0xFF202A42)]
+                : const [Color(0xFFFAF1FF), Color(0xFFF0F4FF)],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(
+              0xFF8E24AA,
+            ).withValues(alpha: isDark ? 0.55 : 0.32),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF7B1FA2).withValues(alpha: 0.16),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar & Name
+              Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF8E24AA), Color(0xFF1565C0)],
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: ColoredBox(
+                        color: isDark
+                            ? const Color(0xFF33253E)
+                            : const Color(0xFFF3E5F5),
+                        child:
+                            user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                            ? Image.network(
+                                user.avatarUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _avatarFallback(user.fullName),
+                              )
+                            : _avatarFallback(user.fullName),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.fullName.isNotEmpty
+                              ? user.fullName
+                              : 'Chưa cập nhật tên',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: Colors.orange.shade400,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              user.averageRating > 0
+                                  ? user.averageRating.toStringAsFixed(1)
+                                  : 'Chưa có',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: secondaryText,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 14,
+                              color: Colors.green.shade500,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${user.totalJobsDone} việc',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: secondaryText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Criteria
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.white.withValues(alpha: 0.66),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF8E24AA).withValues(alpha: 0.16),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (crit.position.isNotEmpty) ...[
+                      Text(
+                        'Vị trí mong muốn: ${crit.position}',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    if (crit.careers.isNotEmpty) ...[
+                      Text(
+                        'Ngành nghề: ${crit.careers.join(", ")}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    if (crit.locations.isNotEmpty) ...[
+                      Text(
+                        'Khu vực: ${crit.locations.join(", ")}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    if (crit.salaryDisplay != null) ...[
+                      Text(
+                        'Mức lương: ${crit.salaryDisplay}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7B1FA2),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Nút "Gửi quan tâm"
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: const Text(
+                    'Gửi yêu cầu thuê',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7B1FA2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 2,
+                    shadowColor: const Color(
+                      0xFF7B1FA2,
+                    ).withValues(alpha: 0.35),
+                  ),
+                  onPressed: () async {
+                    final employerId = FirebaseAuth.instance.currentUser?.uid;
+                    if (employerId != null && employerId.isNotEmpty) {
+                      await CandidateDiscoveryService().recordProfileView(
+                        candidateId: user.id,
+                        employerId: employerId,
+                      );
+                    }
+                    if (!context.mounted) return;
+                    showHireRequestSheet(
+                      context: context,
+                      candidateId: user.id,
+                      candidateName: user.fullName.isEmpty
+                          ? 'Người làm'
+                          : user.fullName,
+                      jobTypeFilter: jobTypeFilter,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -410,7 +504,11 @@ class _CandidateCard extends StatelessWidget {
 class SendInterestSheet extends StatefulWidget {
   final UserModel candidate;
   final String? jobTypeFilter;
-  const SendInterestSheet({super.key, required this.candidate, this.jobTypeFilter = 'full_time'});
+  const SendInterestSheet({
+    super.key,
+    required this.candidate,
+    this.jobTypeFilter = 'full_time',
+  });
 
   @override
   State<SendInterestSheet> createState() => _SendInterestSheetState();
@@ -441,11 +539,11 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
           .collection('jobPosts')
           .where('employerId', isEqualTo: uid)
           .where('status', whereIn: ['active', 'approved']);
-          
+
       if (widget.jobTypeFilter != null) {
         query = query.where('jobType', isEqualTo: widget.jobTypeFilter);
       }
-      
+
       final snap = await query.get();
 
       final appsSnap = await _db
@@ -454,7 +552,7 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
           .where('employerId', isEqualTo: uid)
           .get();
       final doneJobIds = appsSnap.docs
-          .map((d) => (d.data() as Map<String, dynamic>)['jobId'] as String?)
+          .map((d) => d.data()['jobId'] as String?)
           .where((id) => id != null)
           .toSet();
 
@@ -470,20 +568,27 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
           .toSet();
 
       final now = DateTime.now();
-      final list = snap.docs.map((d) {
-        final data = d.data();
-        data['jobId'] = d.id;
-        return JobPostModel.fromMap(data);
-      }).where((job) {
-        if (doneJobIds.contains(job.jobId)) return false;
-        // Bỏ qua việc đã quá hạn ứng tuyển
-        if (job.applicationDeadline != null && job.applicationDeadline!.isBefore(now)) return false;
-        // Bỏ qua việc đã qua ngày kết thúc
-        if (job.endDate != null && job.endDate!.isBefore(now)) return false;
-        // Bỏ qua việc làm 1 ngày nhưng ngày bắt đầu đã qua (hôm qua trở về trước)
-        if (job.endDate == null && job.startDate.add(const Duration(days: 1)).isBefore(now)) return false;
-        return true;
-      }).toList();
+      final list = snap.docs
+          .map((d) {
+            final data = d.data();
+            data['jobId'] = d.id;
+            return JobPostModel.fromMap(data);
+          })
+          .where((job) {
+            if (doneJobIds.contains(job.jobId)) return false;
+            // Bỏ qua việc đã quá hạn ứng tuyển
+            if (job.applicationDeadline != null &&
+                job.applicationDeadline!.isBefore(now))
+              return false;
+            // Bỏ qua việc đã qua ngày kết thúc
+            if (job.endDate != null && job.endDate!.isBefore(now)) return false;
+            // Bỏ qua việc làm 1 ngày nhưng ngày bắt đầu đã qua (hôm qua trở về trước)
+            if (job.endDate == null &&
+                job.startDate.add(const Duration(days: 1)).isBefore(now))
+              return false;
+            return true;
+          })
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -506,7 +611,10 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
     try {
       // Lấy tên NTD
       final employerDoc = await _db.collection('users').doc(uid).get();
-      final employerName = employerDoc.data()?['companyName'] ?? employerDoc.data()?['firstName'] ?? 'Nhà tuyển dụng';
+      final employerName =
+          employerDoc.data()?['companyName'] ??
+          employerDoc.data()?['firstName'] ??
+          'Nhà tuyển dụng';
 
       final success = await _service.sendInterestNotification(
         candidateId: widget.candidate.id,
@@ -573,8 +681,8 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              widget.jobTypeFilter == 'full_time' 
-                  ? 'Chọn công việc Full-time' 
+              widget.jobTypeFilter == 'full_time'
+                  ? 'Chọn công việc Full-time'
                   : 'Chọn công việc',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
@@ -591,79 +699,90 @@ class _SendInterestSheetState extends State<SendInterestSheet> {
                       child: CircularProgressIndicator(),
                     )
                   : (_jobs == null || _jobs!.isEmpty)
-                      ? Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.work_off_rounded,
-                                  size: 48, color: Colors.grey.shade400),
-                              const SizedBox(height: 12),
-                              Text(
-                                widget.jobTypeFilter == 'full_time'
-                                    ? 'Bạn chưa có công việc Full-time nào đang tuyển.'
-                                    : 'Bạn chưa có công việc nào đang tuyển.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 15),
-                              ),
-                            ],
+                  ? Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.work_off_rounded,
+                            size: 48,
+                            color: Colors.grey.shade400,
                           ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: _jobs!.length,
-                          itemBuilder: (context, index) {
-                            final job = _jobs![index];
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1565C0).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.work_rounded,
-                                    color: Color(0xFF1565C0)),
-                              ),
-                              title: Text(
-                                job.title,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700, fontSize: 15),
-                              ),
-                              subtitle: Text(
-                                job.salaryDisplay,
-                                style: const TextStyle(
-                                    color: Color(0xFF7B1FA2),
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.jobTypeFilter == 'full_time'
+                                ? 'Bạn chưa có công việc Full-time nào đang tuyển.'
+                                : 'Bạn chưa có công việc nào đang tuyển.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      itemCount: _jobs!.length,
+                      itemBuilder: (context, index) {
+                        final job = _jobs![index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1565C0).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.work_rounded,
+                              color: Color(0xFF1565C0),
+                            ),
+                          ),
+                          title: Text(
+                            job.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          subtitle: Text(
+                            job.salaryDisplay,
+                            style: const TextStyle(
+                              color: Color(0xFF7B1FA2),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          trailing: _sendingJobId == job.jobId
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : _sentJobIds.contains(job.jobId)
+                              ? const Text(
+                                  'Đã gửi',
+                                  style: TextStyle(
+                                    color: Colors.grey,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 13),
-                              ),
-                              trailing: _sendingJobId == job.jobId
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  : _sentJobIds.contains(job.jobId)
-                                      ? const Text(
-                                          'Đã gửi',
-                                          style: TextStyle(
-                                              color: Colors.grey,
-                                              fontWeight: FontWeight.w600),
-                                        )
-                                      : TextButton(
-                                          onPressed: _sendingJobId != null
-                                              ? null
-                                              : () => _sendInterest(job),
-                                          child: const Text('Gửi'),
-                                        ),
-                            );
-                          },
-                        ),
+                                  ),
+                                )
+                              : TextButton(
+                                  onPressed: _sendingJobId != null
+                                      ? null
+                                      : () => _sendInterest(job),
+                                  child: const Text('Gửi'),
+                                ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

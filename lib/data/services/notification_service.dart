@@ -732,18 +732,46 @@ class NotificationService {
     required String candidateName,
     required String candidateId,
     required String jobId,
+    String? requestId,
   }) async {
     final svc = NotificationService();
     await svc.notifyEmployer(
       employerId: employerId,
       type: 'interest_rejected',
       title: '❌ Lời mời bị từ chối',
-      body: '$candidateName đã từ chối lời mời thuê lại cho "$jobTitle".',
+      body: '$candidateName đã từ chối lời mời làm việc "$jobTitle".',
       category: NotificationCategory.job,
       data: {
         'type': 'interest_rejected',
         'jobId': jobId,
         'candidateId': candidateId,
+        if (requestId != null && requestId.isNotEmpty) 'requestId': requestId,
+      },
+    );
+  }
+
+  static Future<void> notifyHireRequestAccepted({
+    required String employerId,
+    required String jobTitle,
+    required String candidateName,
+    required String candidateId,
+    required String jobId,
+    required String applicationId,
+    String? requestId,
+  }) async {
+    final svc = NotificationService();
+    await svc.notifyEmployer(
+      employerId: employerId,
+      type: 'hire_request_accepted',
+      title: 'Lời mời đã được chấp nhận',
+      body: '$candidateName đã chấp nhận lời mời làm việc "$jobTitle".',
+      category: NotificationCategory.job,
+      data: {
+        'type': 'hire_request_accepted',
+        'jobId': jobId,
+        'candidateId': candidateId,
+        'applicationId': applicationId,
+        if (requestId != null && requestId.isNotEmpty) 'requestId': requestId,
       },
     );
   }

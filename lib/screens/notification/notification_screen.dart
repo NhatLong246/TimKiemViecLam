@@ -10,7 +10,8 @@ import '../messaging/chat_room_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/job_post_model.dart';
-import '../../data/services/schedule_service.dart';
+import '../../data/services/candidate_discovery_service.dart';
+import '../../data/services/candidates_service.dart';
 
 enum _SortOrder { newestFirst, oldestFirst }
 
@@ -28,17 +29,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   _SortOrder _sortOrder = _SortOrder.newestFirst;
   _FilterType _filter = _FilterType.all;
+  String? _handlingHireRequestId;
 
   static const Color _primary = Color(0xFF2E7D32);
 
   Color _unreadBg(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? _primary.withValues(alpha: 0.16)
-          : const Color(0xFFF0F7FF);
+      ? _primary.withValues(alpha: 0.16)
+      : const Color(0xFFF0F7FF);
 
-  List<AppNotificationItem> _filterList(List<AppNotificationItem> notifications) {
-    List<AppNotificationItem> list =
-        MessagingBootstrap.ensureController().visibleNotifications(notifications);
+  List<AppNotificationItem> _filterList(
+    List<AppNotificationItem> notifications,
+  ) {
+    List<AppNotificationItem> list = MessagingBootstrap.ensureController()
+        .visibleNotifications(notifications);
     if (_filter == _FilterType.unread) {
       list = list.where((n) => !n.isRead).toList();
     } else if (_filter == _FilterType.read) {
@@ -67,7 +71,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     await _markRead(item);
     if (!mounted) return;
 
-    if (item.isAttendanceNotification || item.isWorkAssignment || item.isEmployerInterest) {
+    if (item.isAttendanceNotification ||
+        item.isWorkAssignment ||
+        item.isEmployerInterest) {
       await NotificationNavigation.handleTap(context, item);
       return;
     }
@@ -82,9 +88,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => ChatRoomScreen(groupId: groupId),
-        ),
+        MaterialPageRoute(builder: (_) => ChatRoomScreen(groupId: groupId)),
       );
     }
   }
@@ -93,136 +97,154 @@ class _NotificationScreenState extends State<NotificationScreen> {
     await _service.deleteNotification(item.id);
   }
 
-  Future<void> _handleEmployerInterest(AppNotificationItem item, bool accepted) async {
-    if (accepted) {
-      final jobId = item.interestJobId;
-      final employerId = item.data['employerId']?.toString();
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (jobId != null && employerId != null && uid != null) {
-        try {
-          final snap = await FirebaseFirestore.instance
-              .collection('applications')
-              .where('jobId', isEqualTo: jobId)
-              .where('candidateId', isEqualTo: uid)
-              .get();
-          if (snap.docs.isEmpty) {
-            // Lấy thông tin công việc và kiểm tra trùng lịch
-            final jobDoc = await FirebaseFirestore.instance.collection('jobPosts').doc(jobId).get();
-            if (!jobDoc.exists) throw Exception('Công việc không tồn tại.');
-            final jobData = jobDoc.data() ?? {};
-            jobData['jobId'] = jobDoc.id;
-            final jobModel = JobPostModel.fromMap(jobData);
+  Future<void> _handleEmployerInterest(
+    AppNotificationItem item,
+    bool accepted,
+  ) async {
+    if (_handlingHireRequestId != null) return;
+    setState(() => _handlingHireRequestId = item.id);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final employerId = item.data['employerId']?.toString() ?? '';
+    final jobId = item.interestJobId ?? '';
+    if (uid == null || employerId.isEmpty || jobId.isEmpty) {
+      Get.snackbar('Lỗi', 'Lời mời làm việc không còn đủ thông tin.');
+      if (mounted) setState(() => _handlingHireRequestId = null);
+      return;
+    }
 
-            final scheduleService = ScheduleService();
-            await scheduleService.checkOverlap(uid, jobModel);
+    try {
+      final jobDoc = await FirebaseFirestore.instance
+          .collection('jobPosts')
+          .doc(jobId)
+          .get();
+      if (!jobDoc.exists) throw Exception('Công việc không tồn tại.');
+      final jobData = Map<String, dynamic>.from(jobDoc.data()!);
+      jobData['jobId'] = jobDoc.id;
+      final job = JobPostModel.fromMap(jobData);
 
-            final docRef = FirebaseFirestore.instance.collection('applications').doc();
-            await docRef.set({
-              'appId': docRef.id,
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final userData = userDoc.data() ?? const <String, dynamic>{};
+      final name =
+          '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'.trim();
+      final candidateName = name.isEmpty ? 'Ứng viên' : name;
+
+      String? applicationId;
+      if (accepted) {
+        final apps = await FirebaseFirestore.instance
+            .collection('applications')
+            .where('candidateId', isEqualTo: uid)
+            .get();
+
+        QueryDocumentSnapshot<Map<String, dynamic>>? acceptedApp;
+        QueryDocumentSnapshot<Map<String, dynamic>>? pendingApp;
+        for (final doc in apps.docs) {
+          if (doc.data()['jobId']?.toString() != jobId) continue;
+          final status = (doc.data()['status'] ?? '').toString();
+          if (status == 'accepted') acceptedApp = doc;
+          if (status == 'pending') pendingApp = doc;
+        }
+
+        if (acceptedApp != null) {
+          applicationId = acceptedApp.id;
+        } else {
+          final appRef =
+              pendingApp?.reference ??
+              FirebaseFirestore.instance.collection('applications').doc();
+          if (pendingApp == null) {
+            await appRef.set({
+              'appId': appRef.id,
               'jobId': jobId,
               'candidateId': uid,
               'employerId': employerId,
               'status': 'pending',
+              'source': 'employer_invitation',
+              if (item.hireRequestId?.isNotEmpty == true)
+                'hireRequestId': item.hireRequestId,
               'appliedAt': FieldValue.serverTimestamp(),
               'updatedAt': FieldValue.serverTimestamp(),
             });
-            if (mounted) {
-              Get.snackbar(
-                'Thành công',
-                'Đã đồng ý thuê lại! Vui lòng chờ nhà tuyển dụng duyệt.',
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-              );
-            }
-
-            // Gửi thông báo cho nhà tuyển dụng
-            try {
-              final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-              final d = userDoc.data() ?? {};
-              final candidateName = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
-              final finalName = candidateName.isNotEmpty ? candidateName : 'Ứng viên';
-              await NotificationService.notifyNewApplication(
-                employerId: employerId,
-                jobTitle: jobModel.title,
-                candidateName: finalName,
-                jobId: jobId,
-                appId: docRef.id,
-                candidateId: uid,
-              );
-            } catch (_) {}
-          } else {
-            if (mounted) {
-              Get.snackbar('Thông báo', 'Bạn đã ứng tuyển công việc này rồi!');
-            }
           }
-        } catch (e) {
-          if (mounted) {
-            final msg = e.toString().replaceAll('Exception: ', '');
-            Get.snackbar(
-              'Lỗi',
-              msg.isNotEmpty ? msg : 'Không thể xử lý yêu cầu. Vui lòng thử lại.',
-              backgroundColor: Colors.red.shade100,
-              colorText: Colors.red.shade900,
-            );
-          }
-          return; // Do not update notification status if it failed
+          applicationId = appRef.id;
+          await CandidatesService().acceptApplication(appRef.id, jobId);
         }
+
+        try {
+          await CandidateDiscoveryService().markHireRequestResponded(
+            requestId: item.hireRequestId,
+            employerId: employerId,
+            candidateId: uid,
+            jobId: jobId,
+            status: 'accepted',
+            applicationId: applicationId,
+          );
+        } catch (_) {}
+        try {
+          await NotificationService.notifyHireRequestAccepted(
+            employerId: employerId,
+            jobTitle: job.title,
+            candidateName: candidateName,
+            candidateId: uid,
+            jobId: jobId,
+            applicationId: applicationId,
+            requestId: item.hireRequestId,
+          );
+        } catch (_) {}
+
+        Get.snackbar(
+          'Đã chấp nhận',
+          'Bạn đã nhận công việc "${job.title}".',
+          backgroundColor: Colors.green.shade600,
+          colorText: Colors.white,
+        );
+      } else {
+        await CandidateDiscoveryService().markHireRequestResponded(
+          requestId: item.hireRequestId,
+          employerId: employerId,
+          candidateId: uid,
+          jobId: jobId,
+          status: 'rejected',
+        );
+        try {
+          await NotificationService.notifyInterestRejected(
+            employerId: employerId,
+            jobTitle: job.title,
+            candidateName: candidateName,
+            candidateId: uid,
+            jobId: jobId,
+            requestId: item.hireRequestId,
+          );
+        } catch (_) {}
+        Get.snackbar(
+          'Đã từ chối',
+          'Bạn đã từ chối lời mời làm việc "${job.title}".',
+          backgroundColor: Colors.grey.shade700,
+          colorText: Colors.white,
+        );
       }
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notifications')
+          .doc(item.id)
+          .update({
+            'data.handled': true,
+            'data.response': accepted ? 'accepted' : 'rejected',
+          });
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      Get.snackbar(
+        'Không thể xử lý lời mời',
+        message.isEmpty ? 'Vui lòng thử lại.' : message,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+    } finally {
+      if (mounted) setState(() => _handlingHireRequestId = null);
     }
-
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
-        if (!accepted) {
-          final employerId = item.data['employerId']?.toString();
-          final jobId = item.interestJobId;
-          if (employerId != null && jobId != null) {
-            final jobDoc = await FirebaseFirestore.instance.collection('jobPosts').doc(jobId).get();
-            final jobTitle = jobDoc.data()?['title'] ?? 'Công việc';
-            
-            final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-            final d = userDoc.data() ?? {};
-            final candidateName = '${d['firstName'] ?? ''} ${d['lastName'] ?? ''}'.trim();
-            final finalName = candidateName.isNotEmpty ? candidateName : 'Ứng viên';
-            
-            await NotificationService.notifyInterestRejected(
-              employerId: employerId,
-              jobTitle: jobTitle.toString(),
-              candidateName: finalName,
-              candidateId: uid,
-              jobId: jobId,
-            );
-            
-            // Xóa record trong employerInterests để NTD có thể mời lại sau này nếu cần
-            final snapInterests = await FirebaseFirestore.instance
-                .collection('employerInterests')
-                .where('employerId', isEqualTo: employerId)
-                .where('candidateId', isEqualTo: uid)
-                .where('jobId', isEqualTo: jobId)
-                .get();
-            for (var doc in snapInterests.docs) {
-              await doc.reference.delete();
-            }
-            
-            if (mounted) {
-              Get.snackbar(
-                'Thành công',
-                'Đã từ chối lời mời thuê lại.',
-                backgroundColor: Colors.grey.shade700,
-                colorText: Colors.white,
-              );
-            }
-          }
-        }
-        
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('notifications')
-            .doc(item.id)
-            .update({'data.handled': true});
-      }
-    } catch (_) {}
   }
 
   void _deleteAll() {
@@ -282,41 +304,41 @@ class _NotificationScreenState extends State<NotificationScreen> {
       // Cập nhật khi tắt thông báo nhóm (mutedBy).
       final _ = Get.find<MessagingController>().mutedGroupIds.length;
       return StreamBuilder<List<AppNotificationItem>>(
-      stream: _service.streamNotifications(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
+        stream: _service.streamNotifications(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Thông báo')),
+              body: const Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final notifications = snapshot.data ?? [];
+          final items = _filterList(notifications);
+          final unreadCount = notifications.where((n) => !n.isRead).length;
+
           return Scaffold(
-            appBar: AppBar(title: const Text('Thông báo')),
-            body: const Center(child: CircularProgressIndicator()),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            appBar: _buildAppBar(unreadCount, notifications.isNotEmpty),
+            body: Column(
+              children: [
+                _buildFilterBar(),
+                _buildSortBar(),
+                Expanded(
+                  child: items.isEmpty
+                      ? _buildEmpty()
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          itemCount: items.length,
+                          itemBuilder: (_, i) => _buildCard(items[i]),
+                        ),
+                ),
+              ],
+            ),
           );
-        }
-
-        final notifications = snapshot.data ?? [];
-        final items = _filterList(notifications);
-        final unreadCount = notifications.where((n) => !n.isRead).length;
-
-        return Scaffold(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          appBar: _buildAppBar(unreadCount, notifications.isNotEmpty),
-          body: Column(
-            children: [
-              _buildFilterBar(),
-              _buildSortBar(),
-              Expanded(
-                child: items.isEmpty
-                    ? _buildEmpty()
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: items.length,
-                        itemBuilder: (_, i) => _buildCard(items[i]),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+        },
+      );
     });
   }
 
@@ -337,10 +359,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         children: [
           Text(
             'Thông báo',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
           if (unreadCount > 0) ...[
             const SizedBox(width: 8),
@@ -533,7 +554,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: item.isRead ? Theme.of(context).cardColor : _unreadBg(context),
+            color: item.isRead
+                ? Theme.of(context).cardColor
+                : _unreadBg(context),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: item.isRead
@@ -634,46 +657,107 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           _formatTime(item.createdAt),
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
-                    if (item.isEmployerInterest && item.data['handled'] != true) ...[
+                    if (item.isEmployerInterest &&
+                        item.data['handled'] != true) ...[
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () => _handleEmployerInterest(item, false),
+                              onPressed: _handlingHireRequestId == item.id
+                                  ? null
+                                  : () => _handleEmployerInterest(item, false),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.redAccent,
                                 side: const BorderSide(color: Colors.redAccent),
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              child: const Text('Từ chối', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                              child: const Text(
+                                'Từ chối',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () => _handleEmployerInterest(item, true),
+                              onPressed: _handlingHireRequestId == item.id
+                                  ? null
+                                  : () => _handleEmployerInterest(item, true),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _primary,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 elevation: 0,
                               ),
-                              child: const Text('Chấp nhận', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                              child: _handlingHireRequestId == item.id
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Chấp nhận',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],
+                      ),
+                    ] else if (item.isEmployerInterest) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: item.data['response'] == 'accepted'
+                                ? Colors.green.shade50
+                                : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            item.data['response'] == 'accepted'
+                                ? 'Đã chấp nhận lời mời'
+                                : 'Đã từ chối lời mời',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: item.data['response'] == 'accepted'
+                                  ? Colors.green.shade800
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ],

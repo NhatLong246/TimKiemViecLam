@@ -3,14 +3,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import '../data/models/job_post_model.dart';
 import '../data/services/job_post_service.dart';
+import '../data/services/candidate_discovery_service.dart';
 import 'candidates_controller.dart';
 
 class EmployerHomeController extends GetxController {
   final _postService = JobPostService();
+  final _candidateService = CandidateDiscoveryService();
 
   final RxList<JobPostModel> posts = <JobPostModel>[].obs;
   final RxBool isLoading = true.obs;
-  final RxInt displayCount = 3.obs;
+  final RxInt displayCount = 4.obs;
+  final RxList<DiscoverableCandidate> potentialCandidates =
+      <DiscoverableCandidate>[].obs;
+  final RxBool isLoadingCandidates = true.obs;
+  final RxInt candidateDisplayCount = 6.obs;
 
   StreamSubscription<List<JobPostModel>>? _sub;
   Completer<void>? _pendingFirstEvent;
@@ -19,6 +25,7 @@ class EmployerHomeController extends GetxController {
   void onInit() {
     super.onInit();
     _listenToPosts();
+    loadPotentialCandidates();
   }
 
   @override
@@ -83,12 +90,34 @@ class EmployerHomeController extends GetxController {
   }
 
   Future<void> refreshHome() async {
-    displayCount.value = 3;
-    await _listenToPosts();
+    displayCount.value = 4;
+    candidateDisplayCount.value = 6;
+    await Future.wait([_listenToPosts(), loadPotentialCandidates()]);
     if (Get.isRegistered<CandidatesController>()) {
       await Get.find<CandidatesController>().loadAll();
     }
   }
+
+  Future<void> loadPotentialCandidates() async {
+    isLoadingCandidates.value = true;
+    try {
+      potentialCandidates.assignAll(
+        await _candidateService.fetchPotentialCandidates(),
+      );
+    } catch (_) {
+      potentialCandidates.clear();
+    } finally {
+      isLoadingCandidates.value = false;
+    }
+  }
+
+  List<DiscoverableCandidate> get displayedCandidates =>
+      potentialCandidates.take(candidateDisplayCount.value).toList();
+
+  bool get hasMoreCandidates =>
+      potentialCandidates.length > candidateDisplayCount.value;
+
+  void loadMoreCandidates() => candidateDisplayCount.value += 6;
 
   // ── Thống kê ────────────────────────────────────────────────────────
   int get activePostsCount =>
@@ -175,5 +204,5 @@ class EmployerHomeController extends GetxController {
 
   bool get hasMore => activePosts.length > displayCount.value;
 
-  void loadMore() => displayCount.value += 3;
+  void loadMore() => displayCount.value += 4;
 }

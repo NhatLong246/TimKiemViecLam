@@ -34,17 +34,22 @@ class AppNotificationItem {
   }
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'body': body,
-        'category': category.name,
-        'isRead': isRead,
-        if (data.isNotEmpty) 'data': data,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+    'title': title,
+    'body': body,
+    'category': category.name,
+    'isRead': isRead,
+    if (data.isNotEmpty) 'data': data,
+    'createdAt': FieldValue.serverTimestamp(),
+  };
 
   String? get messageGroupId => data['groupId']?.toString();
 
-  bool get isEmployerInterest => data['type']?.toString() == 'employer_interest';
+  bool get isEmployerInterest {
+    final type = data['type']?.toString();
+    return type == 'employer_interest' || type == 'hire_request';
+  }
+
+  String? get hireRequestId => data['requestId']?.toString();
 
   String? get interestJobId => data['jobId']?.toString();
 
@@ -85,13 +90,13 @@ class AppNotificationItem {
   String? get attendanceGroupId => data['groupId']?.toString();
 
   AppNotificationItem copyWith({bool? isRead}) => AppNotificationItem(
-        id: id,
-        title: title,
-        body: body,
-        createdAt: createdAt,
-        category: category,
-        isRead: isRead ?? this.isRead,
-      );
+    id: id,
+    title: title,
+    body: body,
+    createdAt: createdAt,
+    category: category,
+    isRead: isRead ?? this.isRead,
+  );
 
   static NotificationCategory _parseCategory(dynamic v) {
     final s = (v ?? 'system').toString();

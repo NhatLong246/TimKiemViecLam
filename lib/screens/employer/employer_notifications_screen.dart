@@ -145,6 +145,8 @@ class _EmployerNotificationsScreenState
         break;
       case 'application':
       case 'application_withdrawn':
+      case 'hire_request_accepted':
+      case 'interest_rejected':
         final jobId = (n.data['jobId'] ?? '').toString();
         Get.toNamed(
           AppRoutes.employerCandidates,
@@ -654,6 +656,20 @@ class _EmployerNotificationsScreenState
           const Color(0xFFC62828),
           const Color(0xFFFFEBEE),
           'Hủy ứng tuyển',
+        );
+      case 'hire_request_accepted':
+        return _TypeMeta(
+          Icons.handshake_outlined,
+          const Color(0xFF2E7D32),
+          const Color(0xFFE8F5E9),
+          'Đã nhận lời',
+        );
+      case 'interest_rejected':
+        return _TypeMeta(
+          Icons.person_off_outlined,
+          const Color(0xFFC62828),
+          const Color(0xFFFFEBEE),
+          'Từ chối lời mời',
         );
       case 'post_approved':
         return _TypeMeta(

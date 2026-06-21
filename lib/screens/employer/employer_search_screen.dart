@@ -7,6 +7,8 @@ import '../../data/models/job_post_model.dart';
 import '../../data/models/user_model.dart';
 import '../../routes/app_routes.dart';
 import 'candidate_discovery_screen.dart';
+import 'candidate_profile_screen.dart';
+import 'hire_request_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerSearchScreen
@@ -28,11 +30,11 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
   String _query = '';
 
   // ── Bộ lọc bài đăng ──────────────────────────────────────────────────────
-  String _postStatus = 'all';    // all|pending|approved|active|closed|rejected
-  String _postJobType = 'all';   // all|full_time|part_time
+  String _postStatus = 'all'; // all|pending|approved|active|closed|rejected
+  String _postJobType = 'all'; // all|full_time|part_time
 
   // ── Bộ lọc người làm ─────────────────────────────────────────────────────
-  String _workerSort = 'name';   // name|date
+  String _workerSort = 'name'; // name|date
 
   // Firestore
   final _db = FirebaseFirestore.instance;
@@ -122,8 +124,11 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                     color: Colors.white.withOpacity(0.18),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -145,8 +150,11 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                   child: Row(
                     children: [
                       const SizedBox(width: 12),
-                      Icon(Icons.search_rounded,
-                          color: Colors.grey.shade400, size: 20),
+                      Icon(
+                        Icons.search_rounded,
+                        color: Colors.grey.shade400,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
@@ -154,7 +162,9 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                           focusNode: _focusNode,
                           onChanged: (v) => setState(() => _query = v.trim()),
                           style: const TextStyle(
-                              fontSize: 14, color: Color(0xFF1A1A2E)),
+                            fontSize: 14,
+                            color: Color(0xFF1A1A2E),
+                          ),
                           decoration: InputDecoration(
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -165,7 +175,9 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                             contentPadding: EdgeInsets.zero,
                             hintText: 'Tìm bài đăng, người làm...',
                             hintStyle: TextStyle(
-                                color: Colors.grey.shade400, fontSize: 14),
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -177,8 +189,11 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(10),
-                            child: Icon(Icons.close_rounded,
-                                size: 16, color: Colors.grey.shade400),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: Colors.grey.shade400,
+                            ),
                           ),
                         ),
                     ],
@@ -196,14 +211,19 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.35), width: 1.2),
+                      color: Colors.white.withOpacity(0.35),
+                      width: 1.2,
+                    ),
                   ),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
                       const Center(
-                        child: Icon(Icons.tune_rounded,
-                            color: Colors.white, size: 22),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
                       if (_hasActiveFilter())
                         Positioned(
@@ -237,10 +257,11 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
         controller: _tab,
         labelColor: const Color(0xFF7B1FA2),
         unselectedLabelColor: Colors.grey.shade500,
-        labelStyle: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: 14),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
         indicatorColor: const Color(0xFF7B1FA2),
         indicatorWeight: 3,
         indicatorSize: TabBarIndicatorSize.label,
@@ -279,7 +300,8 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
       useSafeArea: true,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => Container(
-          decoration: BoxDecoration(            color: Theme.of(context).cardColor,
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -304,12 +326,16 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
               // Title
               Row(
                 children: [
-                  const Icon(Icons.tune_rounded,
-                      color: Color(0xFF7B1FA2), size: 22),
+                  const Icon(
+                    Icons.tune_rounded,
+                    color: Color(0xFF7B1FA2),
+                    size: 22,
+                  ),
                   const SizedBox(width: 8),
-                  const Text('Bộ lọc tìm kiếm',
-                      style: TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w800)),
+                  const Text(
+                    'Bộ lọc tìm kiếm',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                  ),
                   const Spacer(),
                   TextButton(
                     onPressed: () {
@@ -324,8 +350,10 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                         _workerSort = 'name';
                       });
                     },
-                    child: const Text('Đặt lại',
-                        style: TextStyle(color: Colors.grey)),
+                    child: const Text(
+                      'Đặt lại',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ),
                 ],
               ),
@@ -395,18 +423,27 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.person_search_rounded, size: 20),
-                    label: const Text('Tìm ứng viên Full-time',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: const Text(
+                      'Tìm ứng viên Full-time',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF1565C0),
-                      side: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+                      side: const BorderSide(
+                        color: Color(0xFF1565C0),
+                        width: 1.5,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () {
                       Get.back(); // close bottom sheet
-                      Get.to(() => const CandidateDiscoveryScreen());
+                      Get.to(
+                        () =>
+                            const CandidateDiscoveryScreen(fullTimeOnly: true),
+                      );
                     },
                   ),
                 ),
@@ -452,13 +489,15 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 0,
                   ),
                   onPressed: Get.back,
-                  child: const Text('Áp dụng',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'Áp dụng',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -469,9 +508,7 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
   }
 
   bool _hasActiveFilter() =>
-      _postStatus != 'all' ||
-      _postJobType != 'all' ||
-      _workerSort != 'name';
+      _postStatus != 'all' || _postJobType != 'all' || _workerSort != 'name';
 
   static const _postStatusOptions = {
     'all': 'Tất cả',
@@ -550,16 +587,21 @@ class _PostsTab extends StatelessWidget {
         if (query.isNotEmpty) {
           final q = query.toLowerCase();
           posts = posts
-              .where((p) =>
-                  p.title.toLowerCase().contains(q) ||
-                  p.category.toLowerCase().contains(q) ||
-                  (p.description.toLowerCase().contains(q)))
+              .where(
+                (p) =>
+                    p.title.toLowerCase().contains(q) ||
+                    p.category.toLowerCase().contains(q) ||
+                    (p.description.toLowerCase().contains(q)),
+              )
               .toList();
         }
 
         // Sắp xếp mới nhất trước
-        posts.sort((a, b) =>
-            (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+        posts.sort(
+          (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
+            a.createdAt ?? DateTime(0),
+          ),
+        );
 
         if (posts.isEmpty) {
           return _emptyState(
@@ -625,9 +667,12 @@ class _WorkersTab extends StatelessWidget {
 
         // Lấy danh sách candidateId duy nhất
         final ids = apps
-            .map((d) =>
-                (d.data() as Map<String, dynamic>)['candidateId'] as String? ??
-                '')
+            .map(
+              (d) =>
+                  (d.data() as Map<String, dynamic>)['candidateId']
+                      as String? ??
+                  '',
+            )
             .where((id) => id.isNotEmpty)
             .toSet()
             .toList();
@@ -663,9 +708,10 @@ class _WorkersTab extends StatelessWidget {
             if (query.isNotEmpty) {
               final q = query.toLowerCase();
               workers = workers
-                  .where((w) =>
-                      w.name.toLowerCase().contains(q) ||
-                      w.phone.contains(q))
+                  .where(
+                    (w) =>
+                        w.name.toLowerCase().contains(q) || w.phone.contains(q),
+                  )
                   .toList();
             }
 
@@ -742,8 +788,11 @@ class _PostCard extends StatelessWidget {
                     ),
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: const Icon(Icons.work_rounded,
-                      color: Colors.white, size: 24),
+                  child: const Icon(
+                    Icons.work_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -751,12 +800,14 @@ class _PostCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _HighlightText(
-                          text: post.title,
-                          query: query,
-                          style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1A1A2E))),
+                        text: post.title,
+                        query: query,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1A2E),
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -764,7 +815,9 @@ class _PostCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1565C0).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
@@ -774,9 +827,10 @@ class _PostCard extends StatelessWidget {
                                   ? 'Full-time'
                                   : 'Part-time',
                               style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF1565C0),
-                                  fontWeight: FontWeight.w600),
+                                fontSize: 11,
+                                color: Color(0xFF1565C0),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
@@ -784,22 +838,32 @@ class _PostCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Icon(Icons.people_outline_rounded,
-                              size: 13, color: Colors.grey.shade500),
+                          Icon(
+                            Icons.people_outline_rounded,
+                            size: 13,
+                            color: Colors.grey.shade500,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${post.filledSlots}/${post.slots} người',
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade500),
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
                           ),
                           const SizedBox(width: 10),
-                          Icon(Icons.attach_money_rounded,
-                              size: 13, color: Colors.grey.shade500),
+                          Icon(
+                            Icons.attach_money_rounded,
+                            size: 13,
+                            color: Colors.grey.shade500,
+                          ),
                           Expanded(
                             child: Text(
                               _formatSalary(post.salary, post.salaryType),
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey.shade500),
+                                fontSize: 12,
+                                color: Colors.grey.shade500,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -810,14 +874,19 @@ class _PostCard extends StatelessWidget {
                         Text(
                           'Đăng: ${DateFormat('dd/MM/yyyy').format(post.createdAt!)}',
                           style: TextStyle(
-                              fontSize: 11.5, color: Colors.grey.shade400),
+                            fontSize: 11.5,
+                            color: Colors.grey.shade400,
+                          ),
                         ),
                       ],
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded,
-                    color: Colors.grey.shade300, size: 20),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.grey.shade300,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -871,7 +940,8 @@ class _WorkerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {}, // TODO: mở profile ứng viên
+          onTap: () =>
+              Get.to(() => CandidateProfileScreen(candidate: worker.userModel)),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -891,15 +961,19 @@ class _WorkerCard extends StatelessWidget {
                           end: Alignment.bottomRight,
                         ),
                         border: Border.all(
-                            color: const Color(0xFF7B1FA2).withOpacity(0.2),
-                            width: 2),
+                          color: const Color(0xFF7B1FA2).withOpacity(0.2),
+                          width: 2,
+                        ),
                       ),
                       child: worker.avatarUrl != null
                           ? ClipOval(
-                              child: Image.network(worker.avatarUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      _avatarFallback(worker.name)))
+                              child: Image.network(
+                                worker.avatarUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _avatarFallback(worker.name),
+                              ),
+                            )
                           : _avatarFallback(worker.name),
                     ),
                     const SizedBox(width: 12),
@@ -908,25 +982,33 @@ class _WorkerCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _HighlightText(
-                              text: worker.name.isEmpty
-                                  ? 'Người dùng'
-                                  : worker.name,
-                              query: query,
-                              style: const TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF1A1A2E))),
+                            text: worker.name.isEmpty
+                                ? 'Người dùng'
+                                : worker.name,
+                            query: query,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1A1A2E),
+                            ),
+                          ),
                           const SizedBox(height: 3),
                           if (worker.phone.isNotEmpty)
                             Row(
                               children: [
-                                Icon(Icons.phone_outlined,
-                                    size: 13, color: Colors.grey.shade500),
+                                Icon(
+                                  Icons.phone_outlined,
+                                  size: 13,
+                                  color: Colors.grey.shade500,
+                                ),
                                 const SizedBox(width: 4),
-                                Text(worker.phone,
-                                    style: TextStyle(
-                                        fontSize: 12.5,
-                                        color: Colors.grey.shade500)),
+                                Text(
+                                  worker.phone,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
                               ],
                             ),
                           const SizedBox(height: 4),
@@ -934,27 +1016,33 @@ class _WorkerCard extends StatelessWidget {
                             children: [
                               // Rating stars
                               ...List.generate(
-                                  5,
-                                  (i) => Icon(
-                                        i < worker.rating.round()
-                                            ? Icons.star_rounded
-                                            : Icons.star_outline_rounded,
-                                        size: 14,
-                                        color: const Color(0xFFFFC107),
-                                      )),
+                                5,
+                                (i) => Icon(
+                                  i < worker.rating.round()
+                                      ? Icons.star_rounded
+                                      : Icons.star_outline_rounded,
+                                  size: 14,
+                                  color: const Color(0xFFFFC107),
+                                ),
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 '${worker.rating.toStringAsFixed(1)} • ${worker.jobsDone} việc',
                                 style: TextStyle(
-                                    fontSize: 12, color: Colors.grey.shade500),
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right_rounded,
-                        color: Colors.grey.shade300, size: 20),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.grey.shade300,
+                      size: 20,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -962,23 +1050,26 @@ class _WorkerCard extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.send_rounded, size: 16),
-                    label: const Text('Thuê lại',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    label: const Text(
+                      'Gửi yêu cầu thuê',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1565C0),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       elevation: 0,
                     ),
                     onPressed: () {
-                      Get.bottomSheet(
-                        SendInterestSheet(
-                          candidate: worker.userModel,
-                          jobTypeFilter: null, // Cho phép chọn tất cả các loại công việc
-                        ),
-                        isScrollControlled: true,
+                      showHireRequestSheet(
+                        context: context,
+                        candidateId: worker.userModel.id,
+                        candidateName: worker.name.isEmpty
+                            ? 'Người làm'
+                            : worker.name,
                       );
                     },
                   ),
@@ -992,14 +1083,16 @@ class _WorkerCard extends StatelessWidget {
   }
 
   Widget _avatarFallback(String name) {
-    final initial =
-        name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return Center(
-      child: Text(initial,
-          style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800)),
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -1040,17 +1133,25 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withOpacity(0.3), width: 0.8),
       ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, color: color, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
 
 // Highlight từ khóa tìm kiếm trong text
 class _HighlightText extends StatelessWidget {
-  const _HighlightText(
-      {required this.text, required this.query, required this.style});
+  const _HighlightText({
+    required this.text,
+    required this.query,
+    required this.style,
+  });
   final String text;
   final String query;
   final TextStyle style;
@@ -1068,8 +1169,9 @@ class _HighlightText extends StatelessWidget {
         children: [
           if (idx > 0)
             TextSpan(
-                text: text.substring(0, idx),
-                style: style.copyWith(color: Colors.grey.shade700)),
+              text: text.substring(0, idx),
+              style: style.copyWith(color: Colors.grey.shade700),
+            ),
           TextSpan(
             text: text.substring(idx, idx + query.length),
             style: style.copyWith(
@@ -1079,18 +1181,20 @@ class _HighlightText extends StatelessWidget {
           ),
           if (idx + query.length < text.length)
             TextSpan(
-                text: text.substring(idx + query.length),
-                style: style.copyWith(color: Colors.grey.shade700)),
+              text: text.substring(idx + query.length),
+              style: style.copyWith(color: Colors.grey.shade700),
+            ),
         ],
       ),
     );
   }
 }
 
-Widget _emptyState(
-    {required IconData icon,
-    required String title,
-    required String sub}) {
+Widget _emptyState({
+  required IconData icon,
+  required String title,
+  required String sub,
+}) {
   return Center(
     child: Padding(
       padding: const EdgeInsets.all(40),
@@ -1104,20 +1208,31 @@ Widget _emptyState(
               color: const Color(0xFF7B1FA2).withOpacity(0.08),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon,
-                size: 44, color: const Color(0xFF7B1FA2).withOpacity(0.5)),
+            child: Icon(
+              icon,
+              size: 44,
+              color: const Color(0xFF7B1FA2).withOpacity(0.5),
+            ),
           ),
           const SizedBox(height: 18),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF333333))),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF333333),
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(sub,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 13.5, color: Colors.grey.shade500, height: 1.5)),
+          Text(
+            sub,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: Colors.grey.shade500,
+              height: 1.5,
+            ),
+          ),
         ],
       ),
     ),
@@ -1126,8 +1241,11 @@ Widget _emptyState(
 
 // ── Filter section ────────────────────────────────────────────────────────────
 class _FilterSection extends StatelessWidget {
-  const _FilterSection(
-      {required this.title, required this.icon, required this.child});
+  const _FilterSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
   final String title;
   final IconData icon;
   final Widget child;
@@ -1141,11 +1259,14 @@ class _FilterSection extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: Colors.grey.shade600),
             const SizedBox(width: 6),
-            Text(title,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade700)),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade700,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -1174,13 +1295,14 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: selected ? color : color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: selected ? color : color.withOpacity(0.25), width: 1.2),
+            color: selected ? color : color.withOpacity(0.25),
+            width: 1.2,
+          ),
         ),
         child: Text(
           label,
