@@ -1,15 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 
 import '../models/disbursement_notice_model.dart';
 import '../models/app_notification_model.dart';
 import 'notification_service.dart';
 import 'candidate_earnings_service.dart';
+import 'wallet_service.dart';
 
 class JobWorkflowService {
   final _db = FirebaseFirestore.instance;
   final _notif = NotificationService();
   final _earningsSvc = CandidateEarningsService();
+  final _wallet = WalletService();
+
+  String _money(double v) => '${NumberFormat('#,###', 'vi_VN').format(v)}đ';
 
   CollectionReference<Map<String, dynamic>> get _notices =>
       _db.collection('disbursementNotices');
@@ -568,13 +573,27 @@ class JobWorkflowService {
       }
     }
 
-    // Ghi nhận tiền hoàn về cho NTD (tracking)
+    // Ghi nhận tiền hoàn về cho NTD (tracking & wallet)
     if (totalRefundToEmployer > 0) {
-      await _earningsSvc.addEarning(
-        candidateId: notice.employerId,
+      await _wallet.processComplaintRefund(
+        employerId: notice.employerId,
         jobId: notice.jobId,
         amount: totalRefundToEmployer,
-        details: 'Hoàn tiền đền bù từ khiếu nại: ${notice.jobTitle}',
+        description: 'Hoàn tiền đền bù từ khiếu nại: ${notice.jobTitle}',
+      );
+      
+      // Gửi thông báo cho NTD
+      await _notif.notifyEmployer(
+        employerId: notice.employerId,
+        type: 'refund',
+        title: 'Hoàn tiền khiếu nại',
+        body: 'Bạn đã được hoàn lại ${_money(totalRefundToEmployer)} từ khiếu nại công việc "${notice.jobTitle}".',
+        category: NotificationCategory.system,
+        data: {
+          'type': 'refund',
+          'jobId': notice.jobId,
+          'amount': totalRefundToEmployer,
+        },
       );
     }
 

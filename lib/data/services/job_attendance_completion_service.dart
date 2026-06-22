@@ -20,6 +20,7 @@ class JobDisbursementReadiness {
   final int completedDays;
   final List<String> mandatoryDates;
   final List<String> incompleteDates;
+  final List<String> displayDates; // NEW: All dates to show in UI (mandatory + actual sessions)
   final String message;
 
   JobDisbursementReadiness({
@@ -30,6 +31,7 @@ class JobDisbursementReadiness {
     required this.completedDays,
     required this.mandatoryDates,
     required this.incompleteDates,
+    required this.displayDates,
     required this.message,
   });
 }
@@ -54,6 +56,7 @@ class JobAttendanceCompletionService {
         completedDays: 0,
         mandatoryDates: [],
         incompleteDates: [],
+        displayDates: [],
         message: 'Không tìm thấy bài đăng công việc',
       );
     }
@@ -65,7 +68,13 @@ class JobAttendanceCompletionService {
       scheduledDates: scheduled,
     );
 
-    if (mandatory.isEmpty) {
+    final sessions = await _attendance.fetchAllByJob(jobId);
+    final byDate = {for (final s in sessions) s.date: s};
+
+    // Calculate displayDates: union of mandatory and actual session dates
+    final displayDates = {...mandatory, ...byDate.keys}.toList()..sort();
+
+    if (mandatory.isEmpty && displayDates.isEmpty) {
       return JobDisbursementReadiness(
         canDisburse: false,
         canRequestDisbursement: workPeriodEnded,
@@ -74,6 +83,7 @@ class JobAttendanceCompletionService {
         completedDays: 0,
         mandatoryDates: mandatory,
         incompleteDates: const [],
+        displayDates: const [],
         message: workPeriodEnded
             ? 'Công việc đã kết thúc. Vui lòng gửi yêu cầu giải ngân.'
             : 'Chưa xác định số ngày làm (cần ngày kết thúc hoặc lịch làm)',
@@ -89,12 +99,10 @@ class JobAttendanceCompletionService {
         completedDays: 0,
         mandatoryDates: mandatory,
         incompleteDates: mandatory,
+        displayDates: displayDates,
         message: 'Chưa có nhân viên trong nhóm',
       );
     }
-
-    final sessions = await _attendance.fetchAllByJob(jobId);
-    final byDate = {for (final s in sessions) s.date: s};
 
     final incomplete = <String>[];
     var completed = 0;
@@ -107,7 +115,7 @@ class JobAttendanceCompletionService {
     }
 
     final n = mandatory.length;
-    final can = completed == n;
+    final can = n > 0 && completed == n;
     final canRequest = can;
 
     return JobDisbursementReadiness(
@@ -118,6 +126,7 @@ class JobAttendanceCompletionService {
       completedDays: completed,
       mandatoryDates: mandatory,
       incompleteDates: incomplete,
+      displayDates: displayDates,
       message: _message(
         can: can,
         workPeriodEnded: workPeriodEnded,
