@@ -7,6 +7,7 @@ import '../data/constants/full_time_policy.dart';
 import '../data/models/job_post_model.dart';
 import '../data/models/user_model.dart';
 import '../data/services/application_service.dart';
+import '../data/services/candidate_eligibility_service.dart';
 import '../data/services/group_chat_service.dart';
 import '../data/services/notification_service.dart';
 import '../data/services/schedule_lock_service.dart';
@@ -194,12 +195,16 @@ class JobDetailController extends GetxController {
         Get.find<HomeController>().appliedJobStatus.refresh();
       }
     } catch (e) {
+      final eligibilityError = e is CandidateEligibilityException;
       Get.snackbar(
-        'Không thể ứng tuyển',
+        eligibilityError
+            ? 'Không đủ điều kiện ứng tuyển'
+            : 'Không thể ứng tuyển',
         e.toString().replaceAll('Exception: ', ''),
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade800,
+        duration: Duration(seconds: eligibilityError ? 8 : 3),
       );
     } finally {
       isApplying.value = false;

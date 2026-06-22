@@ -11,7 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/job_post_model.dart';
 import '../../data/services/candidate_discovery_service.dart';
-import '../../data/services/candidates_service.dart';
+import '../../data/services/employer_invitation_service.dart';
 
 enum _SortOrder { newestFirst, oldestFirst }
 
@@ -116,7 +116,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       final jobDoc = await FirebaseFirestore.instance
           .collection('jobPosts')
           .doc(jobId)
-          .get();
+          .get(const GetOptions(source: Source.server));
       if (!jobDoc.exists) throw Exception('Công việc không tồn tại.');
       final jobData = Map<String, dynamic>.from(jobDoc.data()!);
       jobData['jobId'] = jobDoc.id;
@@ -125,66 +125,28 @@ class _NotificationScreenState extends State<NotificationScreen> {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
-          .get();
+          .get(const GetOptions(source: Source.server));
+      if (!userDoc.exists) throw Exception('Không tìm thấy hồ sơ ứng viên.');
       final userData = userDoc.data() ?? const <String, dynamic>{};
+      if ((userData['role'] ?? 'candidate').toString() != 'candidate') {
+        throw Exception('Chỉ tài khoản ứng viên mới được nhận công việc.');
+      }
       final name =
           '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'.trim();
       final candidateName = name.isEmpty ? 'Ứng viên' : name;
 
       String? applicationId;
       if (accepted) {
-        final apps = await FirebaseFirestore.instance
-            .collection('applications')
-            .where('candidateId', isEqualTo: uid)
-            .get();
-
-        QueryDocumentSnapshot<Map<String, dynamic>>? acceptedApp;
-        QueryDocumentSnapshot<Map<String, dynamic>>? pendingApp;
-        for (final doc in apps.docs) {
-          if (doc.data()['jobId']?.toString() != jobId) continue;
-          final status = (doc.data()['status'] ?? '').toString();
-          if (status == 'accepted') acceptedApp = doc;
-          if (status == 'pending') pendingApp = doc;
-        }
-
-        if (acceptedApp != null) {
-          applicationId = acceptedApp.id;
-        } else {
-          final appRef =
-              pendingApp?.reference ??
-              FirebaseFirestore.instance.collection('applications').doc();
-          if (pendingApp == null) {
-            await appRef.set({
-              'appId': appRef.id,
-              'jobId': jobId,
-              'candidateId': uid,
-              'employerId': employerId,
-              'status': 'pending',
-              'source': 'employer_invitation',
-              if (item.hireRequestId?.isNotEmpty == true)
-                'hireRequestId': item.hireRequestId,
-              'appliedAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-          applicationId = appRef.id;
-          await CandidatesService().acceptApplication(appRef.id, jobId);
-        }
-
-        try {
-          await CandidateDiscoveryService().markHireRequestResponded(
-            requestId: item.hireRequestId,
-            employerId: employerId,
-            candidateId: uid,
-            jobId: jobId,
-            status: 'accepted',
-            applicationId: applicationId,
-          );
-        } catch (_) {}
+        final result = await EmployerInvitationService().acceptInvitation(
+          requestId: item.hireRequestId,
+          jobId: jobId,
+          expectedEmployerId: employerId,
+        );
+        applicationId = result.applicationId;
         try {
           await NotificationService.notifyHireRequestAccepted(
-            employerId: employerId,
-            jobTitle: job.title,
+            employerId: result.employerId,
+            jobTitle: result.job.title,
             candidateName: candidateName,
             candidateId: uid,
             jobId: jobId,
@@ -195,7 +157,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
         Get.snackbar(
           'Đã chấp nhận',
-          'Bạn đã nhận công việc "${job.title}".',
+          'Bạn đã nhận công việc "${result.job.title}".',
           backgroundColor: Colors.green.shade600,
           colorText: Colors.white,
         );
@@ -225,15 +187,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
         );
       }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('notifications')
-          .doc(item.id)
-          .update({
-            'data.handled': true,
-            'data.response': accepted ? 'accepted' : 'rejected',
-          });
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('notifications')
+            .doc(item.id)
+            .update({
+              'data.handled': true,
+              'data.response': accepted ? 'accepted' : 'rejected',
+            });
+      } catch (_) {
+        // Trạng thái nghiệp vụ đã lưu; lỗi đồng bộ UI không được báo là thất bại.
+      }
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
       Get.snackbar(
@@ -241,6 +207,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         message.isEmpty ? 'Vui lòng thử lại.' : message,
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade900,
+        duration: const Duration(seconds: 5),
       );
     } finally {
       if (mounted) setState(() => _handlingHireRequestId = null);
