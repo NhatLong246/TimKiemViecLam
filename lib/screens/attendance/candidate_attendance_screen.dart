@@ -144,27 +144,32 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
 
       _targetDate = WorkDayHelper.getCurrentLogicalDate(job);
 
-      final attendanceId = await _attendanceSvc.ensureCandidateRecord(
+      final session = await _attendanceSvc.getSessionByDate(_group!.jobId, _targetDate!);
+      
+      if (session == null) {
+        if (!mounted) return;
+        setState(() {
+          _session = null;
+          _error = 'Nhà tuyển dụng chưa bắt đầu phiên điểm danh cho ngày hôm nay.';
+          _loading = false;
+        });
+        return;
+      }
+
+      await _attendanceSvc.ensureCandidateRecord(
         jobId: _group!.jobId,
         groupId: _group!.groupId,
         employerId: _group!.employerId,
         candidateId: _uid,
         candidateName: name,
       );
-      final session = await _attendanceSvc.getSessionByDate(_group!.jobId, _targetDate!);
+      
+      // Load lại để lấy record mới thêm (nếu có)
+      final updatedSession = await _attendanceSvc.getSessionByDate(_group!.jobId, _targetDate!);
+
       if (!mounted) return;
       setState(() {
-        _session = session ??
-            AttendanceModel(
-              attendanceId: attendanceId,
-              jobId: _group!.jobId,
-              groupId: _group!.groupId,
-              employerId: _group!.employerId,
-              date: _targetDate!,
-              expectedStartTime: '08:00',
-              records: const [],
-              createdAt: DateTime.now(),
-            );
+        _session = updatedSession;
         _syncMyRecord();
         _loading = false;
       });
@@ -214,8 +219,6 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
         final sh = int.tryParse(startParts[0]) ?? 0;
         final sm = int.tryParse(startParts[1]) ?? 0;
         final startDt = DateTime(now.year, now.month, now.day, sh, sm);
-
-        // Bypassed time validation for testing
       }
     } catch (_) {}
 

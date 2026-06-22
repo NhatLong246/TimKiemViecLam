@@ -639,6 +639,10 @@ class _SpendingHiringChart extends StatelessWidget {
                 getTitlesWidget: (val, meta) {
                   final i = val.toInt();
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
+                  
+                  final interval = _xInterval(data.length).toInt();
+                  if (i % interval != 0) return const SizedBox.shrink();
+
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
@@ -751,6 +755,10 @@ class _DepositAreaChart extends StatelessWidget {
                 getTitlesWidget: (val, meta) {
                   final i = val.toInt();
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
+                  
+                  final interval = _xInterval(data.length).toInt();
+                  if (i % interval != 0) return const SizedBox.shrink();
+
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
@@ -860,6 +868,10 @@ class _PostsBarChart extends StatelessWidget {
                 getTitlesWidget: (val, meta) {
                   final i = val.toInt();
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
+                  
+                  final interval = _xInterval(data.length).toInt();
+                  if (i % interval != 0) return const SizedBox.shrink();
+
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(

@@ -63,4 +63,28 @@ class CvController extends GetxController {
       isRemoving.value = false;
     }
   }
+
+  Future<void> uploadGeneratedCv(File file, String fileName) async {
+    try {
+      isUploading.value = true;
+      await _service.uploadCvFile(
+        file,
+        fileName: fileName,
+      );
+      Get.snackbar(
+        'Thành công',
+        'Đã đẩy CV lên hồ sơ đính kèm',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Get.theme.colorScheme.primaryContainer,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Lỗi',
+        e.toString().replaceAll('Exception: ', ''),
+        snackPosition: SnackPosition.TOP,
+      );
+    } finally {
+      isUploading.value = false;
+    }
+  }
 }

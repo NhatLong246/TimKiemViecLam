@@ -149,6 +149,7 @@ class MessagingService {
 
     final existing = await _db
         .collection(_groups)
+        .where('jobId', isEqualTo: jobId)
         .where('employerId', isEqualTo: employerId)
         .where('candidateId', isEqualTo: candidateId)
         .where('chatType', isEqualTo: 'direct')

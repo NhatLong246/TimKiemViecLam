@@ -131,29 +131,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (_group == null) return;
       await _autoNotify.runScheduledForGroup(_group!);
       if (mounted) await _refreshDisbursementReadiness();
-      if (mounted && _ctrl.currentSession.value == null) {
-        String t = WorkDayHelper.getCurrentLogicalDate(_job);
-        
-        // Giới hạn: không vượt quá ngày làm việc cuối cùng
-        String? maxD;
-        if (_readiness != null && _readiness!.mandatoryDates.isNotEmpty) {
-          maxD = _readiness!.mandatoryDates.last;
-        } else if (_job != null) {
-          maxD = WorkDayHelper.formatDate(_job!.endDate ?? _job!.startDate);
-        }
-        if (maxD != null && t.compareTo(maxD) > 0) {
-          t = maxD;
-        }
-        
-        if (_readiness != null && _readiness!.incompleteDates.isNotEmpty) {
-          final earliestIncomplete = _readiness!.incompleteDates.first;
-          if (earliestIncomplete.compareTo(t) <= 0) {
-            t = earliestIncomplete;
-          }
-        }
-        if (mounted) setState(() => _targetDate = t);
-        await _ctrl.loadSessionByDate(_jobId, t);
-      }
+      // Không tự động đổi _targetDate nữa để NTD có thể tự do chọn ngày
     });
   }
 
@@ -194,15 +172,98 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
-      body: Obx(() {
-        if (_ctrl.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (_ctrl.currentSession.value == null) {
-          return _buildNoSession();
-        }
-        return _buildSessionView();
-      }),
+      body: Column(
+        children: [
+          _buildDateSelector(),
+          Expanded(
+            child: Obx(() {
+              if (_ctrl.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (_ctrl.currentSession.value == null) {
+                return _buildNoSession();
+              }
+              return _buildSessionView();
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateSelector() {
+    if (_readiness == null || _readiness!.mandatoryDates.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      height: 85,
+      width: double.infinity,
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text('Chọn ngày làm việc:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.dark)),
+          ),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _readiness!.mandatoryDates.length,
+              itemBuilder: (context, index) {
+                final dateStr = _readiness!.mandatoryDates[index];
+                final dt = DateTime.parse(dateStr);
+                final isSelected = _targetDate == dateStr;
+                final isCompleted = _readiness!.incompleteDates.contains(dateStr) == false;
+                
+                return GestureDetector(
+                  onTap: () async {
+                    if (mounted) setState(() => _targetDate = dateStr);
+                    await _ctrl.loadSessionByDate(_jobId, dateStr);
+                  },
+                  child: Container(
+                    width: 60,
+                    margin: const EdgeInsets.only(right: 8, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.employerPrimary : (isCompleted ? Colors.green.shade50 : Colors.grey.shade100),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? AppColors.employerPrimary : (isCompleted ? Colors.green.shade200 : Colors.grey.shade300),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          DateFormat('dd/MM').format(dt),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : (isCompleted ? Colors.green.shade700 : Colors.black87),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        if (isCompleted)
+                          Icon(Icons.check_circle, size: 14, color: isSelected ? Colors.white : Colors.green.shade600)
+                        else
+                          Text(
+                            DateFormat('E', 'vi').format(dt),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSelected ? Colors.white70 : Colors.grey.shade600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -287,19 +348,28 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                   ),
                 ] else ...[
-                  // Ẩn hoàn toàn nút Bắt đầu điểm danh
+                  // Hiển thị nút Bắt đầu điểm danh
                   const SizedBox(height: 32),
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.people_outline, size: 48, color: Colors.grey.shade400),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Chưa có nhân viên nào điểm danh hôm nay.',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                        ),
-                      ],
+                  const Text('Chọn giờ bắt đầu điểm danh:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  _TimePickerField(controller: _timeCtrl),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.employerPrimary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _startSession,
+                      child: const Text('Bắt đầu điểm danh',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16)),
                     ),
                   ),
                 ],
