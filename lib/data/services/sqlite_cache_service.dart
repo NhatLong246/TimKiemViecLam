@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
@@ -6,7 +8,7 @@ import 'package:path/path.dart' as p;
 class SqliteCacheService {
   static Database? _db;
   static const String _dbName = 'viecnow_cache.db';
-  static const int _dbVersion = 5;
+  static const int _dbVersion = 7;
 
   static Future<Database> get database async {
     _db ??= await _initDb();
@@ -62,6 +64,9 @@ class SqliteCacheService {
         companySize        TEXT,
         businessType       TEXT,
         companyDescription TEXT,
+        businessLicenseImageUrls TEXT,
+        taxCodeImageUrls TEXT,
+        otherDocumentImageUrls TEXT,
         walletBalance      REAL,
         totalSpent         REAL,
         isVerified         INTEGER,
@@ -165,6 +170,28 @@ class SqliteCacheService {
         'INTEGER',
       );
       await _addColumnIfMissing(db, 'cached_jobs', 'createdAt', 'INTEGER');
+    }
+    if (oldVersion < 6) {
+      await _addColumnIfMissing(
+        db,
+        'cached_employer_profile',
+        'businessLicenseImageUrls',
+        'TEXT',
+      );
+      await _addColumnIfMissing(
+        db,
+        'cached_employer_profile',
+        'otherDocumentImageUrls',
+        'TEXT',
+      );
+    }
+    if (oldVersion < 7) {
+      await _addColumnIfMissing(
+        db,
+        'cached_employer_profile',
+        'taxCodeImageUrls',
+        'TEXT',
+      );
     }
   }
 
@@ -363,8 +390,10 @@ class SqliteCacheService {
          (uid, firstName, lastName, email, phone, gender, dateOfBirth, avatarUrl,
           cccd, companyName, companyAddress, companyLogoUrl, companyPhone,
           companyWebsite, companyTaxCode, companySize, businessType,
-          companyDescription, walletBalance, totalSpent, isVerified, cachedAt)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+          companyDescription, businessLicenseImageUrls, taxCodeImageUrls,
+          otherDocumentImageUrls,
+          walletBalance, totalSpent, isVerified, cachedAt)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
       [
         m['uid'],
         m['firstName'],
@@ -384,6 +413,9 @@ class SqliteCacheService {
         m['companySize'],
         m['businessType'],
         m['companyDescription'],
+        jsonEncode(m['businessLicenseImageUrls'] ?? const <String>[]),
+        jsonEncode(m['taxCodeImageUrls'] ?? const <String>[]),
+        jsonEncode(m['otherDocumentImageUrls'] ?? const <String>[]),
         m['walletBalance'] ?? 0.0,
         m['totalSpent'] ?? 0.0,
         (m['isVerified'] == true) ? 1 : 0,

@@ -9,12 +9,17 @@ import '../data/models/user_model.dart';
 import '../data/services/employer_profile_service.dart';
 import '../controller/login_controller.dart';
 
+enum EmployerDocumentType { businessLicense, taxCode, other }
+
 class EmployerProfileController extends GetxController {
   final EmployerProfileService _service = EmployerProfileService();
 
   final Rx<UserModel?> profile = Rx<UserModel?>(null);
   final RxBool isLoading = false.obs;
   final RxBool isSaving = false.obs;
+  final RxBool isUploadingBusinessLicenses = false.obs;
+  final RxBool isUploadingTaxCodeDocuments = false.obs;
+  final RxBool isUploadingOtherDocuments = false.obs;
 
   @override
   void onInit() {
@@ -86,7 +91,8 @@ class EmployerProfileController extends GetxController {
           dateOfBirth: dateOfBirth ?? authCtrl.currentUser!.dateOfBirth,
           cccd: cccd ?? authCtrl.currentUser!.cccd,
           cccdImageUrl: cccdImageUrl ?? authCtrl.currentUser!.cccdImageUrl,
-          cccdBackImageUrl: cccdBackImageUrl ?? authCtrl.currentUser!.cccdBackImageUrl,
+          cccdBackImageUrl:
+              cccdBackImageUrl ?? authCtrl.currentUser!.cccdBackImageUrl,
         );
         authCtrl.update();
       }
@@ -125,18 +131,18 @@ class EmployerProfileController extends GetxController {
       final b64 = base64Encode(bytes);
       final uid = FirebaseAuth.instance.currentUser!.uid;
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .update({'avatarBase64': b64});
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'avatarBase64': b64,
+      });
 
       profile.value = profile.value?.copyWith(avatarBase64: b64);
 
       // Cập nhật AuthController để UI toàn app phản ánh ngay
       final authCtrl = Get.find<AuthController>();
       if (authCtrl.currentUser != null) {
-        authCtrl.currentUser =
-            authCtrl.currentUser!.copyWith(avatarBase64: b64);
+        authCtrl.currentUser = authCtrl.currentUser!.copyWith(
+          avatarBase64: b64,
+        );
         authCtrl.update();
       }
 
@@ -152,7 +158,8 @@ class EmployerProfileController extends GetxController {
     return showModalBottomSheet<ImageSource>(
       context: Get.context!,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -162,18 +169,23 @@ class EmployerProfileController extends GetxController {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2)),
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt_rounded,
-                  color: Color(0xFF7B1FA2)),
+              leading: const Icon(
+                Icons.camera_alt_rounded,
+                color: Color(0xFF7B1FA2),
+              ),
               title: const Text('Chụp ảnh'),
               onTap: () => Navigator.pop(Get.context!, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded,
-                  color: Color(0xFF1565C0)),
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: Color(0xFF1565C0),
+              ),
               title: const Text('Chọn từ thư viện'),
               onTap: () => Navigator.pop(Get.context!, ImageSource.gallery),
             ),
@@ -188,15 +200,129 @@ class EmployerProfileController extends GetxController {
   Future<String?> uploadCccdImage(File file, String side) async {
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      final url = await _service.uploadImage(
-        file,
-        'users/$uid/cccd_$side.jpg',
-      );
+      final url = await _service.uploadImage(file, 'users/$uid/cccd_$side.jpg');
       return url;
     } catch (e) {
       _showError('Tải ảnh CCCD thất bại: ${e.toString()}');
       return null;
     }
+  }
+
+  Future<void> pickAndUploadDocumentImages({
+    required EmployerDocumentType type,
+  }) async {
+    final uploading = _uploadState(type);
+    if (uploading.value) return;
+
+    try {
+      final picked = await ImagePicker().pickMultiImage(
+        imageQuality: 78,
+        maxWidth: 1800,
+        maxHeight: 1800,
+      );
+      if (picked.isEmpty) return;
+
+      uploading.value = true;
+      final urls = await Future.wait(
+        picked.map(
+          (image) => _service.uploadImage(
+            File(image.path),
+            'users/${FirebaseAuth.instance.currentUser!.uid}/documents',
+          ),
+        ),
+      );
+      final current = _documentUrls(profile.value, type);
+      final merged = <String>{...current, ...urls}.toList(growable: false);
+      await _saveDocumentUrls(type: type, urls: merged);
+      _showSuccess('Đã tải lên ${picked.length} ảnh ${_documentLabel(type)}');
+    } catch (e) {
+      _showError('Không thể tải ảnh tài liệu: ${e.toString()}');
+    } finally {
+      uploading.value = false;
+    }
+  }
+
+  Future<void> removeDocumentImage({
+    required EmployerDocumentType type,
+    required String url,
+  }) async {
+    try {
+      final current = _documentUrls(profile.value, type);
+      final next = current.where((item) => item != url).toList(growable: false);
+      await _saveDocumentUrls(type: type, urls: next);
+      _showSuccess('Đã xóa ảnh khỏi hồ sơ');
+    } catch (e) {
+      _showError('Không thể xóa ảnh: ${e.toString()}');
+    }
+  }
+
+  Future<void> _saveDocumentUrls({
+    required EmployerDocumentType type,
+    required List<String> urls,
+  }) async {
+    final field = switch (type) {
+      EmployerDocumentType.businessLicense => 'businessLicenseImageUrls',
+      EmployerDocumentType.taxCode => 'taxCodeImageUrls',
+      EmployerDocumentType.other => 'otherDocumentImageUrls',
+    };
+    await _service.updateFields({field: urls});
+
+    final currentProfile = profile.value;
+    if (currentProfile != null) {
+      profile.value = currentProfile.copyWith(
+        businessLicenseImageUrls: type == EmployerDocumentType.businessLicense
+            ? urls
+            : currentProfile.businessLicenseImageUrls,
+        taxCodeImageUrls: type == EmployerDocumentType.taxCode
+            ? urls
+            : currentProfile.taxCodeImageUrls,
+        otherDocumentImageUrls: type == EmployerDocumentType.other
+            ? urls
+            : currentProfile.otherDocumentImageUrls,
+      );
+    }
+
+    final authCtrl = Get.find<AuthController>();
+    final currentUser = authCtrl.currentUser;
+    if (currentUser != null) {
+      authCtrl.currentUser = currentUser.copyWith(
+        businessLicenseImageUrls: type == EmployerDocumentType.businessLicense
+            ? urls
+            : currentUser.businessLicenseImageUrls,
+        taxCodeImageUrls: type == EmployerDocumentType.taxCode
+            ? urls
+            : currentUser.taxCodeImageUrls,
+        otherDocumentImageUrls: type == EmployerDocumentType.other
+            ? urls
+            : currentUser.otherDocumentImageUrls,
+      );
+      authCtrl.update();
+    }
+  }
+
+  RxBool _uploadState(EmployerDocumentType type) {
+    return switch (type) {
+      EmployerDocumentType.businessLicense => isUploadingBusinessLicenses,
+      EmployerDocumentType.taxCode => isUploadingTaxCodeDocuments,
+      EmployerDocumentType.other => isUploadingOtherDocuments,
+    };
+  }
+
+  List<String> _documentUrls(UserModel? user, EmployerDocumentType type) {
+    if (user == null) return const [];
+    return switch (type) {
+      EmployerDocumentType.businessLicense => user.businessLicenseImageUrls,
+      EmployerDocumentType.taxCode => user.taxCodeImageUrls,
+      EmployerDocumentType.other => user.otherDocumentImageUrls,
+    };
+  }
+
+  String _documentLabel(EmployerDocumentType type) {
+    return switch (type) {
+      EmployerDocumentType.businessLicense => 'giấy phép kinh doanh',
+      EmployerDocumentType.taxCode => 'mã số thuế',
+      EmployerDocumentType.other => 'giấy tờ khác',
+    };
   }
 
   /// Cập nhật thông tin doanh nghiệp
@@ -231,20 +357,25 @@ class EmployerProfileController extends GetxController {
           companyTaxCode: companyTaxCode ?? profile.value!.companyTaxCode,
           companySize: companySize ?? profile.value!.companySize,
           businessType: businessType ?? profile.value!.businessType,
-          companyDescription: companyDescription ?? profile.value!.companyDescription,
+          companyDescription:
+              companyDescription ?? profile.value!.companyDescription,
         );
       }
       final authCtrl = Get.find<AuthController>();
       if (authCtrl.currentUser != null) {
         authCtrl.currentUser = authCtrl.currentUser!.copyWith(
           companyName: companyName ?? authCtrl.currentUser!.companyName,
-          companyAddress: companyAddress ?? authCtrl.currentUser!.companyAddress,
+          companyAddress:
+              companyAddress ?? authCtrl.currentUser!.companyAddress,
           companyPhone: companyPhone ?? authCtrl.currentUser!.companyPhone,
-          companyWebsite: companyWebsite ?? authCtrl.currentUser!.companyWebsite,
-          companyTaxCode: companyTaxCode ?? authCtrl.currentUser!.companyTaxCode,
+          companyWebsite:
+              companyWebsite ?? authCtrl.currentUser!.companyWebsite,
+          companyTaxCode:
+              companyTaxCode ?? authCtrl.currentUser!.companyTaxCode,
           companySize: companySize ?? authCtrl.currentUser!.companySize,
           businessType: businessType ?? authCtrl.currentUser!.businessType,
-          companyDescription: companyDescription ?? authCtrl.currentUser!.companyDescription,
+          companyDescription:
+              companyDescription ?? authCtrl.currentUser!.companyDescription,
         );
         authCtrl.update();
       }
