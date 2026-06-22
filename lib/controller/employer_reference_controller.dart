@@ -66,6 +66,8 @@ class EmployerReferenceController extends GetxController {
   Future<void> refresh() => loadMarketRates();
 
   // ── Derived getters ────────────────────────────────────────────────────────
+  List<MarketRateItem> get allItems => _allItems;
+
   bool get hasActiveFilter =>
       selectedCategory.value != 'all' ||
       filterCity.value != 'all' ||
