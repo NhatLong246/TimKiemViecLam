@@ -21,9 +21,10 @@ import 'candidate_public_reviews_screen.dart';
 import 'hire_request_sheet.dart';
 
 class CandidateProfileScreen extends StatefulWidget {
-  const CandidateProfileScreen({super.key, required this.candidate});
+  const CandidateProfileScreen({super.key, required this.candidate, this.isHired});
 
   final UserModel candidate;
+  final bool? isHired;
 
   @override
   State<CandidateProfileScreen> createState() => _CandidateProfileScreenState();
@@ -35,6 +36,7 @@ class _CandidateProfileScreenState extends State<CandidateProfileScreen> {
   List<EmployerReviewItem> _reviews = const [];
   bool _loading = true;
   bool _openingChat = false;
+  bool _isHired = false;
 
   UserModel get candidate => _candidate ?? widget.candidate;
 
@@ -60,11 +62,27 @@ class _CandidateProfileScreenState extends State<CandidateProfileScreen> {
         userDoc.data() ?? widget.candidate.toMap(),
       );
       data['uid'] = userDoc.id.isEmpty ? widget.candidate.id : userDoc.id;
+
+      bool hiredVal = false;
+      if (widget.isHired != null) {
+        hiredVal = widget.isHired!;
+      } else if (employerId.isNotEmpty) {
+        final snap = await FirebaseFirestore.instance
+            .collection('applications')
+            .where('employerId', isEqualTo: employerId)
+            .where('candidateId', isEqualTo: widget.candidate.id)
+            .where('status', isEqualTo: 'accepted')
+            .limit(1)
+            .get();
+        hiredVal = snap.docs.isNotEmpty;
+      }
+
       if (!mounted) return;
       setState(() {
         _data = data;
         _candidate = UserModel.fromMap(data);
         _reviews = reviews;
+        _isHired = hiredVal;
         _loading = false;
       });
     } catch (_) {
@@ -217,11 +235,13 @@ class _CandidateProfileScreenState extends State<CandidateProfileScreen> {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: _openHireRequest,
-                  icon: const Icon(Icons.handshake_outlined),
-                  label: const Text('Thuê người làm'),
+                  icon: Icon(
+                    _isHired ? Icons.send_rounded : Icons.person_add_alt_1_rounded,
+                  ),
+                  label: Text(_isHired ? 'Thuê lại' : 'Thuê ngay'),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 13),
-                    backgroundColor: const Color(0xFF7B1FA2),
+                    backgroundColor: _isHired ? const Color(0xFF1565C0) : const Color(0xFF2E7D32),
                   ),
                 ),
               ),
@@ -289,7 +309,17 @@ class _CandidateProfileScreenState extends State<CandidateProfileScreen> {
         children: [
           _info(Icons.email_outlined, 'Email', candidate.email),
           _info(Icons.phone_outlined, 'Số điện thoại', candidate.phone),
-          _info(Icons.person_outline, 'Giới tính', candidate.gender ?? ''),
+          _info(
+            Icons.person_outline,
+            'Giới tính',
+            candidate.gender == 'male'
+                ? 'Nam'
+                : candidate.gender == 'female'
+                    ? 'Nữ'
+                    : candidate.gender == 'other'
+                        ? 'Khác'
+                        : candidate.gender ?? '',
+          ),
           _info(
             Icons.cake_outlined,
             'Ngày sinh',

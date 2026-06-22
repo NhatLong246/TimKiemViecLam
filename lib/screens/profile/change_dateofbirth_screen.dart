@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:viecnow/controller/login_controller.dart';
 import 'package:viecnow/controller/update_account_controller.dart';
 
 class ChangeDateOfBirthScreen extends StatefulWidget {
@@ -13,63 +15,179 @@ class ChangeDateOfBirthScreen extends StatefulWidget {
 class _ChangeDateOfBirthScreenState extends State<ChangeDateOfBirthScreen> {
   final TextEditingController _dateController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final UpdateAccountController _controller = UpdateAccountController();
+  final UpdateAccountController _controller = Get.put(UpdateAccountController());
   bool _isLoading = false;
   DateTime? _selectedDate;
 
   @override
+  void initState() {
+    super.initState();
+    final user = Get.find<AuthController>().currentUser;
+    if (user != null && user.dateOfBirth != null) {
+      _selectedDate = user.dateOfBirth;
+      _dateController.text = DateFormat('dd/MM/yyyy').format(user.dateOfBirth!);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    const Color primaryColor = Color(0xFF2E7D32);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Change Date of Birth')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _dateController,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'Date of Birth',
-                  hintText: 'dd/MM/yyyy',
-                  prefixIcon: Icon(Icons.calendar_today),
-                  border: OutlineInputBorder(),
+      backgroundColor: const Color(0xFFF9F9F9),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF666666)),
+        ),
+        title: const Text(
+          'Cập nhật ngày sinh',
+          style: TextStyle(
+            color: Color(0xFF222222),
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Vui lòng chọn ngày sinh của bạn:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
                 ),
-                onTap: _pickDate,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng chọn ngày sinh';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () async {
-                          if (_formKey.currentState!.validate()) {
-                            if (_selectedDate == null) return;
-                            setState(() {
-                              _isLoading = true;
-                            });
-                            await _controller.updateDateOfBirth(_selectedDate!);
-                            setState(() {
-                              _isLoading = false;
-                            });
-                            Navigator.pop(context);
-                          }
-                        },
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Save'),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: _pickDate,
+                  child: AbsorbPointer(
+                    child: TextFormField(
+                      controller: _dateController,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF222222),
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Ngày sinh',
+                        hintText: 'Chọn ngày sinh (ngày/tháng/năm)',
+                        prefixIcon: const Icon(Icons.calendar_today_rounded, color: primaryColor),
+                        filled: true,
+                        fillColor: Colors.white,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: primaryColor, width: 1.8),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.redAccent),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.redAccent, width: 1.8),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Vui lòng chọn ngày sinh';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const Spacer(),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading
+                        ? null
+                        : () async {
+                            if (_formKey.currentState!.validate()) {
+                              if (_selectedDate == null) return;
+                              setState(() {
+                                _isLoading = true;
+                              });
+                              try {
+                                await _controller.updateDateOfBirth(_selectedDate!);
+                                // Cập nhật local
+                                final auth = Get.find<AuthController>();
+                                if (auth.currentUser != null) {
+                                  auth.currentUser = auth.currentUser!.copyWith(
+                                    dateOfBirth: _selectedDate,
+                                  );
+                                  auth.update();
+                                }
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Cập nhật ngày sinh thành công'),
+                                      backgroundColor: primaryColor,
+                                    ),
+                                  );
+                                  Navigator.pop(context);
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Lỗi: ${e.toString()}'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    _isLoading = false;
+                                  });
+                                }
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text(
+                            'Lưu thay đổi',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -84,6 +202,23 @@ class _ChangeDateOfBirthScreenState extends State<ChangeDateOfBirthScreen> {
       initialDate: _selectedDate ?? DateTime(now.year - 18),
       firstDate: DateTime(1900),
       lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2E7D32), // header background color
+              onPrimary: Colors.white, // header text color
+              onSurface: Color(0xFF222222), // body text color
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF2E7D32), // button text color
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (pickedDate != null) {
       setState(() {
