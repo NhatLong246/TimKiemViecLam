@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -127,6 +128,9 @@ class EmployerProfileService {
         'companySize': m.companySize,
         'businessType': m.businessType,
         'companyDescription': m.companyDescription,
+        'businessLicenseImageUrls': m.businessLicenseImageUrls,
+        'taxCodeImageUrls': m.taxCodeImageUrls,
+        'otherDocumentImageUrls': m.otherDocumentImageUrls,
         'walletBalance': m.walletBalance,
         'totalSpent': m.totalSpent,
         'isVerified': m.isVerified,
@@ -160,9 +164,26 @@ class EmployerProfileService {
       companySize: m['companySize'] as String?,
       businessType: m['businessType'] as String?,
       companyDescription: m['companyDescription'] as String?,
+      businessLicenseImageUrls: _decodeImageUrls(m['businessLicenseImageUrls']),
+      taxCodeImageUrls: _decodeImageUrls(m['taxCodeImageUrls']),
+      otherDocumentImageUrls: _decodeImageUrls(m['otherDocumentImageUrls']),
       walletBalance: (m['walletBalance'] as num?)?.toDouble() ?? 0.0,
       totalSpent: (m['totalSpent'] as num?)?.toDouble() ?? 0.0,
       isVerified: (m['isVerified'] as int?) == 1,
     );
+  }
+
+  List<String> _decodeImageUrls(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(value.toString());
+      if (decoded is! Iterable) return const [];
+      return decoded
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
   }
 }

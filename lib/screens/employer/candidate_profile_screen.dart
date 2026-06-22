@@ -143,11 +143,22 @@ class _CandidateProfileScreenState extends State<CandidateProfileScreen> {
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
         title: const Text('Chi tiết người làm'),
+        backgroundColor: const Color(0xFF6420A2),
+        surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+        elevation: 0,
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF7B1FA2), Color(0xFF1565C0)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xFF6420A2), Color(0xFF145DB8)],
             ),
           ),
         ),
