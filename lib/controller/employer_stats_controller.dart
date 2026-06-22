@@ -10,6 +10,7 @@ class EmployerStatsController extends GetxController {
   final period = StatsPeriod.month.obs;
   final startDate = Rx<DateTime>(DateTime.now().subtract(const Duration(days: 30)));
   final endDate = Rx<DateTime>(DateTime.now());
+  final isCustomRange = false.obs;
 
   final isLoading = false.obs;
   final summary = EmployerStatsSummary.empty().obs;
@@ -23,19 +24,65 @@ class EmployerStatsController extends GetxController {
     // Mặc định: tháng hiện tại
     final now = DateTime.now();
     startDate.value = DateTime(now.year, now.month, 1);
-    endDate.value = DateTime(now.year, now.month + 1, 0);
+    endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
     loadData();
   }
 
   // ── Public methods ─────────────────────────────────────────────────────
 
+  void applyFilter(StatsPeriod p, DateTime date) {
+    isCustomRange.value = false;
+    period.value = p;
+    switch (p) {
+      case StatsPeriod.day:
+        startDate.value = DateTime(date.year, date.month, date.day);
+        endDate.value = DateTime(date.year, date.month, date.day, 23, 59, 59);
+        break;
+      case StatsPeriod.week:
+        final start = date.subtract(Duration(days: date.weekday - 1));
+        startDate.value = DateTime(start.year, start.month, start.day);
+        final end = start.add(const Duration(days: 6));
+        endDate.value = DateTime(end.year, end.month, end.day, 23, 59, 59);
+        break;
+      case StatsPeriod.month:
+        startDate.value = DateTime(date.year, date.month, 1);
+        endDate.value = DateTime(date.year, date.month + 1, 0, 23, 59, 59);
+        break;
+      case StatsPeriod.year:
+        startDate.value = DateTime(date.year, 1, 1);
+        endDate.value = DateTime(date.year, 12, 31, 23, 59, 59);
+        break;
+    }
+    loadData();
+  }
+
+  void applyCustomRange(DateTime start, DateTime end) {
+    isCustomRange.value = true;
+    startDate.value = DateTime(start.year, start.month, start.day);
+    endDate.value = DateTime(end.year, end.month, end.day, 23, 59, 59);
+
+    final diff = end.difference(start).inDays;
+    if (diff <= 14) {
+      period.value = StatsPeriod.day;
+    } else if (diff <= 90) {
+      period.value = StatsPeriod.week;
+    } else if (diff <= 365 * 2) {
+      period.value = StatsPeriod.month;
+    } else {
+      period.value = StatsPeriod.year;
+    }
+    loadData();
+  }
+
   void setPeriod(StatsPeriod p) {
+    isCustomRange.value = false;
     period.value = p;
     _adjustDateRange(p);
     loadData();
   }
 
   void setDateRange(DateTime s, DateTime e) {
+    isCustomRange.value = true;
     startDate.value = s;
     endDate.value = e;
     loadData();
