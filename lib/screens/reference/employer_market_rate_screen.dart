@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/controller/employer_reference_controller.dart';
@@ -824,6 +825,19 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
 
   EmployerReferenceController get c => widget.controller;
 
+  static const kVietNamProvinces = [
+    'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh',
+    'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau',
+    'Cần Thơ', 'Cao Bằng', 'Đà Nẵng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai',
+    'Đồng Tháp', 'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Nội', 'Hà Tĩnh', 'Hải Dương',
+    'Hải Phòng', 'Hậu Giang', 'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang',
+    'Kon Tum', 'Lai Châu', 'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định',
+    'Nghệ An', 'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình',
+    'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sóc Trăng', 'Sơn La',
+    'Tây Ninh', 'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang',
+    'TP. Hồ Chí Minh', 'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
+  ];
+
   static const _salaryTypes = [
     ('all', 'Tất cả'),
     ('per_hour', '/giờ'),
@@ -838,6 +852,38 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
     ('low', '📉 Thấp'),
   ];
 
+  double _getMinForType(String type) {
+    final list = c.allItems.where((e) => type == 'all' || e.salaryType == type).toList();
+    if (list.isEmpty) {
+      if (type == 'per_hour') return 10000.0;
+      if (type == 'per_day') return 100000.0;
+      if (type == 'per_month') return 1000000.0;
+      return 0.0;
+    }
+    return list.fold(list.first.minSalary, (prev, e) => min(prev, e.minSalary));
+  }
+
+  double _getMaxForType(String type) {
+    final list = c.allItems.where((e) => type == 'all' || e.salaryType == type).toList();
+    if (list.isEmpty) {
+      if (type == 'per_hour') return 200000.0;
+      if (type == 'per_day') return 2000000.0;
+      if (type == 'per_month') return 50000000.0;
+      return 15000000.0;
+    }
+    return list.fold(0.0, (prev, e) => max(prev, e.maxSalary));
+  }
+
+  double get _dMin => _getMinForType(_salaryType);
+  double get _dMax {
+    final m = _getMaxForType(_salaryType);
+    return m > _dMin ? m : _dMin + 10000.0;
+  }
+
+  bool get _hasRange => _dMax > _dMin;
+  bool get _rangeAtDefault =>
+      _salaryRange.start <= _dMin && _salaryRange.end >= _dMax;
+
   @override
   void initState() {
     super.initState();
@@ -845,27 +891,24 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
     _salaryType = c.filterSalaryType.value;
     _demand = c.filterDemand.value;
     _category = c.selectedCategory.value;
-    final dMin = c.dataMinSalary;
-    final dMax = c.dataMaxSalary > dMin ? c.dataMaxSalary : dMin + 1000000;
+    final dMin = _getMinForType(_salaryType);
+    final dMax = _getMaxForType(_salaryType);
+    final currentMin = c.filterMinSalary.value;
+    final currentMax = c.filterMaxSalary.value;
     _salaryRange = RangeValues(
-      c.filterMinSalary.value > 0
-          ? c.filterMinSalary.value.clamp(dMin, dMax)
-          : dMin,
-      c.filterMaxSalary.value > 0
-          ? c.filterMaxSalary.value.clamp(dMin, dMax)
-          : dMax,
+      currentMin > 0 ? currentMin.clamp(dMin, dMax > dMin ? dMax : dMin + 10000.0) : dMin,
+      currentMax > 0 ? currentMax.clamp(dMin, dMax > dMin ? dMax : dMin + 10000.0) : (dMax > dMin ? dMax : dMin + 10000.0),
     );
   }
 
-  double get _dMin => c.dataMinSalary;
-  double get _dMax {
-    final m = c.dataMaxSalary;
-    return m > _dMin ? m : _dMin + 1000000;
+  void _onSalaryTypeChanged(String type) {
+    setState(() {
+      _salaryType = type;
+      final newMin = _getMinForType(type);
+      final newMax = _getMaxForType(type);
+      _salaryRange = RangeValues(newMin, newMax > newMin ? newMax : newMin + 10000.0);
+    });
   }
-
-  bool get _hasRange => _dMax > _dMin;
-  bool get _rangeAtDefault =>
-      _salaryRange.start <= _dMin && _salaryRange.end >= _dMax;
 
   void _apply() {
     c.setCategory(_category);     // áp dụng danh mục
@@ -885,13 +928,14 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       _salaryType = 'all';
       _demand = 'all';
       _category = 'all';
-      _salaryRange = RangeValues(_dMin, _dMax);
+      final dMin = _getMinForType('all');
+      final dMax = _getMaxForType('all');
+      _salaryRange = RangeValues(dMin, dMax > dMin ? dMax : dMin + 10000.0);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final cities = c.availableCities;
     final screenH = MediaQuery.of(context).size.height;
 
     return Container(
@@ -959,35 +1003,100 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                   // ── Danh mục công việc ──
                   _sectionTitle(Icons.category_rounded, 'Danh mục công việc'),
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: kCategoryLabels.entries.map((e) {
-                      final icon = kCategoryIcons[e.key];
-                      final label = icon != null ? '$icon ${e.value}' : e.value;
-                      return _filterChip(
-                        label: label,
-                        isSelected: _category == e.key,
-                        onTap: () => setState(() => _category = e.key),
-                      );
-                    }).toList(),
+                  DropdownButtonFormField<String>(
+                    value: _category,
+                    dropdownColor: Theme.of(context).cardColor,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF212121),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFFF5F5F5),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF7B1FA2), width: 1.5),
+                      ),
+                    ),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF7B1FA2)),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: 'all',
+                        child: Text('Tất cả danh mục'),
+                      ),
+                      ...kCategoryLabels.entries.where((e) => e.key != 'all').map((e) {
+                        final icon = kCategoryIcons[e.key] ?? '💼';
+                        return DropdownMenuItem<String>(
+                          value: e.key,
+                          child: Text('$icon ${e.value}'),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _category = val);
+                      }
+                    },
                   ),
                   const SizedBox(height: 20),
                   // ── Khu vực ──
-                  if (cities.length > 1) ...[
-                    _sectionTitle(Icons.location_on_outlined, 'Khu vực'),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: cities.map((city) => _filterChip(
-                            label: city == 'all' ? 'Tất cả' : city,
-                            isSelected: _city == city,
-                            onTap: () => setState(() => _city = city),
-                          )).toList(),
+                  _sectionTitle(Icons.location_on_outlined, 'Khu vực'),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: _city == 'all' ? 'all' : (kVietNamProvinces.contains(_city) ? _city : 'all'),
+                    dropdownColor: Theme.of(context).cardColor,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF212121),
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 20),
-                  ],
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFFF5F5F5),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF7B1FA2), width: 1.5),
+                      ),
+                    ),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF7B1FA2)),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: 'all',
+                        child: Text('Tất cả khu vực'),
+                      ),
+                      ...kVietNamProvinces.map((city) => DropdownMenuItem<String>(
+                            value: city,
+                            child: Text(city),
+                          )),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _city = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 20),
                   // ── Loại lương ──
                   _sectionTitle(Icons.payments_outlined, 'Loại lương'),
                   const SizedBox(height: 10),
@@ -997,7 +1106,7 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                     children: _salaryTypes.map((e) => _filterChip(
                           label: e.$2,
                           isSelected: _salaryType == e.$1,
-                          onTap: () => setState(() => _salaryType = e.$1),
+                          onTap: () => _onSalaryTypeChanged(e.$1),
                         )).toList(),
                   ),
                   const SizedBox(height: 20),

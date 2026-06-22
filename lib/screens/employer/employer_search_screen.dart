@@ -42,11 +42,17 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
   String _workerSort = 'name';   // name|date
   String _workerHired = 'all';   // all|hired|not_hired
   String _workerLocation = 'Tất cả';
-  String _workerGender = 'Tất cả'; // Tất cả|male|female|other
+  String _workerGender = 'Tất cả'; // Tất cả|male|female
   String _workerCategory = 'Tất cả';
   String _workerLanguage = 'Tất cả';
   String _workerLanguageLevel = 'Tất cả';
+  String _workerLanguageScore = '';
   String _workerExperience = 'Tất cả'; // Tất cả|has_exp|no_exp
+  String _workerEducation = 'Tất cả';
+  String _workerHeight = 'Tất cả';
+  String _workerWeight = 'Tất cả';
+  String _workerAge = 'Tất cả';
+  final Set<String> _activeOptionalFilters = {};
 
   // Firestore
   final _db = FirebaseFirestore.instance;
@@ -105,7 +111,12 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                   category: _workerCategory,
                   language: _workerLanguage,
                   languageLevel: _workerLanguageLevel,
+                  languageScore: _workerLanguageScore,
                   experience: _workerExperience,
+                  education: _workerEducation,
+                  height: _workerHeight,
+                  weight: _workerWeight,
+                  age: _workerAge,
                   uid: _uid ?? '',
                   db: _db,
                 ),
@@ -375,7 +386,13 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                           _workerCategory = 'Tất cả';
                           _workerLanguage = 'Tất cả';
                           _workerLanguageLevel = 'Tất cả';
+                          _workerLanguageScore = '';
                           _workerExperience = 'Tất cả';
+                          _workerEducation = 'Tất cả';
+                          _workerHeight = 'Tất cả';
+                          _workerWeight = 'Tất cả';
+                          _workerAge = 'Tất cả';
+                          _activeOptionalFilters.clear();
                         }
                       });
                       setState(() {
@@ -390,7 +407,13 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                           _workerCategory = 'Tất cả';
                           _workerLanguage = 'Tất cả';
                           _workerLanguageLevel = 'Tất cả';
+                          _workerLanguageScore = '';
                           _workerExperience = 'Tất cả';
+                          _workerEducation = 'Tất cả';
+                          _workerHeight = 'Tất cả';
+                          _workerWeight = 'Tất cả';
+                          _workerAge = 'Tất cả';
+                          _activeOptionalFilters.clear();
                         }
                       });
                     },
@@ -518,6 +541,7 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                             ],
                           ),
                         ),
+
                         const SizedBox(height: 14),
                         _FilterSection(
                           title: 'Trạng thái thuê',
@@ -626,15 +650,6 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                                 }),
                                 color: const Color(0xFF00695C),
                               ),
-                              _FilterChip(
-                                label: 'Khác',
-                                selected: _workerGender == 'other',
-                                onTap: () => setS(() {
-                                  _workerGender = 'other';
-                                  setState(() => _workerGender = 'other');
-                                }),
-                                color: const Color(0xFF00695C),
-                              ),
                             ],
                           ),
                         ),
@@ -675,132 +690,478 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
                             },
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        const SizedBox(height: 14),
-                        _FilterSection(
-                          title: 'Kinh nghiệm làm việc',
-                          icon: Icons.history_edu_outlined,
-                          child: DropdownButtonFormField<String>(
-                            value: _workerExperience,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade300),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade300),
-                              ),
+                        // ─── Các thuộc tính tùy chọn hiển thị động ──────────────────
+                        if (_activeOptionalFilters.contains('experience')) ...[
+                          const SizedBox(height: 14),
+                          _FilterSection(
+                            title: 'Kinh nghiệm làm việc',
+                            icon: Icons.history_edu_outlined,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _workerExperience,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.grey.shade50,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                      DropdownMenuItem(value: 'no_exp', child: Text('Chưa có kinh nghiệm')),
+                                      DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
+                                      DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
+                                      DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
+                                      DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setS(() {
+                                          _workerExperience = val;
+                                          setState(() => _workerExperience = val);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => setS(() {
+                                    _workerExperience = 'Tất cả';
+                                    _activeOptionalFilters.remove('experience');
+                                    setState(() {
+                                      _workerExperience = 'Tất cả';
+                                      _activeOptionalFilters.remove('experience');
+                                    });
+                                  }),
+                                ),
+                              ],
                             ),
-                            icon: const Icon(Icons.arrow_drop_down),
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
-                              DropdownMenuItem(value: 'no_exp', child: Text('Chưa có kinh nghiệm')),
-                              DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
-                              DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
-                              DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
-                              DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setS(() {
-                                  _workerExperience = val;
-                                  setState(() => _workerExperience = val);
-                                });
-                              }
-                            },
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        _FilterSection(
-                          title: 'Ngoại ngữ',
-                          icon: Icons.translate_rounded,
-                          child: DropdownButtonFormField<String>(
-                            value: _workerLanguage,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade300),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade300),
-                              ),
+                        ],
+                        if (_activeOptionalFilters.contains('education')) ...[
+                          const SizedBox(height: 14),
+                          _FilterSection(
+                            title: 'Trình độ học vấn',
+                            icon: Icons.school_outlined,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _workerEducation,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.grey.shade50,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                      DropdownMenuItem(value: 'Trung học phổ thông', child: Text('Trung học phổ thông')),
+                                      DropdownMenuItem(value: 'Trung cấp', child: Text('Trung cấp')),
+                                      DropdownMenuItem(value: 'Cao đẳng', child: Text('Cao đẳng')),
+                                      DropdownMenuItem(value: 'Đại học', child: Text('Đại học')),
+                                      DropdownMenuItem(value: 'Sau đại học', child: Text('Sau đại học')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setS(() {
+                                          _workerEducation = val;
+                                          setState(() => _workerEducation = val);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => setS(() {
+                                    _workerEducation = 'Tất cả';
+                                    _activeOptionalFilters.remove('education');
+                                    setState(() {
+                                      _workerEducation = 'Tất cả';
+                                      _activeOptionalFilters.remove('education');
+                                    });
+                                  }),
+                                ),
+                              ],
                             ),
-                            icon: const Icon(Icons.arrow_drop_down),
-                            isExpanded: true,
-                            items: ['Tất cả', ...LanguageProficiencyLevels.languageOptions].map((lang) {
-                              return DropdownMenuItem<String>(
-                                value: lang,
-                                child: Text(lang),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setS(() {
-                                  _workerLanguage = val;
-                                  _workerLanguageLevel = 'Tất cả';
-                                  setState(() {
-                                    _workerLanguage = val;
+                          ),
+                        ],
+                        if (_activeOptionalFilters.contains('language')) ...[
+                          const SizedBox(height: 14),
+                          _FilterSection(
+                            title: 'Ngoại ngữ',
+                            icon: Icons.translate_rounded,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      DropdownButtonFormField<String>(
+                                        value: _workerLanguage,
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: Colors.grey.shade50,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.arrow_drop_down),
+                                        isExpanded: true,
+                                        items: ['Tất cả', ...LanguageProficiencyLevels.languageOptions].map((lang) {
+                                          return DropdownMenuItem<String>(
+                                            value: lang,
+                                            child: Text(lang),
+                                          );
+                                        }).toList(),
+                                        onChanged: (val) {
+                                          if (val != null) {
+                                            setS(() {
+                                              _workerLanguage = val;
+                                              _workerLanguageLevel = 'Tất cả';
+                                              _workerLanguageScore = '';
+                                              setState(() {
+                                                _workerLanguage = val;
+                                                _workerLanguageLevel = 'Tất cả';
+                                                _workerLanguageScore = '';
+                                              });
+                                            });
+                                          }
+                                        },
+                                      ),
+                                      if (_workerLanguage != 'Tất cả') ...[
+                                        const SizedBox(height: 8),
+                                        DropdownButtonFormField<String>(
+                                          value: _workerLanguageLevel,
+                                          decoration: InputDecoration(
+                                            filled: true,
+                                            fillColor: Colors.grey.shade50,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                              borderSide: BorderSide(color: Colors.grey.shade300),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                              borderSide: BorderSide(color: Colors.grey.shade300),
+                                            ),
+                                          ),
+                                          icon: const Icon(Icons.arrow_drop_down),
+                                          isExpanded: true,
+                                          items: () {
+                                            final List<String> levels = ['Tất cả'];
+                                            if (_workerLanguage == 'Tiếng Anh') {
+                                              levels.addAll(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'TOEIC']);
+                                            } else {
+                                              levels.addAll(LanguageProficiencyLevels.forLanguage(_workerLanguage));
+                                            }
+                                            return levels.map((lvl) {
+                                              return DropdownMenuItem<String>(
+                                                value: lvl,
+                                                child: Text(lvl),
+                                              );
+                                            }).toList();
+                                          }(),
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setS(() {
+                                                _workerLanguageLevel = val;
+                                                _workerLanguageScore = '';
+                                                setState(() {
+                                                  _workerLanguageLevel = val;
+                                                  _workerLanguageScore = '';
+                                                });
+                                              });
+                                            }
+                                          },
+                                        ),
+                                        if (_workerLanguageLevel == 'IELTS' || _workerLanguageLevel == 'TOEIC') ...[
+                                          const SizedBox(height: 8),
+                                          TextFormField(
+                                            initialValue: _workerLanguageScore,
+                                            decoration: InputDecoration(
+                                              filled: true,
+                                              fillColor: Colors.grey.shade50,
+                                              labelText: _workerLanguageLevel == 'IELTS' ? 'Điểm IELTS (ví dụ: 6.5)' : 'Điểm TOEIC (ví dụ: 750)',
+                                              labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                                borderSide: BorderSide(color: Colors.grey.shade300),
+                                              ),
+                                              enabledBorder: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                                borderSide: BorderSide(color: Colors.grey.shade300),
+                                              ),
+                                            ),
+                                            onChanged: (val) {
+                                              setS(() {
+                                                _workerLanguageScore = val;
+                                                setState(() => _workerLanguageScore = val);
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => setS(() {
+                                    _workerLanguage = 'Tất cả';
                                     _workerLanguageLevel = 'Tất cả';
-                                  });
-                                });
-                              }
-                            },
+                                    _workerLanguageScore = '';
+                                    _activeOptionalFilters.remove('language');
+                                    setState(() {
+                                      _workerLanguage = 'Tất cả';
+                                      _workerLanguageLevel = 'Tất cả';
+                                      _workerLanguageScore = '';
+                                      _activeOptionalFilters.remove('language');
+                                    });
+                                  }),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        _FilterSection(
-                          title: 'Trình độ ngoại ngữ',
-                          icon: Icons.grade_outlined,
-                          child: DropdownButtonFormField<String>(
-                            value: _workerLanguageLevel,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade300),
+                        ],
+                        if (_activeOptionalFilters.contains('height')) ...[
+                          const SizedBox(height: 14),
+                          _FilterSection(
+                            title: 'Chiều cao tối thiểu',
+                            icon: Icons.height_rounded,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _workerHeight,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.grey.shade50,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                      DropdownMenuItem(value: 'Trên 150 cm', child: Text('Trên 150 cm')),
+                                      DropdownMenuItem(value: 'Trên 155 cm', child: Text('Trên 155 cm')),
+                                      DropdownMenuItem(value: 'Trên 160 cm', child: Text('Trên 160 cm')),
+                                      DropdownMenuItem(value: 'Trên 165 cm', child: Text('Trên 165 cm')),
+                                      DropdownMenuItem(value: 'Trên 170 cm', child: Text('Trên 170 cm')),
+                                      DropdownMenuItem(value: 'Trên 175 cm', child: Text('Trên 175 cm')),
+                                      DropdownMenuItem(value: 'Trên 180 cm', child: Text('Trên 180 cm')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setS(() {
+                                          _workerHeight = val;
+                                          setState(() => _workerHeight = val);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => setS(() {
+                                    _workerHeight = 'Tất cả';
+                                    _activeOptionalFilters.remove('height');
+                                    setState(() {
+                                      _workerHeight = 'Tất cả';
+                                      _activeOptionalFilters.remove('height');
+                                    });
+                                  }),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (_activeOptionalFilters.contains('weight')) ...[
+                          const SizedBox(height: 14),
+                          _FilterSection(
+                            title: 'Cân nặng',
+                            icon: Icons.monitor_weight_outlined,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _workerWeight,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.grey.shade50,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                      DropdownMenuItem(value: 'Dưới 50 kg', child: Text('Dưới 50 kg')),
+                                      DropdownMenuItem(value: '50 - 60 kg', child: Text('50 - 60 kg')),
+                                      DropdownMenuItem(value: '60 - 70 kg', child: Text('60 - 70 kg')),
+                                      DropdownMenuItem(value: '70 - 80 kg', child: Text('70 - 80 kg')),
+                                      DropdownMenuItem(value: 'Trên 80 kg', child: Text('Trên 80 kg')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setS(() {
+                                          _workerWeight = val;
+                                          setState(() => _workerWeight = val);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => setS(() {
+                                    _workerWeight = 'Tất cả';
+                                    _activeOptionalFilters.remove('weight');
+                                    setState(() {
+                                      _workerWeight = 'Tất cả';
+                                      _activeOptionalFilters.remove('weight');
+                                    });
+                                  }),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (_activeOptionalFilters.contains('age')) ...[
+                          const SizedBox(height: 14),
+                          _FilterSection(
+                            title: 'Tuổi',
+                            icon: Icons.cake_outlined,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _workerAge,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.grey.shade50,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                    isExpanded: true,
+                                    items: const [
+                                      DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                      DropdownMenuItem(value: '18 - 25 tuổi', child: Text('18 - 25 tuổi')),
+                                      DropdownMenuItem(value: '26 - 35 tuổi', child: Text('26 - 35 tuổi')),
+                                      DropdownMenuItem(value: 'Trên 35 tuổi', child: Text('Trên 35 tuổi')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setS(() {
+                                          _workerAge = val;
+                                          setState(() => _workerAge = val);
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                  onPressed: () => setS(() {
+                                    _workerAge = 'Tất cả';
+                                    _activeOptionalFilters.remove('age');
+                                    setState(() {
+                                      _workerAge = 'Tất cả';
+                                      _activeOptionalFilters.remove('age');
+                                    });
+                                  }),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        Center(
+                          child: InkWell(
+                            onTap: () {
+                              _showAddFilterDialog(ctx, setS, {
+                                'experience': 'Kinh nghiệm làm việc',
+                                'education': 'Trình độ học vấn',
+                                'language': 'Ngoại ngữ',
+                                'height': 'Chiều cao',
+                                'weight': 'Cân nặng',
+                                'age': 'Tuổi',
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(30),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: const Color(0xFF7B1FA2), width: 1.5),
+                                borderRadius: BorderRadius.circular(30),
+                                color: const Color(0xFF7B1FA2).withOpacity(0.05),
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.add_rounded, color: Color(0xFF7B1FA2), size: 20),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Thêm thuộc tính lọc',
+                                    style: TextStyle(
+                                      color: const Color(0xFF7B1FA2),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            icon: const Icon(Icons.arrow_drop_down),
-                            isExpanded: true,
-                            items: () {
-                              final List<String> levels = ['Tất cả'];
-                              if (_workerLanguage != 'Tất cả') {
-                                if (_workerLanguage == 'Tiếng Anh') {
-                                  levels.addAll(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'TOEIC']);
-                                } else {
-                                  levels.addAll(LanguageProficiencyLevels.forLanguage(_workerLanguage));
-                                }
-                              }
-                              return levels.map((lvl) {
-                                return DropdownMenuItem<String>(
-                                  value: lvl,
-                                  child: Text(lvl),
-                                );
-                              }).toList();
-                            }(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setS(() {
-                                  _workerLanguageLevel = val;
-                                  setState(() => _workerLanguageLevel = val);
-                                });
-                              }
-                            },
                           ),
                         ),
                       ],
@@ -848,7 +1209,80 @@ class _EmployerSearchScreenState extends State<EmployerSearchScreen>
           _workerCategory != 'Tất cả' ||
           _workerLanguage != 'Tất cả' ||
           _workerLanguageLevel != 'Tất cả' ||
-          _workerExperience != 'Tất cả';
+          _workerLanguageScore.isNotEmpty ||
+          _workerExperience != 'Tất cả' ||
+          _workerEducation != 'Tất cả' ||
+          _workerHeight != 'Tất cả' ||
+          _workerWeight != 'Tất cả' ||
+          _workerAge != 'Tất cả';
+    }
+  }
+
+  void _showAddFilterDialog(
+    BuildContext ctx,
+    StateSetter setS,
+    Map<String, String> allOptions,
+  ) {
+    final remainingOptions = Map<String, String>.from(allOptions)
+      ..removeWhere((key, _) => _activeOptionalFilters.contains(key));
+
+    if (remainingOptions.isEmpty) {
+      Get.snackbar(
+        'Thông báo',
+        'Tất cả các thuộc tính đã được thêm.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.black.withOpacity(0.8),
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    showDialog(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text(
+          'Chọn thuộc tính cần lọc',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: remainingOptions.entries.map((entry) {
+            return ListTile(
+              leading: Icon(_getIconForOption(entry.key), color: const Color(0xFF7B1FA2)),
+              title: Text(entry.value, style: const TextStyle(fontSize: 14)),
+              onTap: () {
+                setS(() {
+                  _activeOptionalFilters.add(entry.key);
+                  setState(() {
+                    _activeOptionalFilters.add(entry.key);
+                  });
+                });
+                Navigator.pop(dialogCtx);
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForOption(String key) {
+    switch (key) {
+      case 'experience':
+        return Icons.history_edu_outlined;
+      case 'education':
+        return Icons.school_outlined;
+      case 'language':
+        return Icons.translate_rounded;
+      case 'height':
+        return Icons.height_rounded;
+      case 'weight':
+        return Icons.monitor_weight_outlined;
+      case 'age':
+        return Icons.cake_outlined;
+      default:
+        return Icons.add_circle_outline_rounded;
     }
   }
 
@@ -982,7 +1416,12 @@ class _WorkersTab extends StatelessWidget {
     required this.category,
     required this.language,
     required this.languageLevel,
+    required this.languageScore,
     required this.experience,
+    required this.education,
+    required this.height,
+    required this.weight,
+    required this.age,
   });
 
   final String query;
@@ -995,7 +1434,12 @@ class _WorkersTab extends StatelessWidget {
   final String category;
   final String language;
   final String languageLevel;
+  final String languageScore;
   final String experience;
+  final String education;
+  final String height;
+  final String weight;
+  final String age;
 
   @override
   Widget build(BuildContext context) {
@@ -1056,6 +1500,7 @@ class _WorkersTab extends StatelessWidget {
                 criteria: criteria,
                 languages: data['languages'] as List? ?? [],
                 workExperiences: data['workExperiences'] as List? ?? [],
+                educations: data['educations'] as List? ?? [],
                 hasWorkExperience: data['hasWorkExperience'] as bool? ?? (data['workExperiences'] as List? ?? []).isNotEmpty,
               );
             }).toList();
@@ -1068,6 +1513,8 @@ class _WorkersTab extends StatelessWidget {
             } else if (hired == 'not_hired') {
               filtered = filtered.where((w) => !hiredIds.contains(w.worker.uid)).toList();
             }
+
+
 
             // 2. Lọc theo khu vực
             if (location != 'Tất cả') {
@@ -1102,19 +1549,19 @@ class _WorkersTab extends StatelessWidget {
                     return !commonLanguages.any((common) => name.contains(common));
                   });
                 }
-                final targetLang = language.toLowerCase();
+                final target = language.toLowerCase();
                 return w.languages.any((lang) {
                   final name = (lang['language'] as String? ?? '').toLowerCase();
-                  if (targetLang == 'tiếng anh') {
+                  if (target == 'tiếng anh') {
                     return name.contains('anh') || name.contains('english');
-                  } else if (targetLang == 'tiếng trung') {
+                  } else if (target == 'tiếng trung') {
                     return name.contains('trung') || name.contains('chinese');
-                  } else if (targetLang == 'tiếng nhật') {
+                  } else if (target == 'tiếng nhật') {
                     return name.contains('nhật') || name.contains('japanese');
-                  } else if (targetLang == 'tiếng hàn') {
+                  } else if (target == 'tiếng hàn') {
                     return name.contains('hàn') || name.contains('korean');
                   }
-                  return name.contains(targetLang);
+                  return name.contains(target);
                 });
               }).toList();
             }
@@ -1146,6 +1593,16 @@ class _WorkersTab extends StatelessWidget {
                   if (!langMatch) return false;
                   
                   final lvl = (lang['level'] as String? ?? '').toLowerCase();
+                  
+                  if (targetLevel == 'ielts' || targetLevel == 'toeic') {
+                    if (!lvl.contains(targetLevel)) return false;
+                    if (languageScore.isNotEmpty) {
+                      final scoreStr = languageScore.toLowerCase().trim();
+                      return lvl.contains(scoreStr);
+                    }
+                    return true;
+                  }
+                  
                   return lvl.contains(targetLevel) || lvl == targetLevel;
                 });
               }).toList();
@@ -1203,7 +1660,66 @@ class _WorkersTab extends StatelessWidget {
               }).toList();
             }
 
-            // 7. Lọc theo query (Tên hoặc SĐT hoặc Vị trí mong muốn)
+            // 8. Lọc theo trình độ học vấn
+            if (education != 'Tất cả') {
+              filtered = filtered.where((w) {
+                return w.educations.any((edu) {
+                  final map = Map<String, dynamic>.from(edu);
+                  final deg = (map['degree'] as String? ?? '').toLowerCase();
+                  final targetEdu = education.toLowerCase();
+                  return deg.contains(targetEdu) || targetEdu.contains(deg);
+                });
+              }).toList();
+            }
+
+            // 9. Lọc theo chiều cao
+            if (height != 'Tất cả') {
+              filtered = filtered.where((w) {
+                final h = w.worker.userModel.height;
+                if (h == null) return false;
+                if (height == 'Trên 150 cm') return h >= 150;
+                if (height == 'Trên 155 cm') return h >= 155;
+                if (height == 'Trên 160 cm') return h >= 160;
+                if (height == 'Trên 165 cm') return h >= 165;
+                if (height == 'Trên 170 cm') return h >= 170;
+                if (height == 'Trên 175 cm') return h >= 175;
+                if (height == 'Trên 180 cm') return h >= 180;
+                return true;
+              }).toList();
+            }
+
+            // 10. Lọc theo cân nặng
+            if (weight != 'Tất cả') {
+              filtered = filtered.where((w) {
+                final wt = w.worker.userModel.weight;
+                if (wt == null) return false;
+                if (weight == 'Dưới 50 kg') return wt < 50;
+                if (weight == '50 - 60 kg') return wt >= 50 && wt <= 60;
+                if (weight == '60 - 70 kg') return wt >= 60 && wt <= 70;
+                if (weight == '70 - 80 kg') return wt >= 70 && wt <= 80;
+                if (weight == 'Trên 80 kg') return wt > 80;
+                return true;
+              }).toList();
+            }
+
+            // 11. Lọc theo tuổi
+            if (age != 'Tất cả') {
+              filtered = filtered.where((w) {
+                final dob = w.worker.userModel.dateOfBirth;
+                if (dob == null) return false;
+                final now = DateTime.now();
+                int currentAge = (now.year - dob.year).toInt();
+                if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+                  currentAge--;
+                }
+                if (age == '18 - 25 tuổi') return currentAge >= 18 && currentAge <= 25;
+                if (age == '26 - 35 tuổi') return currentAge >= 26 && currentAge <= 35;
+                if (age == 'Trên 35 tuổi') return currentAge > 35;
+                return true;
+              }).toList();
+            }
+
+            // 12. Lọc theo query (Tên hoặc SĐT hoặc Vị trí mong muốn)
             if (query.isNotEmpty) {
               final q = query.toLowerCase();
               filtered = filtered.where((w) {
@@ -1252,12 +1768,14 @@ class _ParsedWorker {
   final JobCriteriaModel? criteria;
   final List<dynamic> languages;
   final List<dynamic> workExperiences;
+  final List<dynamic> educations;
   final bool hasWorkExperience;
   _ParsedWorker({
     required this.worker,
     this.criteria,
     required this.languages,
     required this.workExperiences,
+    required this.educations,
     required this.hasWorkExperience,
   });
 }

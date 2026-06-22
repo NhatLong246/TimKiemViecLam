@@ -213,6 +213,36 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     final minCtrl = TextEditingController(text: tempMinSalary?.toInt().toString() ?? '');
     final maxCtrl = TextEditingController(text: tempMaxSalary?.toInt().toString() ?? '');
 
+    final Set<String> activeOptionalFilters = {};
+    String selectedEducation = 'Tất cả';
+    String selectedHeight = 'Tất cả';
+
+    if (selectedExperience != 'Tất cả') activeOptionalFilters.add('experience');
+    if (selectedLanguage != 'Tất cả') activeOptionalFilters.add('language');
+
+    final bool isPresetCategory = job_cats.kCategoryLabels.containsKey(selectedCategory) && selectedCategory != 'other';
+    final customCategoryCtrl = TextEditingController(
+      text: isPresetCategory ? '' : (selectedCategory == 'other' ? '' : selectedCategory),
+    );
+    if (!isPresetCategory && selectedCategory.isNotEmpty && selectedCategory != 'all') {
+      selectedCategory = 'other';
+    }
+
+    String initialDropdownLevel = selectedLanguageLevel;
+    String initialScore = '';
+    if (selectedLanguageLevel.startsWith('IELTS ')) {
+      initialDropdownLevel = 'IELTS';
+      initialScore = selectedLanguageLevel.substring(6);
+    } else if (selectedLanguageLevel.startsWith('TOEIC ')) {
+      initialDropdownLevel = 'TOEIC';
+      initialScore = selectedLanguageLevel.substring(6);
+    } else if (selectedLanguageLevel == 'IELTS' || selectedLanguageLevel == 'TOEIC') {
+      initialDropdownLevel = selectedLanguageLevel;
+      initialScore = '';
+    }
+    final languageScoreCtrl = TextEditingController(text: initialScore);
+    String tempLanguageLevelDropdown = initialDropdownLevel;
+
     Get.bottomSheet(
       isScrollControlled: true,
       StatefulBuilder(
@@ -237,6 +267,47 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 ),
               ),
               onSelected: (_) => onSelect(label),
+            );
+          }
+
+          void showAddFilterDialog(Map<String, String> allOptions) {
+            final remainingOptions = Map<String, String>.from(allOptions)
+              ..removeWhere((key, _) => activeOptionalFilters.contains(key));
+
+            if (remainingOptions.isEmpty) {
+              Get.snackbar(
+                'Thông báo',
+                'Tất cả các thuộc tính đã được thêm.',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.black.withOpacity(0.8),
+                colorText: Colors.white,
+              );
+              return;
+            }
+
+            showDialog(
+              context: context,
+              builder: (dialogCtx) => AlertDialog(
+                title: const Text(
+                  'Chọn thuộc tính cần lọc',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: remainingOptions.entries.map((entry) {
+                    return ListTile(
+                      title: Text(entry.value),
+                      onTap: () {
+                        setState(() {
+                          activeOptionalFilters.add(entry.key);
+                        });
+                        Navigator.pop(dialogCtx);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
             );
           }
 
@@ -409,6 +480,26 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         if (val != null) setState(() => selectedCategory = val);
                       },
                     ),
+                    if (selectedCategory == 'other') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: customCategoryCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Nhập danh mục khác...',
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.green.shade200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.green.shade200),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     const Text(
@@ -437,117 +528,345 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
 
-                    const Text('Kinh nghiệm yêu cầu', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedExperience,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
+                    // ─── Các thuộc tính tùy chọn hiển thị động ──────────────────
+                    if (activeOptionalFilters.contains('experience')) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Kinh nghiệm yêu cầu', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: selectedExperience,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                    DropdownMenuItem(value: 'no_exp', child: Text('Chưa có kinh nghiệm')),
+                                    DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
+                                    DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
+                                    DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
+                                    DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => selectedExperience = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 28.0),
+                            child: IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              onPressed: () => setState(() {
+                                selectedExperience = 'Tất cả';
+                                activeOptionalFilters.remove('experience');
+                              }),
+                            ),
+                          ),
+                        ],
                       ),
-                      icon: const Icon(Icons.arrow_drop_down),
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
-                        DropdownMenuItem(value: 'no_exp', child: Text('Chưa có kinh nghiệm')),
-                        DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
-                        DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
-                        DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
-                        DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => selectedExperience = val);
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                    ],
+                    if (activeOptionalFilters.contains('language')) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Yêu cầu ngoại ngữ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: selectedLanguage,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  isExpanded: true,
+                                  items: ['Tất cả', ...LanguageProficiencyLevels.languageOptions].map((lang) {
+                                    return DropdownMenuItem<String>(
+                                      value: lang,
+                                      child: Text(lang),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        selectedLanguage = val;
+                                        selectedLanguageLevel = 'Tất cả';
+                                        tempLanguageLevelDropdown = 'Tất cả';
+                                        languageScoreCtrl.clear();
+                                      });
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                const Text('Trình độ ngoại ngữ yêu cầu', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: tempLanguageLevelDropdown,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  isExpanded: true,
+                                  items: () {
+                                    final List<String> levels = ['Tất cả'];
+                                    if (selectedLanguage != 'Tất cả') {
+                                      if (selectedLanguage == 'Tiếng Anh') {
+                                        levels.addAll(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'TOEIC']);
+                                      } else {
+                                        levels.addAll(LanguageProficiencyLevels.forLanguage(selectedLanguage));
+                                      }
+                                    }
+                                    return levels.map((lvl) {
+                                      return DropdownMenuItem<String>(
+                                        value: lvl,
+                                        child: Text(lvl),
+                                      );
+                                    }).toList();
+                                  }(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        tempLanguageLevelDropdown = val;
+                                        selectedLanguageLevel = val;
+                                        if (val != 'IELTS' && val != 'TOEIC') {
+                                          languageScoreCtrl.clear();
+                                        }
+                                      });
+                                    }
+                                  },
+                                ),
+                                if (tempLanguageLevelDropdown == 'IELTS' || tempLanguageLevelDropdown == 'TOEIC') ...[
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: languageScoreCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'Nhập điểm ${tempLanguageLevelDropdown}...',
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.green.shade200),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.green.shade200),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 28.0),
+                            child: IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              onPressed: () => setState(() {
+                                selectedLanguage = 'Tất cả';
+                                selectedLanguageLevel = 'Tất cả';
+                                activeOptionalFilters.remove('language');
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (activeOptionalFilters.contains('education')) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Trình độ học vấn', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: selectedEducation,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                    DropdownMenuItem(value: 'Trung học phổ thông', child: Text('Trung học phổ thông')),
+                                    DropdownMenuItem(value: 'Trung cấp', child: Text('Trung cấp')),
+                                    DropdownMenuItem(value: 'Cao đẳng', child: Text('Cao đẳng')),
+                                    DropdownMenuItem(value: 'Đại học', child: Text('Đại học')),
+                                    DropdownMenuItem(value: 'Sau đại học', child: Text('Sau đại học')),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => selectedEducation = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 28.0),
+                            child: IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              onPressed: () => setState(() {
+                                selectedEducation = 'Tất cả';
+                                activeOptionalFilters.remove('education');
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (activeOptionalFilters.contains('height')) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Chiều cao tối thiểu', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  value: selectedHeight,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.green.shade200),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.arrow_drop_down),
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                                    DropdownMenuItem(value: 'Trên 150 cm', child: Text('Trên 150 cm')),
+                                    DropdownMenuItem(value: 'Trên 155 cm', child: Text('Trên 155 cm')),
+                                    DropdownMenuItem(value: 'Trên 160 cm', child: Text('Trên 160 cm')),
+                                    DropdownMenuItem(value: 'Trên 165 cm', child: Text('Trên 165 cm')),
+                                    DropdownMenuItem(value: 'Trên 170 cm', child: Text('Trên 170 cm')),
+                                    DropdownMenuItem(value: 'Trên 175 cm', child: Text('Trên 175 cm')),
+                                    DropdownMenuItem(value: 'Trên 180 cm', child: Text('Trên 180 cm')),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => selectedHeight = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 28.0),
+                            child: IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                              onPressed: () => setState(() {
+                                selectedHeight = 'Tất cả';
+                                activeOptionalFilters.remove('height');
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
-                    const Text('Yêu cầu ngoại ngữ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedLanguage,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
-                      ),
-                      icon: const Icon(Icons.arrow_drop_down),
-                      isExpanded: true,
-                      items: ['Tất cả', ...LanguageProficiencyLevels.languageOptions].map((lang) {
-                        return DropdownMenuItem<String>(
-                          value: lang,
-                          child: Text(lang),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            selectedLanguage = val;
-                            selectedLanguageLevel = 'Tất cả';
+                    const SizedBox(height: 24),
+                    Center(
+                      child: InkWell(
+                        onTap: () {
+                          showAddFilterDialog({
+                            'experience': 'Kinh nghiệm yêu cầu',
+                            'language': 'Ngoại ngữ',
+                            'education': 'Trình độ học vấn',
+                            'height': 'Chiều cao',
                           });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    const Text('Trình độ ngoại ngữ yêu cầu', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedLanguageLevel,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
+                        },
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.green, width: 1.5),
+                            borderRadius: BorderRadius.circular(30),
+                            color: Colors.green.withOpacity(0.05),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_rounded, color: Colors.green, size: 20),
+                              SizedBox(width: 6),
+                              Text(
+                                'Thêm thuộc tính lọc',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      icon: const Icon(Icons.arrow_drop_down),
-                      isExpanded: true,
-                      items: () {
-                        final List<String> levels = ['Tất cả'];
-                        if (selectedLanguage != 'Tất cả') {
-                          if (selectedLanguage == 'Tiếng Anh') {
-                            levels.addAll(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'TOEIC']);
-                          } else {
-                            levels.addAll(LanguageProficiencyLevels.forLanguage(selectedLanguage));
-                          }
-                        }
-                        return levels.map((lvl) {
-                          return DropdownMenuItem<String>(
-                            value: lvl,
-                            child: Text(lvl),
-                          );
-                        }).toList();
-                      }(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => selectedLanguageLevel = val);
-                        }
-                      },
                     ),
                     const SizedBox(height: 32),
 
@@ -562,16 +881,39 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           ),
                         ),
                         onPressed: () {
+                          final finalCategory = selectedCategory == 'other'
+                              ? (customCategoryCtrl.text.trim().isNotEmpty
+                                  ? customCategoryCtrl.text.trim()
+                                  : 'other')
+                              : selectedCategory;
+
+                          String finalLanguage = selectedLanguage;
+                          String finalLanguageLevel = selectedLanguageLevel;
+                          if (activeOptionalFilters.contains('language')) {
+                            if ((selectedLanguageLevel == 'IELTS' || selectedLanguageLevel == 'TOEIC') &&
+                                languageScoreCtrl.text.trim().isNotEmpty) {
+                              finalLanguageLevel = '$selectedLanguageLevel ${languageScoreCtrl.text.trim()}';
+                            }
+                          } else {
+                            finalLanguage = 'Tất cả';
+                            finalLanguageLevel = 'Tất cả';
+                          }
+
+                          String finalExperience = selectedExperience;
+                          if (!activeOptionalFilters.contains('experience')) {
+                            finalExperience = 'Tất cả';
+                          }
+
                           _controller.applyAdvancedFilters(
                             tempMinSalary,
                             tempMaxSalary,
                             selectedLoc,
                             selectedJobType,
-                            selectedCategory,
+                            finalCategory,
                             selectedGender,
-                            selectedLanguage,
-                            selectedLanguageLevel,
-                            selectedExperience,
+                            finalLanguage,
+                            finalLanguageLevel,
+                            finalExperience,
                           );
                           Get.back();
                         },
