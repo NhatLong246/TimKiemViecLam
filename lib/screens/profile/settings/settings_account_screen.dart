@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:viecnow/controller/login_controller.dart';
 import 'package:viecnow/controller/update_account_controller.dart';
 import 'package:viecnow/routes/app_routes.dart';
@@ -101,6 +102,28 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
           final emailVerified = firebaseUser?.emailVerified ?? false;
           final phoneVerified = phone.isNotEmpty;
 
+          // Extract gender and date of birth
+          final rawGender = (data['gender'] ?? '').toString().trim();
+          String genderDisplay = 'Chưa cập nhật';
+          if (rawGender == 'male') {
+            genderDisplay = 'Nam';
+          } else if (rawGender == 'female') {
+            genderDisplay = 'Nữ';
+          } else if (rawGender == 'other') {
+            genderDisplay = 'Khác';
+          }
+
+          final dobTimestamp = data['dateOfBirth'];
+          String dobDisplay = 'Chưa cập nhật';
+          if (dobTimestamp is Timestamp) {
+            dobDisplay = DateFormat('dd/MM/yyyy').format(dobTimestamp.toDate());
+          } else if (dobTimestamp is String && dobTimestamp.isNotEmpty) {
+            try {
+              final parsed = DateTime.parse(dobTimestamp);
+              dobDisplay = DateFormat('dd/MM/yyyy').format(parsed);
+            } catch (_) {}
+          }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             child: Column(
@@ -149,6 +172,26 @@ class _SettingsAccountScreenState extends State<SettingsAccountScreen> {
                         onUpdate: () => Navigator.pushNamed(
                           context,
                           AppRoutes.changeEmail,
+                        ),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFEDEDED)),
+                      _updatableRow(
+                        icon: Icons.cake_outlined,
+                        value: dobDisplay,
+                        verified: dobDisplay != 'Chưa cập nhật',
+                        onUpdate: () => Navigator.pushNamed(
+                          context,
+                          AppRoutes.changeDateofBirth,
+                        ),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFEDEDED)),
+                      _updatableRow(
+                        icon: Icons.wc_outlined,
+                        value: genderDisplay,
+                        verified: genderDisplay != 'Chưa cập nhật',
+                        onUpdate: () => Navigator.pushNamed(
+                          context,
+                          AppRoutes.changeGender,
                         ),
                       ),
                     ],

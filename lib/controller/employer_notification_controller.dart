@@ -167,8 +167,6 @@ class EmployerNotificationController extends GetxController {
         .collection('applications')
         .where('employerId', isEqualTo: uid)
         .where('status', isEqualTo: 'pending')
-        .orderBy('appliedAt', descending: true)
-        .limit(30)
         .snapshots()
         .listen((snap) async {
           if (_appInitialLoad) {

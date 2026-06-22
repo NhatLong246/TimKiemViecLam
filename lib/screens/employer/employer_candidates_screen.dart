@@ -1183,7 +1183,13 @@ class _CandidateProfileSheetState extends State<_CandidateProfileSheet> {
                 _buildInfoRow(
                   Icons.person_outline,
                   'Giới tính',
-                  _fullUser!.gender ?? 'Chưa cập nhật',
+                  _fullUser!.gender == 'male'
+                      ? 'Nam'
+                      : _fullUser!.gender == 'female'
+                          ? 'Nữ'
+                          : _fullUser!.gender == 'other'
+                              ? 'Khác'
+                              : _fullUser!.gender ?? 'Chưa cập nhật',
                 ),
                 const SizedBox(height: 16),
                 _buildInfoRow(

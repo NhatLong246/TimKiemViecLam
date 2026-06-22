@@ -338,8 +338,6 @@ class AuthController extends GetxController {
     update();
   }
 
-  int? _lastSeenAttempt;
-
   void _listenToSession(String uid) {
     _userSubscription?.cancel();
     _userSubscription = FirebaseFirestore.instance
@@ -377,14 +375,6 @@ class AuthController extends GetxController {
                 return;
               }
 
-              final attempt = data['lastLoginAttempt'] as int?;
-              if (attempt != null) {
-                if (_lastSeenAttempt != null && attempt > _lastSeenAttempt!) {
-                  _showLoginAttemptWarning();
-                }
-                _lastSeenAttempt = attempt;
-              }
-
               if (currentUser != null) {
                 final mutableData = Map<String, dynamic>.from(data);
                 mutableData['uid'] = uid;
@@ -394,16 +384,5 @@ class AuthController extends GetxController {
             }
           }
         });
-  }
-
-  void _showLoginAttemptWarning() {
-    Get.snackbar(
-      'Cảnh báo bảo mật',
-      'Có thiết bị khác đang cố gắng đăng nhập vào tài khoản của bạn.',
-      snackPosition: SnackPosition.TOP,
-      backgroundColor: Colors.orange,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 5),
-    );
   }
 }
