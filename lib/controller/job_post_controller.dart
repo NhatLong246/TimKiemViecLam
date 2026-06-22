@@ -12,6 +12,7 @@ import '../routes/app_routes.dart';
 import '../utils/job_time_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../data/services/profanity_filter_service.dart';
 
 class JobPostController extends GetxController {
   final JobPostService _service = JobPostService();
@@ -133,6 +134,9 @@ class JobPostController extends GetxController {
   // ── Tạo bài đăng ──────────────────────────────────────────────────────────
   Future<bool> createPost(JobPostModel post) async {
     try {
+      if (ProfanityFilterService.containsProfanity('${post.title} ${post.description} ${post.requirements} ${post.location}')) {
+        throw Exception('Bài đăng chứa từ ngữ vi phạm tiêu chuẩn cộng đồng.');
+      }
       await _service.createJobPost(post);
       return true;
     } catch (e) {
@@ -333,6 +337,9 @@ class JobPostController extends GetxController {
 
   Future<bool> updatePost(JobPostModel post) async {
     try {
+      if (ProfanityFilterService.containsProfanity('${post.title} ${post.description} ${post.requirements} ${post.location}')) {
+        throw Exception('Bài đăng chứa từ ngữ vi phạm tiêu chuẩn cộng đồng.');
+      }
       await _service.updateJobPost(post);
       return true;
     } catch (e) {

@@ -9,6 +9,7 @@ import 'attendance_service.dart';
 import '../../utils/attendance_capture_helper.dart';
 import 'group_chat_service.dart';
 import 'notification_service.dart';
+import 'profanity_filter_service.dart';
 
 class MessagingService {
   final NotificationService _notifications = NotificationService();
@@ -48,6 +49,12 @@ class MessagingService {
         final first = (d['firstName'] as String?) ?? '';
         final last = (d['lastName'] as String?) ?? '';
         var name = '$first $last'.trim();
+        if (name.isEmpty) {
+          name = (d['fullName'] as String?)?.trim() ?? '';
+        }
+        if (name.isEmpty) {
+          name = (d['username'] as String?)?.trim() ?? '';
+        }
         if (name.isEmpty) {
           name = (d['companyName'] as String?)?.trim() ?? 'Người dùng';
         }
@@ -163,6 +170,9 @@ class MessagingService {
         employerId: employerId,
         candidateId: candidateId,
       )) {
+        if (data['status'] == 'closed') {
+          await doc.reference.update({'status': 'active'});
+        }
         return doc.id;
       }
     }
@@ -475,6 +485,10 @@ class MessagingService {
     if (uid == null) throw Exception('Chưa đăng nhập');
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+
+    if (ProfanityFilterService.containsProfanity(trimmed)) {
+      throw Exception('Tin nhắn vi phạm tiêu chuẩn cộng đồng (chứa từ ngữ không phù hợp).');
+    }
 
     await _sendMessageRaw(
       groupId,

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/services/register_auth_service.dart';
 import '../data/models/user_model.dart';
+import '../data/services/profanity_filter_service.dart';
 
 class RegisterController {
   final RegisterAuthService _authService = RegisterAuthService();
@@ -17,6 +18,9 @@ class RegisterController {
     String? companyAddress,
   }) async {
     try {
+      if (ProfanityFilterService.containsProfanity('$firstName $lastName $username $companyName $companyAddress')) {
+        return 'Thông tin đăng ký chứa từ ngữ không phù hợp.';
+      }
       final UserModel userModel = UserModel(
         id: '',
         role: role,

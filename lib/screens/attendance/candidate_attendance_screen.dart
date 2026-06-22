@@ -112,49 +112,22 @@ class _CandidateAttendanceScreenState extends State<CandidateAttendanceScreen> {
         final jobData = jobDoc.data()!;
         jobData['jobId'] = jobDoc.id;
         job = JobPostModel.fromMap(jobData);
-        
-        final endDateTs = jobData['endDate'] as Timestamp?;
-        if (endDateTs != null) {
-          final endDate = endDateTs.toDate();
-          final endOfDay = DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
-          if (DateTime.now().isAfter(endOfDay)) {
-            if (!mounted) return;
-            setState(() {
-              _error = 'Công việc này đã kết thúc. Bạn không thể điểm danh nữa.';
-              _loading = false;
-            });
-            return;
-          }
-        }
-        
-        final startDate = job.startDate;
-        final now = DateTime.now();
-        final todayStart = DateTime(now.year, now.month, now.day);
-        final jobStart = DateTime(startDate.year, startDate.month, startDate.day);
-        // [BYPASS FOR TESTING]
-        // if (todayStart.isBefore(jobStart)) {
-        //   if (!mounted) return;
-        //   setState(() {
-        //     _error = 'Công việc này chưa bắt đầu. Bạn chỉ có thể điểm danh từ ngày ${DateFormat('dd/MM/yyyy').format(jobStart)}.';
-        //     _loading = false;
-        //   });
-        //   return;
-        // }
       }
 
-      _targetDate = WorkDayHelper.getCurrentLogicalDate(job);
-
-      final session = await _attendanceSvc.getSessionByDate(_group!.jobId, _targetDate!);
+      // Tìm phiên điểm danh mới nhất (bất kể ngày nào NTD đã bắt đầu)
+      final session = await _attendanceSvc.getLatestSession(_group!.jobId);
       
       if (session == null) {
         if (!mounted) return;
         setState(() {
           _session = null;
-          _error = 'Nhà tuyển dụng chưa bắt đầu phiên điểm danh cho ngày hôm nay.';
+          _error = 'Nhà tuyển dụng chưa bắt đầu phiên điểm danh.';
           _loading = false;
         });
         return;
       }
+
+      _targetDate = session.date;
 
       await _attendanceSvc.ensureCandidateRecord(
         jobId: _group!.jobId,

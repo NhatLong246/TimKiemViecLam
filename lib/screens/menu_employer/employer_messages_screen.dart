@@ -4,6 +4,7 @@ import '../../common/styles/app_colors.dart';
 import '../../controller/messaging_controller.dart';
 import '../../utils/messaging_bootstrap.dart';
 import '../messaging/conversation_list_screen.dart';
+import '../messaging/chat_history_screen.dart';
 
 class EmployerMessagesScreen extends StatefulWidget {
   const EmployerMessagesScreen({super.key});
@@ -73,6 +74,15 @@ class _EmployerMessagesScreenState extends State<EmployerMessagesScreen> {
               ],
             );
           }),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.history_rounded, color: Colors.white),
+              tooltip: 'Lịch sử nhóm chat',
+              onPressed: () {
+                Get.to(() => const ChatHistoryScreen(isEmployer: true));
+              },
+            ),
+          ],
           bottom: TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,

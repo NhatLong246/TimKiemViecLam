@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/models/user_model.dart';
 import '../data/services/employer_profile_service.dart';
+import '../data/services/profanity_filter_service.dart';
 import '../controller/login_controller.dart';
 
 enum EmployerDocumentType { businessLicense, taxCode, other }
@@ -57,6 +58,9 @@ class EmployerProfileController extends GetxController {
     String? cccdBackImageUrl,
   }) async {
     try {
+      if (ProfanityFilterService.containsProfanity('$firstName $lastName')) {
+        throw Exception('Họ tên chứa từ ngữ không phù hợp.');
+      }
       isSaving.value = true;
       await _service.updatePersonalInfo(
         firstName: firstName,
@@ -337,6 +341,9 @@ class EmployerProfileController extends GetxController {
     String? companyDescription,
   }) async {
     try {
+      if (ProfanityFilterService.containsProfanity('$companyName $companyAddress $companyDescription')) {
+        throw Exception('Thông tin chứa từ ngữ không phù hợp.');
+      }
       isSaving.value = true;
       await _service.updateCompanyInfo(
         companyName: companyName,

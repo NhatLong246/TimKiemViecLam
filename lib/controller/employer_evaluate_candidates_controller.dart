@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 
 import '../data/services/job_workflow_service.dart';
+import '../data/services/profanity_filter_service.dart';
 
 class CandidateToEvaluate {
   final String jobId;
@@ -155,6 +156,9 @@ class EmployerEvaluateCandidatesController extends GetxController {
   Future<void> submitRating(String jobId, String candidateId, double rating, String comment) async {
     isLoading.value = true;
     try {
+      if (ProfanityFilterService.containsProfanity(comment)) {
+        throw Exception('Nhận xét chứa từ ngữ không phù hợp.');
+      }
       await _workflow.submitEmployerRating(
         jobId: jobId,
         candidateId: candidateId,
