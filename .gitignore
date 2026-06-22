@@ -74,3 +74,6 @@ Desktop.ini
 # Flutter generated plugin files
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# Local Superpowers brainstorming previews
+.superpowers/
