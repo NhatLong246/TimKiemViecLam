@@ -9,6 +9,7 @@ import '../../controller/messaging_controller.dart';
 import '../../data/models/app_notification_model.dart';
 import '../../data/services/notification_service.dart';
 import '../../utils/messaging_bootstrap.dart';
+import '../../widgets/dynamic_weather_header.dart';
 import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
 import '../../data/constants/job_categories.dart' as job_cats;
@@ -119,20 +120,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [Color(0xFF81C784), Color(0xFF2E7D32)],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: SafeArea(
+    return Obx(() {
+      final weather = _homeController.weather.value;
+      final conditionCode = weather?.conditionCode ?? 800; // Mặc định trời nắng
+
+      return DynamicWeatherHeader(
+        conditionCode: conditionCode,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,22 +255,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Container(
                       height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.white.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.5),
+                          width: 1,
+                        ),
                       ),
                       child: Row(
                         children: const [
                           SizedBox(width: 14),
                           Icon(
                             Icons.search,
-                            color: Color(0xFFBDBDBD),
+                            color: Colors.white,
                             size: 20,
                           ),
                           SizedBox(width: 8),
@@ -282,8 +275,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               'Tìm kiếm công việc...',
                               style: TextStyle(
-                                color: Color(0xFFBDBDBD),
+                                color: Colors.white,
                                 fontSize: 14,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
@@ -316,7 +310,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-    );
+      ),
+      );
+    });
   }
 
   Widget _buildQuickTools() {

@@ -10,6 +10,8 @@ import '../../data/models/group_chat_model.dart';
 import '../../data/services/group_chat_service.dart';
 import '../messaging/chat_room_screen.dart';
 
+import '../messaging/chat_history_screen.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployerGroupsScreen — danh sách nhóm chat theo job
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,14 +30,15 @@ class EmployerGroupsScreen extends StatelessWidget {
           if (ctrl.isLoadingGroups.value) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (ctrl.groups.isEmpty) {
+          final activeGroups = ctrl.groups.where((g) => !g.isDissolved).toList();
+          if (activeGroups.isEmpty) {
             return _buildEmpty();
           }
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: ctrl.groups.length,
+            itemCount: activeGroups.length,
             itemBuilder: (_, i) {
-              final g = ctrl.groups[i];
+              final g = activeGroups[i];
               return _GroupCard(
                 key: ValueKey(g.groupId),
                 group: g,
@@ -72,6 +75,15 @@ class EmployerGroupsScreen extends StatelessWidget {
           fontSize: 18,
         ),
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.history_rounded, color: Colors.white),
+          tooltip: 'Lịch sử nhóm chat',
+          onPressed: () {
+            Get.to(() => const ChatHistoryScreen(isEmployer: true));
+          },
+        ),
+      ],
     );
   }
 

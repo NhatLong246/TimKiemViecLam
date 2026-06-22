@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 
 import '../data/models/job_post_model.dart';
+import '../data/models/weather_model.dart';
 import '../data/services/job_post_service.dart';
+import '../data/services/weather_service.dart';
 
 class HomeController extends GetxController {
   final JobPostService _jobPostService = JobPostService();
@@ -18,6 +20,10 @@ class HomeController extends GetxController {
   final RxInt interestCount = 0.obs;
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
+
+  final Rx<WeatherModel?> weather = Rx<WeatherModel?>(null);
+  final RxBool isLoadingWeather = true.obs;
+  final RxString weatherError = ''.obs;
 
   final Rx<double?> filterMinSalary = Rx<double?>(null);
   final Rx<double?> filterMaxSalary = Rx<double?>(null);
@@ -42,6 +48,7 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    fetchWeather();
     _listenToLatestJobs();
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       fetchLatestJobs();
@@ -49,6 +56,19 @@ class HomeController extends GetxController {
       _listenToProfileViews(user?.uid);
       _listenToInterests(user?.uid);
     });
+  }
+
+  Future<void> fetchWeather() async {
+    isLoadingWeather.value = true;
+    weatherError.value = '';
+    try {
+      final w = await WeatherService().fetchWeather();
+      weather.value = w;
+    } catch (e) {
+      weatherError.value = e.toString().replaceFirst('Exception: ', '');
+    } finally {
+      isLoadingWeather.value = false;
+    }
   }
 
   @override

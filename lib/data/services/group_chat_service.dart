@@ -201,7 +201,7 @@ class GroupChatService {
       snap,
     ) {
       final list = snap.docs
-          .where((d) => (d.data()['status'] ?? '').toString() != 'closed')
+          // .where((d) => (d.data()['status'] ?? '').toString() != 'closed')
           .map(
             (d) => GroupChatModel.fromMap(
               d.data() as Map<String, dynamic>,

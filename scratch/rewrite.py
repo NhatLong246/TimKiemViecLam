@@ -1,104 +1,23 @@
-import 'dart:convert';
+import sys
 
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../data/constants/full_time_policy.dart';
-import '../../controller/job_detail_controller.dart';
-import '../../controller/login_controller.dart';
-import '../../data/models/application_model.dart';
-import '../../data/models/full_time_job_details.dart';
-import '../../data/models/job_post_model.dart';
-import '../../data/services/candidates_service.dart';
-import '../../data/services/messaging_service.dart';
-import '../../utils/job_time_helper.dart';
-import '../messaging/chat_room_screen.dart';
-import '../candidate/candidate_employer_reviews_screen.dart';
+file_path = 'e:/BTL_Android/TimKiemViecLam/lib/screens/job/job_detail_screen.dart'
 
-class JobDetailScreen extends StatefulWidget {
-  const JobDetailScreen({super.key});
+with open(file_path, 'r', encoding='utf-8') as f:
+    lines = f.readlines()
 
-  @override
-  State<JobDetailScreen> createState() => _JobDetailScreenState();
-}
+build_idx = -1
+for i, line in enumerate(lines):
+    if 'Widget build(BuildContext context) {' in line:
+        build_idx = i
+        break
 
-class _JobDetailScreenState extends State<JobDetailScreen> {
-  late final JobDetailController _controller;
-  final MessagingService _messagingService = MessagingService();
-  final CandidatesService _candidatesService = CandidatesService();
-  late JobPostModel job;
-  bool _hasJob = false;
-  bool _historyMode = false;
-  bool _readOnlyNoBottom = false;
-  bool _dialogShowing = false;
-  bool _isLoadingHiredUsers = false;
-  String? _hiredUsersError;
-  List<ApplicationEntry> _hiredEntries = [];
+if build_idx == -1:
+    print('Could not find build method')
+    sys.exit(1)
 
-  @override
-  void initState() {
-    super.initState();
-    // Xóa controller cũ (nếu có) và tạo controller mới hoàn toàn
-    if (Get.isRegistered<JobDetailController>()) {
-      Get.delete<JobDetailController>(force: true);
-    }
-    _controller = Get.put(JobDetailController());
+code = "".join(lines[:build_idx])
 
-    final dynamic args = Get.arguments;
-    final parsedJob = _jobFromArguments(args);
-    if (parsedJob != null) {
-      job = parsedJob;
-      _hasJob = true;
-      _historyMode = args is Map && args['fromPostHistory'] == true;
-      _readOnlyNoBottom = args is Map && args['readOnlyNoBottom'] == true;
-      _controller.fetchEmployerInfo(job.employerId);
-      if (_historyMode) {
-        _loadHiredUsers();
-      } else if (!_readOnlyNoBottom) {
-        _controller.checkApplicationStatus(job.jobId);
-      }
-    }
-  }
-
-  JobPostModel? _jobFromArguments(dynamic args) {
-    if (args is JobPostModel) return args;
-    if (args is Map && args['job'] is JobPostModel) {
-      return args['job'] as JobPostModel;
-    }
-    return null;
-  }
-
-  Future<void> _loadHiredUsers() async {
-    setState(() {
-      _isLoadingHiredUsers = true;
-      _hiredUsersError = null;
-    });
-
-    try {
-      final entries = await _candidatesService.fetchAcceptedByJob(job);
-      if (!mounted) return;
-      setState(() {
-        _hiredEntries = entries;
-        _isLoadingHiredUsers = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _hiredUsersError = e.toString().replaceFirst('Exception: ', '');
-        _isLoadingHiredUsers = false;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    Get.delete<JobDetailController>(force: true);
-    super.dispose();
-  }
-
-  @override
-  @override
+new_code = r"""  @override
   Widget build(BuildContext context) {
     if (!_hasJob) {
       return const Scaffold(
@@ -132,11 +51,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final dateLabel = isFullTimeReferral ? 'Ngày hẹn PV' : 'Ngày làm';
     final dateValue = isFullTimeReferral
         ? startDateStr
-        : '$startDateStr - $endDateStr';
+        : f'{startDateStr} - {endDateStr}'.replaceAll('f', '');
     final timeLabel = isFullTimeReferral ? 'Giờ hẹn' : 'Thời gian';
     final timeValue = isFullTimeReferral
         ? startTimeStr
-        : '$startTimeStr (${workHoursStr}/ngày)';
+        : f'{startTimeStr} ({workHoursStr}/ngày)'.replaceAll('f', '');
 
     final slotsStr = '${job.filledSlots} / ${job.slots} người';
 
@@ -168,11 +87,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(
-                Icons.arrow_back,
-                color: Colors.black87,
-                size: 20,
-              ),
+              icon: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
               onPressed: () => Get.back(),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -219,10 +134,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             if (b64.contains(',')) {
                               b64 = b64.split(',').last;
                             }
-                            final sanitized = b64.replaceAll(
-                              RegExp(r'\s+'),
-                              '',
-                            );
+                            final sanitized = b64.replaceAll(RegExp(r'\s+'), '');
                             final padded = sanitized.padRight(
                               sanitized.length + (4 - sanitized.length % 4) % 4,
                               '=',
@@ -267,16 +179,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                ),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                               ),
                               child: Text(
                                 type,
@@ -301,10 +208,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [primaryColor, secondaryColor],
@@ -314,11 +218,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(
-                                        Icons.monetization_on,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
+                                      const Icon(Icons.monetization_on, color: Colors.white, size: 18),
                                       const SizedBox(width: 6),
                                       Text(
                                         salary,
@@ -346,35 +246,24 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     offset: const Offset(0, -15),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isExpired
-                            ? Colors.red.shade50
-                            : Colors.blue.shade50,
+                        color: isExpired ? Colors.red.shade50 : Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isExpired
-                              ? Colors.red.shade200
-                              : Colors.blue.shade200,
-                        ),
+                        border: Border.all(color: isExpired ? Colors.red.shade200 : Colors.blue.shade200),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
-                          ),
+                          )
                         ],
                       ),
                       child: Row(
                         children: [
                           Icon(
                             isExpired ? Icons.timer_off : Icons.timer,
-                            color: isExpired
-                                ? Colors.red.shade600
-                                : Colors.blue.shade700,
+                            color: isExpired ? Colors.red.shade600 : Colors.blue.shade700,
                             size: 26,
                           ),
                           const SizedBox(width: 12),
@@ -383,13 +272,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Hạn ứng tuyển: $deadlineStr',
+                                  'Hạn ứng tuyển: ${deadlineStr}',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
-                                    color: isExpired
-                                        ? Colors.red.shade800
-                                        : Colors.blue.shade900,
+                                    color: isExpired ? Colors.red.shade800 : Colors.blue.shade900,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -397,13 +284,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   isExpired
                                       ? 'Đã hết hạn ứng tuyển'
                                       : (daysLeft != null && daysLeft == 0
-                                            ? 'Hết hạn trong hôm nay'
-                                            : 'Còn $daysLeft ngày để ứng tuyển'),
+                                          ? 'Hết hạn trong hôm nay'
+                                          : 'Còn ${daysLeft} ngày để ứng tuyển'),
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isExpired
-                                        ? Colors.red.shade700
-                                        : Colors.blue.shade800,
+                                    color: isExpired ? Colors.red.shade700 : Colors.blue.shade800,
                                   ),
                                 ),
                               ],
@@ -421,9 +306,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
-                      onTap: location.isEmpty
-                          ? null
-                          : () => _openDirectionsMap(context),
+                      onTap: location.isEmpty ? null : () => _openDirectionsMap(context),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.all(16),
@@ -434,17 +317,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.02),
                               blurRadius: 5,
-                            ),
+                            )
                           ],
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.location_on,
-                              color: primaryColor,
-                              size: 24,
-                            ),
+                            Icon(Icons.location_on, color: primaryColor, size: 24),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -460,9 +339,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    location.isEmpty
-                                        ? 'Chưa có địa điểm'
-                                        : location,
+                                    location.isEmpty ? 'Chưa có địa điểm' : location,
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey.shade700,
@@ -473,11 +350,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             ),
                             if (location.isNotEmpty) ...[
                               const SizedBox(width: 8),
-                              Icon(
-                                Icons.map_outlined,
-                                size: 20,
-                                color: primaryColor,
-                              ),
+                              Icon(Icons.map_outlined, size: 20, color: primaryColor),
                             ],
                           ],
                         ),
@@ -499,11 +372,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.lightbulb_outline,
-                            size: 20,
-                            color: Colors.amber.shade800,
-                          ),
+                          Icon(Icons.lightbulb_outline, size: 20, color: Colors.amber.shade800),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -529,10 +398,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     children: [
                       const Text(
                         'Chi tiết tuyển dụng',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
                       GridView.count(
@@ -543,35 +409,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         crossAxisSpacing: 12,
                         childAspectRatio: 2.2,
                         children: [
-                          _buildGridCard(
-                            Icons.calendar_today,
-                            dateLabel,
-                            dateValue,
-                            Colors.blue,
-                          ),
-                          _buildGridCard(
-                            Icons.access_time,
-                            timeLabel,
-                            timeValue,
-                            Colors.orange,
-                          ),
-                          _buildGridCard(
-                            Icons.people_alt_outlined,
-                            'Số lượng tuyển',
-                            slotsStr,
-                            Colors.purple,
-                          ),
+                          _buildGridCard(Icons.calendar_today, dateLabel, dateValue, Colors.blue),
+                          _buildGridCard(Icons.access_time, timeLabel, timeValue, Colors.orange),
+                          _buildGridCard(Icons.people_alt_outlined, 'Số lượng tuyển', slotsStr, Colors.purple),
                           if (job.applicationDeadline != null)
-                            _buildGridCard(
-                              Icons.event_busy,
-                              'Hạn nộp',
-                              deadlineStr,
-                              Colors.red,
-                            ),
+                            _buildGridCard(Icons.event_busy, 'Hạn nộp', deadlineStr, Colors.red),
                         ],
                       ),
-                      if (job.jobType == 'full_time' &&
-                          job.fullTimeDetails != null) ...[
+                      if (job.jobType == 'full_time' && job.fullTimeDetails != null) ...[
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -581,11 +426,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             border: Border.all(color: Colors.grey.shade200),
                           ),
                           child: Column(
-                            children: _buildFullTimeDetailRows(
-                              job.fullTimeDetails!,
-                            ),
+                            children: _buildFullTimeDetailRows(job.fullTimeDetails!),
                           ),
-                        ),
+                        )
                       ],
                     ],
                   ),
@@ -595,11 +438,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
 
                 // 4. Mô tả công việc
                 if (description.isNotEmpty) ...[
-                  _buildSection(
-                    title: 'Mô tả công việc',
-                    content: description,
-                    icon: Icons.description_outlined,
-                  ),
+                  _buildSection(title: 'Mô tả công việc', content: description, icon: Icons.description_outlined),
                   Container(height: 6, color: Colors.grey.shade200),
                 ],
 
@@ -621,31 +460,22 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     children: [
                       const Text(
                         'Thông tin nhà tuyển dụng',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
                       Obx(() {
                         if (_controller.isLoadingEmployer.value) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return const Center(child: CircularProgressIndicator());
                         }
 
                         final employer = _controller.employer.value;
                         if (employer == null) {
-                          return const Text(
-                            'Không tải được thông tin nhà tuyển dụng.',
-                          );
+                          return const Text('Không tải được thông tin nhà tuyển dụng.');
                         }
 
-                        final compName =
-                            employer.companyName ?? employer.fullName;
+                        final compName = employer.companyName ?? employer.fullName;
                         final compSize = employer.companySize ?? 'Không rõ';
-                        final compLogo =
-                            employer.companyLogoUrl ?? employer.avatarUrl;
+                        final compLogo = employer.companyLogoUrl ?? employer.avatarUrl;
 
                         return Container(
                           padding: const EdgeInsets.all(16),
@@ -672,32 +502,22 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.grey.shade200,
-                                      ),
+                                      border: Border.all(color: Colors.grey.shade200),
                                     ),
                                     clipBehavior: Clip.hardEdge,
                                     child: compLogo != null
                                         ? Image.network(
                                             compLogo,
                                             fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) =>
-                                                    const Icon(
-                                                      Icons.business,
-                                                      color: Colors.grey,
-                                                    ),
+                                            errorBuilder: (context, error, stackTrace) =>
+                                                const Icon(Icons.business, color: Colors.grey),
                                           )
-                                        : const Icon(
-                                            Icons.business,
-                                            color: Colors.grey,
-                                          ),
+                                        : const Icon(Icons.business, color: Colors.grey),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
@@ -712,21 +532,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                               ),
                                             ),
                                             if (employer.isVerified)
-                                              const Icon(
-                                                Icons.verified,
-                                                color: Colors.blue,
-                                                size: 18,
-                                              ),
+                                              const Icon(Icons.verified, color: Colors.blue, size: 18),
                                           ],
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
                                           employer.businessType == 'company'
                                               ? 'Doanh nghiệp'
-                                              : employer.businessType ==
-                                                    'cooperative'
-                                              ? 'Hợp tác xã'
-                                              : 'Cá nhân',
+                                              : employer.businessType == 'cooperative'
+                                                  ? 'Hợp tác xã'
+                                                  : 'Cá nhân',
                                           style: TextStyle(
                                             color: Colors.grey.shade600,
                                             fontSize: 13,
@@ -741,37 +556,20 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               const SizedBox(height: 16),
                               Divider(color: Colors.grey.shade100, height: 1),
                               const SizedBox(height: 16),
-                              if (employer.companyAddress != null &&
-                                  employer.companyAddress!.isNotEmpty) ...[
-                                _buildCompanyDetailRow(
-                                  Icons.location_on_outlined,
-                                  employer.companyAddress!,
-                                ),
+                              if (employer.companyAddress != null && employer.companyAddress!.isNotEmpty) ...[
+                                _buildCompanyDetailRow(Icons.location_on_outlined, employer.companyAddress!),
                                 const SizedBox(height: 10),
                               ],
-                              if (employer.companyPhone != null &&
-                                  employer.companyPhone!.isNotEmpty) ...[
-                                _buildCompanyDetailRow(
-                                  Icons.phone_outlined,
-                                  employer.companyPhone!,
-                                ),
+                              if (employer.companyPhone != null && employer.companyPhone!.isNotEmpty) ...[
+                                _buildCompanyDetailRow(Icons.phone_outlined, employer.companyPhone!),
                                 const SizedBox(height: 10),
                               ],
-                              if (employer.companyWebsite != null &&
-                                  employer.companyWebsite!.isNotEmpty) ...[
-                                _buildCompanyDetailRow(
-                                  Icons.language_outlined,
-                                  employer.companyWebsite!,
-                                  isLink: true,
-                                ),
+                              if (employer.companyWebsite != null && employer.companyWebsite!.isNotEmpty) ...[
+                                _buildCompanyDetailRow(Icons.language_outlined, employer.companyWebsite!, isLink: true),
                                 const SizedBox(height: 10),
                               ],
-                              _buildCompanyDetailRow(
-                                Icons.people_outline,
-                                'Quy mô: ${compSize} nhân viên',
-                              ),
-                              if (employer.companyDescription != null &&
-                                  employer.companyDescription!.isNotEmpty) ...[
+                              _buildCompanyDetailRow(Icons.people_outline, 'Quy mô: ${compSize} nhân viên'),
+                              if (employer.companyDescription != null && employer.companyDescription!.isNotEmpty) ...[
                                 const SizedBox(height: 12),
                                 Container(
                                   padding: const EdgeInsets.all(12),
@@ -804,25 +602,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     );
                                   },
                                   icon: const Icon(Icons.star, size: 18),
-                                  label: const Text(
-                                    'Xem đánh giá về nhà tuyển dụng',
-                                  ),
+                                  label: const Text('Xem đánh giá về nhà tuyển dụng'),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: primaryColor,
-                                    side: BorderSide(
-                                      color: primaryColor.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                    ),
-                                    backgroundColor: primaryColor.withValues(
-                                      alpha: 0.05,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
+                                    side: BorderSide(color: primaryColor.withValues(alpha: 0.5)),
+                                    backgroundColor: primaryColor.withValues(alpha: 0.05),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                   ),
                                 ),
                               ),
@@ -840,7 +626,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               ],
             ),
           ),
-
+          
           // 7. Nút ứng tuyển VIP
           if (!hideBottomActions)
             Positioned(
@@ -848,15 +634,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.08),
@@ -877,33 +658,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       'rejected',
                     ].contains(status);
                     final jobStarted =
-                        (isPending || isAccepted) &&
-                        JobTimeHelper.hasStarted(job);
-                    final isFullForOtherUsers =
-                        job.isFull && !isPending && !isAccepted;
+                        (isPending || isAccepted) && JobTimeHelper.hasStarted(job);
+                    final isFullForOtherUsers = job.isFull && !isPending && !isAccepted;
 
                     List<Color> btnGradient;
-                    if (!_controller.canApply.value ||
-                        isWithdrawn ||
-                        jobStarted ||
-                        isFullForOtherUsers ||
-                        isExpired) {
-                      btnGradient = [
-                        Colors.grey.shade400,
-                        Colors.grey.shade500,
-                      ];
+                    if (!_controller.canApply.value || isWithdrawn || jobStarted || isFullForOtherUsers || isExpired) {
+                      btnGradient = [Colors.grey.shade400, Colors.grey.shade500];
                     } else if (isAccepted) {
                       btnGradient = [Colors.red.shade400, Colors.red.shade600];
                     } else if (isPending) {
-                      btnGradient = [
-                        Colors.amber.shade500,
-                        Colors.amber.shade700,
-                      ];
+                      btnGradient = [Colors.amber.shade500, Colors.amber.shade700];
                     } else {
-                      btnGradient = [
-                        const Color(0xFF4CAF50),
-                        const Color(0xFF2E7D32),
-                      ];
+                      btnGradient = [const Color(0xFF4CAF50), const Color(0xFF2E7D32)];
                     }
 
                     String btnText;
@@ -914,29 +680,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ? 'Đã qua giờ hẹn PV'
                           : 'Công việc đã bắt đầu';
                     } else if (isAccepted) {
-                      btnText = job.isFullTimeReferral
-                          ? 'Hủy lịch phỏng vấn'
-                          : 'Hủy tham gia';
+                      btnText = job.isFullTimeReferral ? 'Hủy lịch phỏng vấn' : 'Hủy tham gia';
                     } else if (isPending) {
                       btnText = 'Hủy ứng tuyển';
                     } else if (isWithdrawn) {
-                      btnText = job.isFullTimeReferral
-                          ? 'Hồ sơ không còn hiệu lực'
-                          : 'Không thể ứng tuyển';
+                      btnText = job.isFullTimeReferral ? 'Hồ sơ không còn hiệu lực' : 'Không thể ứng tuyển';
                     } else if (isFullForOtherUsers) {
                       btnText = 'Đã đủ người';
                     } else {
-                      btnText = job.isFullTimeReferral
-                          ? 'Nộp CV Ứng Tuyển'
-                          : 'Ứng Tuyển Ngay';
+                      btnText = job.isFullTimeReferral ? 'Nộp CV Ứng Tuyển' : 'Ứng Tuyển Ngay';
                     }
 
-                    final bool disabled =
-                        !_controller.canApply.value ||
-                        isWithdrawn ||
-                        jobStarted ||
-                        isFullForOtherUsers ||
-                        (isExpired && !isPending && !isAccepted);
+                    final bool disabled = !_controller.canApply.value || isWithdrawn || jobStarted || isFullForOtherUsers || (isExpired && !isPending && !isAccepted);
 
                     return Row(
                       children: [
@@ -946,34 +701,20 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             border: Border.all(
-                              color: _controller.canApply.value
-                                  ? primaryColor
-                                  : Colors.grey.shade300,
+                              color: _controller.canApply.value ? primaryColor : Colors.grey.shade300,
                               width: 1.5,
                             ),
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: _controller.canApply.value
-                                ? [
-                                    BoxShadow(
-                                      color: primaryColor.withValues(
-                                        alpha: 0.1,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
+                                ? [BoxShadow(color: primaryColor.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4))]
                                 : null,
                           ),
                           child: IconButton(
                             icon: Icon(
                               Icons.chat_bubble_outline,
-                              color: _controller.canApply.value
-                                  ? primaryColor
-                                  : Colors.grey.shade400,
+                              color: _controller.canApply.value ? primaryColor : Colors.grey.shade400,
                             ),
-                            onPressed: _controller.canApply.value
-                                ? () => _openMessages(context)
-                                : null,
+                            onPressed: _controller.canApply.value ? () => _openMessages(context) : null,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -987,9 +728,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   ? null
                                   : [
                                       BoxShadow(
-                                        color: btnGradient.last.withValues(
-                                          alpha: 0.4,
-                                        ),
+                                        color: btnGradient.last.withValues(alpha: 0.4),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
@@ -1003,18 +742,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                         if (_dialogShowing) return;
                                         _dialogShowing = true;
                                         Get.defaultDialog(
-                                          title:
-                                              job.isFullTimeReferral &&
-                                                  isAccepted
+                                          title: job.isFullTimeReferral && isAccepted
                                               ? 'Xác nhận hủy lịch'
                                               : 'Xác nhận hủy ứng tuyển',
-                                          middleText:
-                                              job.isFullTimeReferral &&
-                                                  isAccepted
+                                          middleText: job.isFullTimeReferral && isAccepted
                                               ? 'CV của bạn đã được duyệt. Bạn có chắc chắn muốn hủy lịch phỏng vấn?'
                                               : (isAccepted
-                                                    ? 'Bạn đã được nhận vào công việc này. Bạn có chắc muốn hủy?'
-                                                    : 'Bạn có chắc chắn muốn hủy đơn ứng tuyển đang chờ duyệt không?'),
+                                                  ? 'Bạn đã được nhận vào công việc này. Bạn có chắc muốn hủy?'
+                                                  : 'Bạn có chắc chắn muốn hủy đơn ứng tuyển đang chờ duyệt không?'),
                                           textConfirm: 'Có',
                                           textCancel: 'Không',
                                           confirmTextColor: Colors.white,
@@ -1042,10 +777,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   ? const SizedBox(
                                       width: 24,
                                       height: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2.5,
-                                      ),
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                                     )
                                   : Text(
                                       btnText,
@@ -1071,10 +803,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               right: 16,
               child: IgnorePointer(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(10),
@@ -1572,11 +1301,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required String content,
-    required IconData icon,
-  }) {
+  Widget _buildSection({required String title, required String content, required IconData icon}) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1588,10 +1313,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -1618,12 +1340,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildGridCard(
-    IconData icon,
-    String title,
-    String value,
-    Color color,
-  ) {
+  Widget _buildGridCard(IconData icon, String title, String value, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1635,7 +1352,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             color: color.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
-          ),
+          )
         ],
       ),
       child: Row(
@@ -1677,11 +1394,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildCompanyDetailRow(
-    IconData icon,
-    String text, {
-    bool isLink = false,
-  }) {
+  Widget _buildCompanyDetailRow(IconData icon, String text, {bool isLink = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1700,3 +1413,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 }
+"""
+
+full_code = code + new_code
+
+with open(file_path, 'w', encoding='utf-8') as f:
+    f.write(full_code)
+
+print('File updated successfully.')

@@ -195,29 +195,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             ),
             title: _buildAppBarTitle(thread),
             actions: [
-              if (widget.isEmployer && !thread.isGroupChat)
+              if (!thread.isClosed) ...[
+                if (widget.isEmployer && !thread.isGroupChat)
+                  _topAction(
+                    Icons.handshake_outlined,
+                    () => _openHireRequest(thread),
+                    forEmployer: true,
+                  ),
                 _topAction(
-                  Icons.handshake_outlined,
-                  () => _openHireRequest(thread),
-                  forEmployer: true,
-                ),
-              _topAction(
-                Icons.call_outlined,
-                () => _startCall(thread, isVideo: false),
-                forEmployer: widget.isEmployer,
-              ),
-              _topAction(
-                Icons.videocam_outlined,
-                () => _startCall(thread, isVideo: true),
-                forEmployer: widget.isEmployer,
-              ),
-              if (thread.isGroupChat)
-                _topAction(
-                  Icons.menu,
-                  () => _openGroupManagement(thread),
+                  Icons.call_outlined,
+                  () => _startCall(thread, isVideo: false),
                   forEmployer: widget.isEmployer,
                 ),
-              const SizedBox(width: 8),
+                _topAction(
+                  Icons.videocam_outlined,
+                  () => _startCall(thread, isVideo: true),
+                  forEmployer: widget.isEmployer,
+                ),
+                if (thread.isGroupChat)
+                  _topAction(
+                    Icons.menu,
+                    () => _openGroupManagement(thread),
+                    forEmployer: widget.isEmployer,
+                  ),
+                const SizedBox(width: 8),
+              ]
             ],
           ),
           body: Stack(
@@ -240,7 +242,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                       ],
                     ),
                   ),
-                  if (_actionMessage == null)
+                  if (thread.isClosed)
+                    _buildClosedNotice()
+                  else if (_actionMessage == null)
                     (isRecording ? buildRecordingBar() : _buildComposer(thread))
                   else
                     _buildMessageActionToolbar(thread),
@@ -1130,6 +1134,34 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildClosedNotice() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_outline_rounded, color: Colors.grey.shade600, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            'Nhóm chat này đã kết thúc',
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }

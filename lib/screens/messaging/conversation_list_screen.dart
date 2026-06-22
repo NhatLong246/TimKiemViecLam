@@ -7,6 +7,7 @@ import '../../controller/login_controller.dart';
 import '../../controller/messaging_controller.dart';
 import '../../utils/messaging_bootstrap.dart';
 import '../../data/models/messaging_models.dart';
+import 'chat_history_screen.dart';
 import 'chat_room_screen.dart';
 
 enum ConversationInboxFilter { all, groupsOnly, directOnly }
@@ -87,18 +88,19 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     List<ConversationThread> base;
     if (!widget.isEmployer) {
       base = _ctrl.conversations.where((c) {
+        if (c.isClosed) return false;
         return _candidateTabIndex == 0 ? c.isGroupChat : !c.isGroupChat;
       }).toList();
     } else {
       switch (widget.inboxFilter) {
         case ConversationInboxFilter.groupsOnly:
-          base = _ctrl.conversations.where((c) => c.isGroupChat).toList();
+          base = _ctrl.conversations.where((c) => c.isGroupChat && !c.isClosed).toList();
           break;
         case ConversationInboxFilter.directOnly:
-          base = _ctrl.conversations.where((c) => !c.isGroupChat).toList();
+          base = _ctrl.conversations.where((c) => !c.isGroupChat && !c.isClosed).toList();
           break;
         default:
-          base = _ctrl.conversations.toList();
+          base = _ctrl.conversations.where((c) => !c.isClosed).toList();
       }
     }
     if (q.isEmpty) return base;
@@ -185,6 +187,13 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
           color: widget.isEmployer ? Colors.black87 : Colors.white,
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Lịch sử nhóm chat',
+            onPressed: () {
+              Get.to(() => ChatHistoryScreen(isEmployer: widget.isEmployer));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.cleaning_services_rounded),
             tooltip: 'Dọn dẹp tin nhắn lặp lại',

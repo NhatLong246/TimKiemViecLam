@@ -324,7 +324,7 @@ class MessagingService {
       final isGroup = chatType != 'direct' && chatType != 'peer';
 
       // Ẩn nhóm việc đã đóng với TẤT CẢ mọi người (chỉ ẩn group chat)
-      if (status == 'closed' && isGroup) continue;
+      // if (status == 'closed' && isGroup) continue; // TẠM BỎ: Để hiển thị trong Lịch sử
       if (isGroup && hiddenFullTimeJobIds.contains(jobId)) continue;
 
       final peerId = _resolvePeerId(
@@ -349,7 +349,7 @@ class MessagingService {
       final isGroup = chatType != 'direct' && chatType != 'peer';
 
       // Ẩn nhóm việc đã đóng với TẤT CẢ mọi người (chỉ ẩn group chat)
-      if (status == 'closed' && isGroup) continue;
+      // if (status == 'closed' && isGroup) continue; // TẠM BỎ: Để hiển thị trong Lịch sử
       if (isGroup && hiddenFullTimeJobIds.contains(jobId)) continue;
 
       final peerId = _resolvePeerId(
