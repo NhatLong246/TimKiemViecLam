@@ -14,7 +14,6 @@ import '../../data/models/job_post_model.dart';
 import '../../data/services/attendance_auto_notify_service.dart';
 import '../../data/services/group_chat_service.dart';
 import '../../data/services/job_attendance_completion_service.dart';
-import '../../routes/app_routes.dart';
 import '../../utils/work_day_helper.dart';
 import '../../widgets/attendance_photo_info.dart';
 
@@ -70,7 +69,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _group = await _groupChatSvc.getGroup(_groupId);
     if (_group == null) return;
 
-    final jobSnap = await FirebaseFirestore.instance.collection('jobs').doc(_jobId).get();
+    final jobSnap = await FirebaseFirestore.instance.collection('jobPosts').doc(_jobId).get();
     if (jobSnap.exists && jobSnap.data() != null) {
       final data = jobSnap.data()!;
       data['jobId'] = jobSnap.id;
@@ -84,36 +83,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     
     await _refreshDisbursementReadiness();
     
-    String targetDate = WorkDayHelper.getCurrentLogicalDate(_job);
-    
-    // Giới hạn: không được vượt quá ngày làm việc cuối cùng
-    String? maxDateStr;
-    if (_readiness != null && _readiness!.mandatoryDates.isNotEmpty) {
-      maxDateStr = _readiness!.mandatoryDates.last;
-    } else if (_job != null) {
-      maxDateStr = WorkDayHelper.formatDate(_job!.endDate ?? _job!.startDate);
-    }
-    
-    if (maxDateStr != null && targetDate.compareTo(maxDateStr) > 0) {
-      targetDate = maxDateStr;
-      
-      // Tự động dọn dẹp các phiên dư thừa bị tạo nhầm (lớn hơn maxDateStr)
-      try {
-        final badSnaps = await FirebaseFirestore.instance
-            .collection('jobs')
-            .doc(_jobId)
-            .collection('attendance')
-            .where('date', isGreaterThan: maxDateStr)
-            .get();
-        for (var doc in badSnaps.docs) {
-          final badRecs = await doc.reference.collection('records').get();
-          for (var r in badRecs.docs) await r.reference.delete();
-          await doc.reference.delete();
-        }
-      } catch (e) {
-        debugPrint('Lỗi dọn dẹp: $e');
-      }
-    }
+    String targetDate = WorkDayHelper.selectAttendanceDate(
+      targetDate: WorkDayHelper.getCurrentLogicalDate(_job),
+      mandatoryDates: _readiness?.mandatoryDates ?? const [],
+    );
     
     // Ép buộc hoàn thành các ngày cũ: tìm ngày chưa hoàn thành sớm nhất
     if (_readiness != null && _readiness!.incompleteDates.isNotEmpty) {
@@ -598,6 +571,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _startSession() async {
+    final targetDate =
+        _targetDate ?? WorkDayHelper.getCurrentLogicalDate(_job);
+    final mandatoryDates = _readiness?.mandatoryDates ?? const <String>[];
+    if (mandatoryDates.isNotEmpty && !mandatoryDates.contains(targetDate)) {
+      Get.snackbar(
+        'Ngày không hợp lệ',
+        'Chỉ có thể điểm danh trong ngày làm việc đã được thiết lập.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
     final workers = (_members ?? [])
         .where((u) => u.id != _employerId)
@@ -615,7 +599,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       groupId: _groupId,
       workers: workers,
       expectedStartTime: _timeCtrl.text,
-      date: _targetDate ?? WorkDayHelper.getCurrentLogicalDate(_job),
+      date: targetDate,
     );
 
     final session = _ctrl.currentSession.value;

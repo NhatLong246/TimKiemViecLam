@@ -4,11 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/application_model.dart';
 import '../models/candidate_dashboard_models.dart';
-import '../models/candidate_dashboard_models.dart';
 import '../models/disbursement_notice_model.dart';
 import '../models/employer_stats_model.dart';
 import '../models/job_post_model.dart';
 import 'attendance_service.dart';
+import 'candidate_payment_amount_resolver.dart';
 import 'notification_service.dart';
 import 'candidate_earnings_service.dart';
 
@@ -130,6 +130,7 @@ class CandidateDashboardService {
 
   CandidatePayment _rowToPayment(
     _AcceptedJobRow row, {
+    required String candidateId,
     DisbursementNoticeModel? notice,
     DateTime? completedAt,
     bool isDisputed = false,
@@ -146,9 +147,13 @@ class CandidateDashboardService {
       status = 'pending';
     }
 
-    final amountVnd = completed
-        ? (actualEarnings?.round() ?? (notice != null ? notice.amount.round() : row.job.salary.round()))
-        : (notice != null ? notice.amount.round() : row.job.salary.round());
+    final amountVnd = CandidatePaymentAmountResolver.resolve(
+      candidateId: candidateId,
+      candidateAmounts: notice?.candidateAmounts ?? const {},
+      fallbackSalary: row.job.salary,
+      completed: completed,
+      actualEarnings: actualEarnings,
+    );
 
     return CandidatePayment(
       id: row.application.appId,
@@ -318,6 +323,7 @@ class CandidateDashboardService {
         .map(
           (row) => _rowToPayment(
             row,
+            candidateId: uid,
             notice: notices[row.job.jobId],
             completedAt: completedAtByJob[row.job.jobId],
             isDisputed: disputedJobs.contains(row.job.jobId),

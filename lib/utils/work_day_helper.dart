@@ -78,6 +78,29 @@ class WorkDayHelper {
     return datesInRange(job.startDate, job.endDate!);
   }
 
+  static List<String> validAttendanceDisplayDates({
+    required List<String> mandatoryDates,
+    required Iterable<String> sessionDates,
+  }) {
+    final allowedDates = mandatoryDates.toSet();
+    final displayDates = <String>{...mandatoryDates};
+    displayDates.addAll(sessionDates.where(allowedDates.contains));
+    return displayDates.toList()..sort();
+  }
+
+  static String selectAttendanceDate({
+    required String targetDate,
+    required List<String> mandatoryDates,
+  }) {
+    if (mandatoryDates.isEmpty) return targetDate;
+
+    final sortedDates = List<String>.from(mandatoryDates)..sort();
+    for (final date in sortedDates) {
+      if (date.compareTo(targetDate) >= 0) return date;
+    }
+    return sortedDates.last;
+  }
+
   /// Một ngày trong ca: mọi nhân viên đã điểm danh đầu ca + cuối ca.
   static bool isDayAttendanceComplete(
     AttendanceModel? session,

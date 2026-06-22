@@ -71,8 +71,10 @@ class JobAttendanceCompletionService {
     final sessions = await _attendance.fetchAllByJob(jobId);
     final byDate = {for (final s in sessions) s.date: s};
 
-    // Calculate displayDates: union of mandatory and actual session dates
-    final displayDates = {...mandatory, ...byDate.keys}.toList()..sort();
+    final displayDates = WorkDayHelper.validAttendanceDisplayDates(
+      mandatoryDates: mandatory,
+      sessionDates: byDate.keys,
+    );
 
     if (mandatory.isEmpty && displayDates.isEmpty) {
       return JobDisbursementReadiness(
