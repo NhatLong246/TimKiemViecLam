@@ -12,7 +12,6 @@ import '../../data/models/user_model.dart';
 import '../../data/services/candidate_discovery_service.dart';
 import '../../routes/app_routes.dart';
 import '../post/post_history_screen.dart';
-import 'candidate_discovery_screen.dart';
 import 'candidate_profile_screen.dart';
 
 // ── Màu employer (tím → xanh) ──────────────────────────────────────────────
@@ -907,22 +906,9 @@ class EmployerHomeScreen extends StatelessWidget {
   Widget _buildCandidateSectionTitle(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'Danh sách người làm tiềm năng',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Get.to(
-              () => const CandidateDiscoveryScreen(),
-              transition: Transition.rightToLeft,
-            ),
-            child: const Text('Xem tất cả'),
-          ),
-        ],
+      child: const Text(
+        'Danh sách người làm tiềm năng',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
       ),
     );
   }

@@ -136,7 +136,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final timeLabel = isFullTimeReferral ? 'Giờ hẹn' : 'Thời gian';
     final timeValue = isFullTimeReferral
         ? startTimeStr
-        : '$startTimeStr (${workHoursStr}/ngày)';
+        : '$startTimeStr ($workHoursStr/ngày)';
 
     final slotsStr = '${job.filledSlots} / ${job.slots} người';
 
@@ -604,11 +604,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ],
 
                 // 5. Yêu cầu công việc
-                if (requirements != null && requirements.isNotEmpty) ...[
-                  _buildSection(
-                    title: 'Yêu cầu ứng viên',
-                    content: requirements,
-                    icon: Icons.checklist_rtl_outlined,
+                if (job.candidateRequirements.isNotEmpty ||
+                    (requirements != null && requirements.isNotEmpty)) ...[
+                  _buildCandidateRequirementsSection(
+                    job.candidateRequirements,
+                    legacyRequirements: requirements,
                   ),
                   Container(height: 6, color: Colors.grey.shade200),
                 ],
@@ -768,7 +768,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               ],
                               _buildCompanyDetailRow(
                                 Icons.people_outline,
-                                'Quy mô: ${compSize} nhân viên',
+                                'Quy mô: $compSize nhân viên',
                               ),
                               if (employer.companyDescription != null &&
                                   employer.companyDescription!.isNotEmpty) ...[
@@ -1151,7 +1151,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           else if (_hiredUsersError != null)
             _buildHiredUsersNotice(
               Icons.error_outline,
-              'Không tải được danh sách user: ${_hiredUsersError}',
+              'Không tải được danh sách user: $_hiredUsersError',
             )
           else if (_hiredEntries.isEmpty)
             _buildHiredUsersNotice(
@@ -1420,10 +1420,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Future<void> _openDirectionsMap(BuildContext context) async {
     // Thử mở bằng geo intent (mở app bản đồ native)
     final label = Uri.encodeComponent(job.mapsDestinationQuery);
-    String geoUrl = 'geo:0,0?q=${label}';
+    String geoUrl = 'geo:0,0?q=$label';
 
     if (job.hasMapCoordinates) {
-      geoUrl = 'geo:${job.locationLat},${job.locationLng}?q=${label}';
+      geoUrl = 'geo:${job.locationLat},${job.locationLng}?q=$label';
     }
 
     final geoUri = Uri.parse(geoUrl);
@@ -1571,6 +1571,210 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       ],
     );
   }
+
+  Widget _buildCandidateRequirementsSection(
+    List<Map<String, dynamic>> requirements, {
+    String? legacyRequirements,
+  }) {
+    final displayItems = requirements
+        .map((requirement) {
+          final value = _candidateRequirementValue(requirement);
+          if (value.isEmpty) return null;
+          final type = requirement['type']?.toString() ?? 'other';
+          return <String, dynamic>{
+            'type': type,
+            'label': _candidateRequirementLabel(requirement),
+            'value': value,
+            'icon': _candidateRequirementIcon(type),
+          };
+        })
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    if (displayItems.isEmpty) {
+      return _buildSection(
+        title: 'Yêu cầu ứng viên',
+        content: legacyRequirements ?? '',
+        icon: Icons.checklist_rtl_outlined,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.fact_check_outlined,
+                color: Color(0xFF2E7D32),
+                size: 22,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Yêu cầu ứng viên',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Các tiêu chí nhà tuyển dụng sẽ đối chiếu với hồ sơ của bạn.',
+            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              children: displayItems.asMap().entries.map((entry) {
+                final item = entry.value;
+                final isLast = entry.key == displayItems.length - 1;
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    border: isLast
+                        ? null
+                        : Border(
+                            bottom: BorderSide(color: Colors.grey.shade200),
+                          ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF2E7D32,
+                          ).withValues(alpha: 0.09),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          item['icon'] as IconData,
+                          color: const Color(0xFF2E7D32),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item['label'] as String,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              item['value'] as String,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                height: 1.4,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _candidateRequirementLabel(Map<String, dynamic> requirement) {
+    final savedLabel = requirement['label']?.toString().trim() ?? '';
+    if (savedLabel.isNotEmpty) return savedLabel;
+    return switch (requirement['type']?.toString()) {
+      'skills' => 'Kỹ năng',
+      'certificates' => 'Chứng chỉ',
+      'languages' => 'Ngoại ngữ',
+      'gender' => 'Giới tính',
+      'education' => 'Học vấn',
+      'experience' => 'Kinh nghiệm',
+      _ => 'Yêu cầu khác',
+    };
+  }
+
+  String _candidateRequirementValue(Map<String, dynamic> requirement) {
+    final type = requirement['type']?.toString();
+    switch (type) {
+      case 'skills':
+      case 'certificates':
+        return _requirementStringList(requirement['values']).join(', ');
+      case 'languages':
+        final language = requirement['language']?.toString().trim() ?? '';
+        final levelType = requirement['levelType']?.toString().trim() ?? '';
+        final minimum = requirement['minimum']?.toString().trim() ?? '';
+        if (language.isEmpty) return '';
+        if (minimum.isEmpty) return language;
+        final level = levelType == 'TOEIC' || levelType == 'IELTS'
+            ? '$levelType từ $minimum'
+            : '$minimum trở lên';
+        return '$language · $level';
+      case 'gender':
+        return switch (requirement['value']?.toString()) {
+          'male' => 'Nam',
+          'female' => 'Nữ',
+          'other' => 'Khác',
+          _ => 'Không yêu cầu',
+        };
+      case 'education':
+        return FullTimeJobDetails.educationLabel(
+          requirement['minimum']?.toString(),
+        );
+      case 'experience':
+        return switch (requirement['minimum']?.toString()) {
+          'no_exp' => 'Không yêu cầu, chấp nhận người mới',
+          'under_1' => 'Dưới 1 năm',
+          '1_to_3' => '1 - 3 năm',
+          '3_to_5' => '3 - 5 năm',
+          'over_5' => 'Trên 5 năm',
+          _ => 'Không yêu cầu',
+        };
+      case 'other':
+        return requirement['text']?.toString().trim() ?? '';
+      default:
+        return (requirement['text'] ?? requirement['value'] ?? '')
+            .toString()
+            .trim();
+    }
+  }
+
+  List<String> _requirementStringList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((value) => value.toString().trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+  }
+
+  IconData _candidateRequirementIcon(String type) => switch (type) {
+    'skills' => Icons.psychology_outlined,
+    'certificates' => Icons.workspace_premium_outlined,
+    'languages' => Icons.translate_rounded,
+    'gender' => Icons.wc_outlined,
+    'education' => Icons.school_outlined,
+    'experience' => Icons.work_history_outlined,
+    _ => Icons.notes_rounded,
+  };
 
   Widget _buildSection({
     required String title,

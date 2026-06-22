@@ -9,6 +9,7 @@ class JobPostModel {
   final String title;
   final String description;
   final String category;
+  final String? customCategory;
   final String jobType; // "part_time" | "full_time"
   final Map<String, dynamic> location; // {address, city, district, lat, lng}
   final double salary;
@@ -20,6 +21,7 @@ class JobPostModel {
   final double? workHoursPerDay;
   final String? startTime; // "HH:mm"
   final String? requirements;
+  final List<Map<String, dynamic>> candidateRequirements;
   final String
   status; // "draft"|"pending"|"approved"|"active"|"closed"|"rejected"|"cancelled"|"deleted"
   final double totalBudget;
@@ -49,6 +51,7 @@ class JobPostModel {
     required this.title,
     required this.description,
     required this.category,
+    this.customCategory,
     required this.jobType,
     required this.location,
     required this.salary,
@@ -60,6 +63,7 @@ class JobPostModel {
     this.workHoursPerDay,
     this.startTime,
     this.requirements,
+    this.candidateRequirements = const [],
     required this.status,
     required this.totalBudget,
     this.depositStatus = 'none',
@@ -185,6 +189,7 @@ class JobPostModel {
       title: map['title'] as String? ?? '',
       description: map['description'] as String? ?? '',
       category: map['category'] as String? ?? '',
+      customCategory: map['customCategory'] as String?,
       jobType: map['jobType'] as String? ?? 'part_time',
       location: (map['location'] as Map<String, dynamic>?) ?? {},
       salary: (map['salary'] as num?)?.toDouble() ?? 0,
@@ -196,6 +201,11 @@ class JobPostModel {
       workHoursPerDay: (map['workHoursPerDay'] as num?)?.toDouble(),
       startTime: map['startTime'] as String?,
       requirements: map['requirements'] as String?,
+      candidateRequirements: (map['candidateRequirements'] as List?)
+              ?.whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList() ??
+          const [],
       status: map['status'] as String? ?? 'draft',
       totalBudget: (map['totalBudget'] as num?)?.toDouble() ?? 0,
       depositStatus: map['depositStatus'] as String? ?? 'none',
@@ -247,6 +257,7 @@ class JobPostModel {
       'title': title,
       'description': description,
       'category': category,
+      'customCategory': customCategory?.trim(),
       'jobType': jobType,
       'location': location,
       'salary': salary,
@@ -257,7 +268,8 @@ class JobPostModel {
       if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
       if (workHoursPerDay != null) 'workHoursPerDay': workHoursPerDay,
       if (startTime != null) 'startTime': startTime,
-      if (requirements != null) 'requirements': requirements,
+      'requirements': requirements,
+      'candidateRequirements': candidateRequirements,
       'status': status,
       'totalBudget': totalBudget,
       'depositStatus': depositStatus,
@@ -294,6 +306,7 @@ class JobPostModel {
     String? title,
     String? description,
     String? category,
+    String? customCategory,
     String? jobType,
     Map<String, dynamic>? location,
     double? salary,
@@ -305,6 +318,7 @@ class JobPostModel {
     double? workHoursPerDay,
     String? startTime,
     String? requirements,
+    List<Map<String, dynamic>>? candidateRequirements,
     String? status,
     double? totalBudget,
     String? depositStatus,
@@ -332,6 +346,7 @@ class JobPostModel {
       title: title ?? this.title,
       description: description ?? this.description,
       category: category ?? this.category,
+      customCategory: customCategory ?? this.customCategory,
       jobType: jobType ?? this.jobType,
       location: location ?? this.location,
       salary: salary ?? this.salary,
@@ -343,6 +358,8 @@ class JobPostModel {
       workHoursPerDay: workHoursPerDay ?? this.workHoursPerDay,
       startTime: startTime ?? this.startTime,
       requirements: requirements ?? this.requirements,
+      candidateRequirements:
+          candidateRequirements ?? this.candidateRequirements,
       status: status ?? this.status,
       totalBudget: totalBudget ?? this.totalBudget,
       depositStatus: depositStatus ?? this.depositStatus,
@@ -384,4 +401,11 @@ class JobPostModel {
   /// Nhãn hiển thị cho category
   static String categoryLabel(String category) =>
       job_cats.categoryLabel(category);
+
+  /// Tên danh mục thực tế, gồm cả giá trị doanh nghiệp tự nhập khi chọn Khác.
+  String get categoryDisplay {
+    final custom = customCategory?.trim() ?? '';
+    if (category == 'other' && custom.isNotEmpty) return custom;
+    return categoryLabel(category);
+  }
 }

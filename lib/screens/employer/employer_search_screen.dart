@@ -932,7 +932,7 @@ class _PostsTab extends StatelessWidget {
               .where(
                 (p) =>
                     p.title.toLowerCase().contains(q) ||
-                    p.category.toLowerCase().contains(q) ||
+                    p.categoryDisplay.toLowerCase().contains(q) ||
                     (p.description.toLowerCase().contains(q)),
               )
               .toList();

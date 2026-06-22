@@ -16,7 +16,7 @@ class EmployerHomeController extends GetxController {
   final RxList<DiscoverableCandidate> potentialCandidates =
       <DiscoverableCandidate>[].obs;
   final RxBool isLoadingCandidates = true.obs;
-  final RxInt candidateDisplayCount = 6.obs;
+  final RxInt candidateDisplayCount = 4.obs;
 
   StreamSubscription<List<JobPostModel>>? _sub;
   Completer<void>? _pendingFirstEvent;
@@ -55,6 +55,7 @@ class EmployerHomeController extends GetxController {
               'pending',
               'approved',
               'active',
+              'completed',
               'closed',
               'rejected',
               'cancelled',
@@ -91,7 +92,7 @@ class EmployerHomeController extends GetxController {
 
   Future<void> refreshHome() async {
     displayCount.value = 4;
-    candidateDisplayCount.value = 6;
+    candidateDisplayCount.value = 4;
     await Future.wait([_listenToPosts(), loadPotentialCandidates()]);
     if (Get.isRegistered<CandidatesController>()) {
       await Get.find<CandidatesController>().loadAll();
@@ -117,11 +118,12 @@ class EmployerHomeController extends GetxController {
   bool get hasMoreCandidates =>
       potentialCandidates.length > candidateDisplayCount.value;
 
-  void loadMoreCandidates() => candidateDisplayCount.value += 6;
+  void loadMoreCandidates() => candidateDisplayCount.value += 4;
 
   // ── Thống kê ────────────────────────────────────────────────────────
-  int get activePostsCount =>
-      posts.where((p) => p.status == 'approved' || p.status == 'active').length;
+  int get activePostsCount => activePosts
+      .where((p) => p.status == 'approved' || p.status == 'active')
+      .length;
 
   int get totalHired => posts.fold(0, (sum, p) => sum + p.filledSlots);
 
@@ -132,6 +134,8 @@ class EmployerHomeController extends GetxController {
   List<JobPostModel> get activePosts {
     final now = DateTime.now();
     return posts.where((p) {
+      // Quyết toán xong thì bài thuộc lịch sử, bất kể ngày kết thúc còn xa.
+      if (p.depositStatus == 'released') return false;
       switch (p.status) {
         case 'pending':
         case 'approved':
@@ -153,11 +157,15 @@ class EmployerHomeController extends GetxController {
   List<JobPostModel> get completedWorkPosts {
     final now = DateTime.now();
     return posts.where((p) {
+      final settled = p.depositStatus == 'released';
       final statusOk =
           p.status == 'approved' ||
           p.status == 'active' ||
+          p.status == 'completed' ||
           p.status == 'closed';
       final workEnded =
+          settled ||
+          p.status == 'completed' ||
           p.status == 'closed' ||
           (p.endDate != null && !_endDateTime(p).isAfter(now));
       return statusOk && p.filledSlots > 0 && workEnded;

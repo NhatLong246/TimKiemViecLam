@@ -72,7 +72,7 @@ class SearchService {
         final t = _removeVietnameseTones(job.title).toLowerCase();
         final d = _removeVietnameseTones(job.description).toLowerCase();
         final c = _removeVietnameseTones(
-          JobPostModel.categoryLabel(job.category),
+          job.categoryDisplay,
         ).toLowerCase();
         matchesKeyword =
             t.contains(normalizedKeyword) ||
