@@ -481,17 +481,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildGridCard(
-                                Icons.people_alt_outlined,
-                                'Số lượng tuyển',
-                                slotsStr,
-                                Colors.purple,
-                              )),
-                              const SizedBox(width: 12),
-                              const Expanded(child: SizedBox()),
-                            ],
+                          _buildGridCard(
+                            Icons.people_alt_outlined,
+                            'Số lượng tuyển',
+                            slotsStr,
+                            Colors.purple,
                           ),
                         ],
                       ),

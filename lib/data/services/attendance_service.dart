@@ -344,4 +344,24 @@ class AttendanceService {
 
     return model;
   }
+
+  /// Lấy phiên điểm danh mới nhất của job (không giới hạn ngày hôm nay).
+  /// Dùng cho phía ứng viên để tìm phiên NTD vừa bắt đầu bất kể ngày nào.
+  Future<AttendanceModel?> getLatestSession(String jobId) async {
+    final snap = await _col
+        .where('jobId', isEqualTo: jobId)
+        .get();
+
+    if (snap.docs.isEmpty) return null;
+
+    final sessions = snap.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      return AttendanceModel.fromMap(data, doc.id);
+    }).toList();
+
+    // Sort by date descending (latest first)
+    sessions.sort((a, b) => b.date.compareTo(a.date));
+
+    return sessions.first;
+  }
 }

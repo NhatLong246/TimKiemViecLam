@@ -598,30 +598,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _startSession() async {
-    final timeParts = _timeCtrl.text.split(':');
-    if (timeParts.length == 2) {
-      final now = DateTime.now();
-      
-      // Chúng ta sử dụng _targetDate (hoặc current logical date) làm cơ sở
-      final baseDate = _targetDate != null 
-          ? DateTime.parse(_targetDate!) 
-          : WorkDayHelper.getCurrentLogicalDateTime(_job);
-          
-      final expectedTime = DateTime(baseDate.year, baseDate.month, baseDate.day, int.parse(timeParts[0]), int.parse(timeParts[1]));
-      
-      // Nếu _targetDate là ngày hôm qua, thì 'now' chắc chắn sẽ sau 'expectedTime', cho phép bắt đầu.
-      // Do đó check dưới đây sẽ an toàn.
-      if (now.isBefore(expectedTime)) {
-        Get.snackbar(
-          'Chưa đến giờ',
-          'Bạn chỉ có thể bắt đầu điểm danh từ ${_timeCtrl.text} trở đi.',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        return;
-      }
-    }
 
     final workers = (_members ?? [])
         .where((u) => u.id != _employerId)

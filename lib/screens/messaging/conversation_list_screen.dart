@@ -50,31 +50,8 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   Future<void> _cleanupStaleGroups() async {
-    try {
-      final auth = Get.find<AuthController>();
-      final uid = auth.currentUser?.id;
-      if (uid == null) return;
-      
-      final db = FirebaseFirestore.instance;
-      final snap = await db.collection('groupChats').where('memberIds', arrayContains: uid).get();
-      
-      for (final doc in snap.docs) {
-        final jobId = doc.data()['jobId']?.toString();
-        final currentStatus = doc.data()['status']?.toString();
-        
-        if (jobId != null && jobId.isNotEmpty && currentStatus != 'closed') {
-          final jobSnap = await db.collection('jobPosts').doc(jobId).get();
-          if (jobSnap.exists) {
-            final jobStatus = jobSnap.data()?['status']?.toString();
-            if (['closed', 'completed', 'cancelled', 'deleted'].contains(jobStatus)) {
-              await doc.reference.update({'status': 'closed'});
-            }
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Cleanup error: $e');
-    }
+    // Tạm thời tắt tính năng dọn dẹp/tự động đóng nhóm chat theo yêu cầu
+    return;
   }
 
   @override

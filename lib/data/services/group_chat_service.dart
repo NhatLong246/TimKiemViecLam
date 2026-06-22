@@ -5,7 +5,10 @@ import '../models/app_notification_model.dart';
 import 'notification_service.dart';
 import '../models/chat_message_model.dart';
 import '../models/user_model.dart';
+import 'package:flutter/foundation.dart';
 import '../../utils/chat_wallpaper_preferences.dart';
+import '../models/messaging_models.dart';
+import 'profanity_filter_service.dart';
 
 class GroupChatService {
   final _db = FirebaseFirestore.instance;
@@ -156,6 +159,10 @@ class GroupChatService {
 
   // ─── Gửi tin nhắn ────────────────────────────────────────────────────────
   Future<void> sendMessage(String groupId, ChatMessageModel message) async {
+    if (message.type == 'text' && ProfanityFilterService.containsProfanity(message.content)) {
+      throw Exception('Tin nhắn vi phạm tiêu chuẩn cộng đồng (chứa từ ngữ không phù hợp).');
+    }
+
     await _groups.doc(groupId).collection('messages').add(message.toMap());
 
     final senderId = message.senderId;
@@ -249,22 +256,8 @@ class GroupChatService {
 
   // ─── Đóng nhóm chat khi công việc kết thúc ───────────────────────────────
   Future<void> closeGroupsForJob(String jobId) async {
-    if (jobId.isEmpty) return;
-    final snap = await _groups.where('jobId', isEqualTo: jobId).get();
-    if (snap.docs.isEmpty) return;
-
-    WriteBatch batch = _db.batch();
-    var opCount = 0;
-    for (final doc in snap.docs) {
-      batch.update(doc.reference, {'status': 'closed'});
-      opCount++;
-      if (opCount >= 400) {
-        await batch.commit();
-        batch = _db.batch();
-        opCount = 0;
-      }
-    }
-    if (opCount > 0) await batch.commit();
+    // Tạm thời tắt tính năng dọn dẹp/tự động đóng nhóm chat theo yêu cầu
+    return;
   }
 
   // ─── Cập nhật trạng thái cuộc gọi ───────────────────────────────────────

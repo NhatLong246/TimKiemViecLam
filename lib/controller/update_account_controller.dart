@@ -6,6 +6,7 @@ import '../data/models/job_criteria_model.dart';
 import '../data/models/work_experience_model.dart';
 import '../data/services/candidate_profile_service.dart';
 import '../data/services/update_account_service.dart';
+import '../data/services/profanity_filter_service.dart';
 import 'package:get/get.dart';
 
 class UpdateAccountController extends GetxController {
@@ -13,6 +14,7 @@ class UpdateAccountController extends GetxController {
   final CandidateProfileService _profileService = CandidateProfileService();
 
   Future<void> changeName(String fullName) async {
+    if (ProfanityFilterService.containsProfanity(fullName)) throw Exception('Tên chứa từ ngữ không phù hợp.');
     final authController = Get.find<AuthController>();
     final user = authController.currentUser;
     if (user == null) return;
@@ -35,6 +37,7 @@ class UpdateAccountController extends GetxController {
   }
 
   Future<void> updateUsername(String username) async {
+    if (ProfanityFilterService.containsProfanity(username)) throw Exception('Username chứa từ ngữ không phù hợp.');
     await _service.updateUsername(username);
   }
 
@@ -101,6 +104,7 @@ class UpdateAccountController extends GetxController {
     String? endDate,
     required bool currentlyWorking,
   }) async {
+    if (ProfanityFilterService.containsProfanity('$company $position $description')) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     final experience = WorkExperienceModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       company: company.trim(),
@@ -122,6 +126,7 @@ class UpdateAccountController extends GetxController {
     String? endDate,
     required bool currentlyWorking,
   }) async {
+    if (ProfanityFilterService.containsProfanity('$company $position $description')) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     final experience = WorkExperienceModel(
       id: id,
       company: company.trim(),
@@ -176,18 +181,22 @@ class UpdateAccountController extends GetxController {
   }
 
   Future<void> saveSelfIntroduction(String text) async {
+    if (ProfanityFilterService.containsProfanity(text)) throw Exception('Nội dung chứa từ ngữ không phù hợp.');
     await _profileService.saveSelfIntroduction(text);
   }
 
   Future<void> saveSkills(List<String> skills) async {
+    if (skills.any((s) => ProfanityFilterService.containsProfanity(s))) throw Exception('Kỹ năng chứa từ ngữ không phù hợp.');
     await _profileService.saveSkills(skills);
   }
 
   Future<void> addEducation(EducationModel item) async {
+    if (ProfanityFilterService.containsProfanity('${item.school} ${item.major} ${item.description}')) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.addEducation(item);
   }
 
   Future<void> updateEducation(EducationModel item) async {
+    if (ProfanityFilterService.containsProfanity('${item.school} ${item.major} ${item.description}')) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.updateEducation(item);
   }
 
@@ -196,10 +205,12 @@ class UpdateAccountController extends GetxController {
   }
 
   Future<void> addProject(ProjectModel item) async {
+    if (ProfanityFilterService.containsProfanity('${item.name} ${item.description}')) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.addProject(item);
   }
 
   Future<void> updateProject(ProjectModel item) async {
+    if (ProfanityFilterService.containsProfanity('${item.name} ${item.description}')) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.updateProject(item);
   }
 
@@ -208,10 +219,12 @@ class UpdateAccountController extends GetxController {
   }
 
   Future<void> addLanguage(LanguageModel item) async {
+    if (ProfanityFilterService.containsProfanity(item.language)) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.addLanguage(item);
   }
 
   Future<void> updateLanguage(LanguageModel item) async {
+    if (ProfanityFilterService.containsProfanity(item.language)) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.updateLanguage(item);
   }
 
@@ -220,10 +233,12 @@ class UpdateAccountController extends GetxController {
   }
 
   Future<void> addCertificate(CertificateModel item) async {
+    if (ProfanityFilterService.containsProfanity(item.name)) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.addCertificate(item);
   }
 
   Future<void> updateCertificate(CertificateModel item) async {
+    if (ProfanityFilterService.containsProfanity(item.name)) throw Exception('Thông tin chứa từ ngữ không phù hợp.');
     await _profileService.updateCertificate(item);
   }
 
