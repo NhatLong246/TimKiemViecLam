@@ -25,8 +25,9 @@ class HomeController extends GetxController {
   final RxString filterJobType = 'Tất cả'.obs;
   final RxString filterCategory = 'all'.obs;
   final RxString filterGender = 'Tất cả'.obs;
-  final Rx<double?> filterHeight = Rx<double?>(null);
-  final Rx<double?> filterWeight = Rx<double?>(null);
+  final RxString filterLanguage = 'Tất cả'.obs;
+  final RxString filterLanguageLevel = 'Tất cả'.obs;
+  final RxString filterExperience = 'Tất cả'.obs;
 
   StreamSubscription? _applicationsSub;
   StreamSubscription? _profileViewsSub;
@@ -234,8 +235,9 @@ class HomeController extends GetxController {
     required String jobType,
     required String category,
     required String gender,
-    double? height,
-    double? weight,
+    required String language,
+    required String languageLevel,
+    required String experience,
   }) {
     filterMinSalary.value = minSalary;
     filterMaxSalary.value = maxSalary;
@@ -243,8 +245,9 @@ class HomeController extends GetxController {
     filterJobType.value = jobType;
     filterCategory.value = category;
     filterGender.value = gender;
-    filterHeight.value = height;
-    filterWeight.value = weight;
+    filterLanguage.value = language;
+    filterLanguageLevel.value = languageLevel;
+    filterExperience.value = experience;
     _applyFilter();
   }
 
@@ -269,6 +272,66 @@ class HomeController extends GetxController {
       if (filterCategory.value != 'all' && filterCategory.value != 'Tất cả') {
         if (j.category != filterCategory.value) return false;
       }
+
+      // Language filter
+      if (filterLanguage.value != 'Tất cả') {
+        final req = (j.requirements ?? '').toLowerCase() + ' ' + j.description.toLowerCase();
+        final normalizedReq = _removeVietnameseTones(req);
+        final targetLang = filterLanguage.value.toLowerCase();
+        
+        bool langMatch = false;
+        if (targetLang == 'tiếng anh') {
+          langMatch = normalizedReq.contains('anh') || normalizedReq.contains('english') || normalizedReq.contains('ielts') || normalizedReq.contains('toeic');
+        } else if (targetLang == 'tiếng trung') {
+          langMatch = normalizedReq.contains('trung') || normalizedReq.contains('chinese') || normalizedReq.contains('hsk');
+        } else if (targetLang == 'tiếng nhật') {
+          langMatch = normalizedReq.contains('nhat') || normalizedReq.contains('japanese') || normalizedReq.contains('jlpt') || normalizedReq.contains('n1') || normalizedReq.contains('n2') || normalizedReq.contains('n3');
+        } else if (targetLang == 'tiếng hàn') {
+          langMatch = normalizedReq.contains('han') || normalizedReq.contains('korean') || normalizedReq.contains('topik');
+        } else {
+          langMatch = normalizedReq.contains(_removeVietnameseTones(targetLang));
+        }
+
+        if (!langMatch) return false;
+        
+        if (filterLanguageLevel.value != 'Tất cả') {
+          final targetLevel = _removeVietnameseTones(filterLanguageLevel.value.toLowerCase());
+          if (!normalizedReq.contains(targetLevel)) return false;
+        }
+      }
+
+      // Experience filter
+      if (filterExperience.value != 'Tất cả') {
+        final req = (j.requirements ?? '').toLowerCase() + ' ' + j.description.toLowerCase();
+        final normalizedReq = _removeVietnameseTones(req);
+        
+        final noExpTerms = ['khong yeu cau kinh nghiem', 'khong can kinh nghiem', 'chua co kinh nghiem', 'no experience'];
+        bool explicitlyNoExp = noExpTerms.any((term) => normalizedReq.contains(term));
+        
+        final regex = RegExp(r'(\d+)\s*(nam|year)');
+        final match = regex.firstMatch(normalizedReq);
+        double reqYears = 0;
+        if (match != null) {
+          reqYears = double.tryParse(match.group(1) ?? '0') ?? 0;
+        }
+        
+        if (explicitlyNoExp || (reqYears == 0 && !normalizedReq.contains('kinh nghiem'))) {
+          if (filterExperience.value != 'no_exp') return false;
+        } else {
+          if (filterExperience.value == 'no_exp') {
+            if (reqYears != 0) return false;
+          } else if (filterExperience.value == 'under_1') {
+            if (!(reqYears > 0 && reqYears < 1.0)) return false;
+          } else if (filterExperience.value == '1_to_3') {
+            if (!(reqYears >= 1.0 && reqYears <= 3.0)) return false;
+          } else if (filterExperience.value == '3_to_5') {
+            if (!(reqYears >= 3.0 && reqYears <= 5.0)) return false;
+          } else if (filterExperience.value == 'over_5') {
+            if (reqYears <= 5.0) return false;
+          }
+        }
+      }
+
       return true;
     }).toList();
 

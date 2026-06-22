@@ -56,6 +56,9 @@ class SearchService {
     String? location,
     String? jobType,
     String? category,
+    String? language,
+    String? languageLevel,
+    String? experience,
   }) async {
 
     final allJobs = await _jobPostService.getLatestActiveJobs();
@@ -105,11 +108,74 @@ class SearchService {
         matchesCategory = job.category == category;
       }
 
+      // 6. Language filter
+      bool matchesLanguage = true;
+      if (language != null && language.isNotEmpty && language != 'Tất cả') {
+        final req = (job.requirements ?? '').toLowerCase() + ' ' + job.description.toLowerCase();
+        final normalizedReq = _removeVietnameseTones(req);
+        final targetLang = language.toLowerCase();
+        
+        bool langMatch = false;
+        if (targetLang == 'tiếng anh') {
+          langMatch = normalizedReq.contains('anh') || normalizedReq.contains('english') || normalizedReq.contains('ielts') || normalizedReq.contains('toeic');
+        } else if (targetLang == 'tiếng trung') {
+          langMatch = normalizedReq.contains('trung') || normalizedReq.contains('chinese') || normalizedReq.contains('hsk');
+        } else if (targetLang == 'tiếng nhật') {
+          langMatch = normalizedReq.contains('nhat') || normalizedReq.contains('japanese') || normalizedReq.contains('jlpt') || normalizedReq.contains('n1') || normalizedReq.contains('n2') || normalizedReq.contains('n3');
+        } else if (targetLang == 'tiếng hàn') {
+          langMatch = normalizedReq.contains('han') || normalizedReq.contains('korean') || normalizedReq.contains('topik');
+        } else {
+          langMatch = normalizedReq.contains(_removeVietnameseTones(targetLang));
+        }
+
+        if (!langMatch) {
+          matchesLanguage = false;
+        } else if (languageLevel != null && languageLevel.isNotEmpty && languageLevel != 'Tất cả') {
+          final targetLevel = _removeVietnameseTones(languageLevel.toLowerCase());
+          matchesLanguage = normalizedReq.contains(targetLevel);
+        }
+      }
+
+      // 7. Experience filter
+      bool matchesExperience = true;
+      if (experience != null && experience.isNotEmpty && experience != 'Tất cả') {
+        final req = (job.requirements ?? '').toLowerCase() + ' ' + job.description.toLowerCase();
+        final normalizedReq = _removeVietnameseTones(req);
+        
+        final noExpTerms = ['khong yeu cau kinh nghiem', 'khong can kinh nghiem', 'chua co kinh nghiem', 'no experience'];
+        bool explicitlyNoExp = noExpTerms.any((term) => normalizedReq.contains(term));
+        
+        final regex = RegExp(r'(\d+)\s*(nam|year)');
+        final match = regex.firstMatch(normalizedReq);
+        double reqYears = 0;
+        if (match != null) {
+          reqYears = double.tryParse(match.group(1) ?? '0') ?? 0;
+        }
+        
+        if (explicitlyNoExp || (reqYears == 0 && !normalizedReq.contains('kinh nghiem'))) {
+          matchesExperience = (experience == 'no_exp');
+        } else {
+          if (experience == 'no_exp') {
+            matchesExperience = (reqYears == 0);
+          } else if (experience == 'under_1') {
+            matchesExperience = (reqYears > 0 && reqYears < 1.0);
+          } else if (experience == '1_to_3') {
+            matchesExperience = (reqYears >= 1.0 && reqYears <= 3.0);
+          } else if (experience == '3_to_5') {
+            matchesExperience = (reqYears >= 3.0 && reqYears <= 5.0);
+          } else if (experience == 'over_5') {
+            matchesExperience = (reqYears > 5.0);
+          }
+        }
+      }
+
       return matchesKeyword &&
           matchesSalary &&
           matchesLocation &&
           matchesJobType &&
-          matchesCategory;
+          matchesCategory &&
+          matchesLanguage &&
+          matchesExperience;
     }).toList();
 
     return filtered;

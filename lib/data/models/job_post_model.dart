@@ -34,6 +34,9 @@ class JobPostModel {
   final String? groupChatId;
   final List<String> imageUrls;
   final FullTimeJobDetails? fullTimeDetails;
+  final String? requiredLanguage;
+  final String? requiredLanguageLevel;
+  final String? requiredExperience;
   final DateTime? applicationDeadline;
   final bool underfilledAccepted;
   final DateTime? createdAt;
@@ -70,6 +73,9 @@ class JobPostModel {
     this.groupChatId,
     this.imageUrls = const [],
     this.fullTimeDetails,
+    this.requiredLanguage,
+    this.requiredLanguageLevel,
+    this.requiredExperience,
     this.applicationDeadline,
     this.underfilledAccepted = false,
     this.createdAt,
@@ -221,6 +227,9 @@ class JobPostModel {
               map['fullTimeDetails'] as Map<String, dynamic>,
             )
           : null,
+      requiredLanguage: map['requiredLanguage'] as String?,
+      requiredLanguageLevel: map['requiredLanguageLevel'] as String?,
+      requiredExperience: map['requiredExperience'] as String?,
       applicationDeadline: map['applicationDeadline'] != null
           ? toDateTime(map['applicationDeadline'])
           : null,
@@ -268,6 +277,9 @@ class JobPostModel {
       if (groupChatId != null) 'groupChatId': groupChatId,
       if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
       if (fullTimeDetails != null) 'fullTimeDetails': fullTimeDetails!.toMap(),
+      if (requiredLanguage != null) 'requiredLanguage': requiredLanguage,
+      if (requiredLanguageLevel != null) 'requiredLanguageLevel': requiredLanguageLevel,
+      if (requiredExperience != null) 'requiredExperience': requiredExperience,
       if (applicationDeadline != null)
         'applicationDeadline': Timestamp.fromDate(applicationDeadline!),
       'underfilledAccepted': underfilledAccepted,
@@ -306,6 +318,9 @@ class JobPostModel {
     String? groupChatId,
     List<String>? imageUrls,
     FullTimeJobDetails? fullTimeDetails,
+    String? requiredLanguage,
+    String? requiredLanguageLevel,
+    String? requiredExperience,
     DateTime? applicationDeadline,
     bool? underfilledAccepted,
     DateTime? createdAt,
@@ -342,6 +357,9 @@ class JobPostModel {
       groupChatId: groupChatId ?? this.groupChatId,
       imageUrls: imageUrls ?? this.imageUrls,
       fullTimeDetails: fullTimeDetails ?? this.fullTimeDetails,
+      requiredLanguage: requiredLanguage ?? this.requiredLanguage,
+      requiredLanguageLevel: requiredLanguageLevel ?? this.requiredLanguageLevel,
+      requiredExperience: requiredExperience ?? this.requiredExperience,
       applicationDeadline: applicationDeadline ?? this.applicationDeadline,
       underfilledAccepted: underfilledAccepted ?? this.underfilledAccepted,
       createdAt: createdAt ?? this.createdAt,

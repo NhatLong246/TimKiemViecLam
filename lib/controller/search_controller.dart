@@ -34,8 +34,9 @@ class SearchController extends GetxController {
   final RxString selectedJobType = 'Tất cả'.obs;
   final RxString selectedCategory = 'all'.obs;
   final RxString selectedGender = 'Tất cả'.obs;
-  final Rx<double?> selectedHeight = Rx<double?>(null);
-  final Rx<double?> selectedWeight = Rx<double?>(null);
+  final RxString selectedLanguage = 'Tất cả'.obs;
+  final RxString selectedLanguageLevel = 'Tất cả'.obs;
+  final RxString selectedExperience = 'Tất cả'.obs;
 
   @override
   void onInit() {
@@ -106,6 +107,9 @@ class SearchController extends GetxController {
         location: selectedLocation.value,
         jobType: selectedJobType.value,
         category: selectedCategory.value,
+        language: selectedLanguage.value,
+        languageLevel: selectedLanguageLevel.value,
+        experience: selectedExperience.value,
       );
 
       // Sắp xếp theo active filter
@@ -140,8 +144,9 @@ class SearchController extends GetxController {
     String jobType,
     String category,
     String gender,
-    double? height,
-    double? weight,
+    String language,
+    String languageLevel,
+    String experience,
   ) {
     minSalary.value = min;
     maxSalary.value = max;
@@ -149,8 +154,9 @@ class SearchController extends GetxController {
     selectedJobType.value = jobType;
     selectedCategory.value = category;
     selectedGender.value = gender;
-    selectedHeight.value = height;
-    selectedWeight.value = weight;
+    selectedLanguage.value = language;
+    selectedLanguageLevel.value = languageLevel;
+    selectedExperience.value = experience;
     performSearch();
   }
 
