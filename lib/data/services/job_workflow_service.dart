@@ -6,6 +6,7 @@ import '../models/disbursement_notice_model.dart';
 import '../models/app_notification_model.dart';
 import 'notification_service.dart';
 import 'candidate_earnings_service.dart';
+import 'disbursement_calculator.dart';
 import 'wallet_service.dart';
 
 class JobWorkflowService {
@@ -104,7 +105,7 @@ class JobWorkflowService {
   // BƯỚC 1: NTD BẤM GIẢI NGÂN → Tạo yêu cầu (approved luôn)
   // ═══════════════════════════════════════════════════════
 
-  /// NTD yêu cầu giải ngân → tự chia đều tiền cho các ứng viên
+  /// NTD yêu cầu giải ngân theo lương thực tế của từng ứng viên.
   Future<String> requestDisbursement({
     required String jobId,
     required String groupId,
@@ -158,7 +159,7 @@ class JobWorkflowService {
   // NTD chọn "Không khiếu nại" → chia tiền đều → xong
   // ═══════════════════════════════════════════════════════
 
-  /// Giải ngân trực tiếp (không khiếu nại): chia đều tiền về ví ứng viên
+  /// Giải ngân trực tiếp (không khiếu nại) theo lương thực tế.
   Future<void> disburseDirectly(String noticeId) async {
     final snap = await _notices.doc(noticeId).get();
     if (!snap.exists) throw Exception('Không tìm thấy yêu cầu');
@@ -167,6 +168,10 @@ class JobWorkflowService {
     if (notice.status != 'approved') {
       throw Exception('Trạng thái không hợp lệ để giải ngân.');
     }
+
+    final grossCandidatePayment = DisbursementCalculator.grossCandidatePayment(
+      notice.candidateAmounts,
+    );
 
     // Ghi tiền vào ví từng ứng viên
     for (final entry in notice.candidateAmounts.entries) {
@@ -203,7 +208,7 @@ class JobWorkflowService {
     await _closeJobPost(
       notice.jobId,
       employerId: notice.employerId,
-      totalActualPayment: notice.amount,
+      totalActualPayment: grossCandidatePayment,
       jobTitle: notice.jobTitle,
     );
   }
@@ -458,6 +463,10 @@ class JobWorkflowService {
       throw Exception('Chưa thể giải ngân — chờ Admin xem xét xong.');
     }
 
+    final grossCandidatePayment = DisbursementCalculator.grossCandidatePayment(
+      notice.candidateAmounts,
+    );
+
     double totalRefundToEmployer = 0;
     final userDebts = <String, Map<String, dynamic>>{};
 
@@ -581,7 +590,7 @@ class JobWorkflowService {
         amount: totalRefundToEmployer,
         description: 'Hoàn tiền đền bù từ khiếu nại: ${notice.jobTitle}',
       );
-      
+
       // Gửi thông báo cho NTD
       await _notif.notifyEmployer(
         employerId: notice.employerId,
@@ -612,7 +621,7 @@ class JobWorkflowService {
     await _closeJobPost(
       notice.jobId,
       employerId: notice.employerId,
-      totalActualPayment: notice.amount,
+      totalActualPayment: grossCandidatePayment,
       jobTitle: notice.jobTitle,
     );
   }
@@ -723,15 +732,26 @@ class JobWorkflowService {
     final jobData = jobSnap.data();
     final depositHeld = (jobData?['depositStatus'] ?? '').toString() == 'held';
     final heldAmount = (jobData?['totalBudget'] as num?)?.toDouble() ?? 0;
+    final unusedHeldAmount = depositHeld
+        ? DisbursementCalculator.refundFromHeldBudget(
+            heldAmount: heldAmount,
+            grossPayment: totalActualPayment,
+          )
+        : 0.0;
 
     await jobRef.update({
       'status': 'closed',
       if (depositHeld) 'depositStatus': 'released',
       if (depositHeld) 'depositReleasedAt': FieldValue.serverTimestamp(),
+      if (unusedHeldAmount > 0) 'depositRefundAmount': unusedHeldAmount,
+      if (unusedHeldAmount > 0)
+        'depositRefundedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    if (employerId != null && employerId.isNotEmpty && totalActualPayment > 0) {
+    if (employerId != null &&
+        employerId.isNotEmpty &&
+        (depositHeld || totalActualPayment > 0)) {
       double walletBalanceAdjustment = 0.0;
       if (depositHeld) {
         walletBalanceAdjustment = heldAmount - totalActualPayment;
@@ -749,31 +769,37 @@ class JobWorkflowService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // Record transaction
-      final txRef = _db.collection('walletTransactions').doc();
-      batch.set(txRef, {
-        'userId': employerId,
-        'type': 'payment',
-        'amount': totalActualPayment,
-        'description': 'Thanh toán tiền công cho "$jobTitle"',
-        'status': 'completed',
-        'paymentMethod': 'wallet',
-        'jobId': jobId,
-        'createdAt': FieldValue.serverTimestamp(),
-        'completedAt': FieldValue.serverTimestamp(),
-      });
+      if (totalActualPayment > 0) {
+        final txRef = _db.collection('walletTransactions').doc();
+        batch.set(txRef, {
+          'userId': employerId,
+          'type': 'payment',
+          'amount': totalActualPayment,
+          'description': 'Thanh toán tiền công cho "$jobTitle"',
+          'status': 'completed',
+          'paymentMethod': 'wallet',
+          'jobId': jobId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (unusedHeldAmount > 0) {
+        final refundRef = _db.collection('walletTransactions').doc();
+        batch.set(refundRef, {
+          'userId': employerId,
+          'type': 'refund',
+          'amount': unusedHeldAmount,
+          'description': 'Hoàn tiền ứng dư cho "$jobTitle"',
+          'status': 'completed',
+          'paymentMethod': 'wallet',
+          'jobId': jobId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       await batch.commit();
-    } else if (depositHeld &&
-        heldAmount > 0 &&
-        employerId != null &&
-        employerId.isNotEmpty) {
-      // Legacy fallback
-      await _db.collection('users').doc(employerId).set({
-        'walletHeldBalance': FieldValue.increment(-heldAmount),
-        'totalSpent': FieldValue.increment(heldAmount),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
     }
   }
 

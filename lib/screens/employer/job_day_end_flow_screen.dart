@@ -12,6 +12,7 @@ import '../../data/services/group_chat_service.dart';
 import '../../data/services/job_attendance_completion_service.dart';
 import '../../data/services/job_workflow_service.dart';
 import '../../data/services/file_upload_service.dart';
+import '../../data/services/disbursement_calculator.dart';
 import '../../routes/app_routes.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -118,7 +119,7 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
           _amountCtrl.text.replaceAll('.', '').replaceAll(',', ''),
         ) ??
         0;
-    
+
     // BYPASS: Bỏ qua validate phải giải ngân đúng bằng thời gian thực tế
     /*
     if (amount <= 0 || amount < _totalEarned) {
@@ -169,25 +170,10 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
       }
       */
 
-      // Đảm bảo tổng chia cho ứng viên không vượt quá số tiền giải ngân (amount)
-      // Chia theo tỷ lệ lương đã tính (dựa trên điểm danh)
-      final proportionalAmounts = <String, double>{};
-      final totalCalc = _calculatedSalaries.values.fold(0.0, (a, b) => a + b);
-      
-      if (totalCalc > 0) {
-        for (final entry in _calculatedSalaries.entries) {
-          proportionalAmounts[entry.key] = (entry.value / totalCalc) * amount;
-        }
-      } else {
-        // Nếu không ai có điểm danh hợp lệ nhưng NTD vẫn giải ngân, chia đều
-        final count = _candidates.where((c) => c.id != _group.employerId).length;
-        final split = count > 0 ? amount / count : 0.0;
-        for (final c in _candidates) {
-          if (c.id != _group.employerId) {
-            proportionalAmounts[c.id] = split;
-          }
-        }
-      }
+      final allocation = DisbursementCalculator.allocate(
+        availableAmount: amount,
+        calculatedSalaries: _calculatedSalaries,
+      );
 
       await _workflow.requestDisbursement(
         jobId: _group.jobId,
@@ -195,8 +181,8 @@ class _JobDayEndFlowScreenState extends State<JobDayEndFlowScreen> {
         employerId: empId,
         workDate: _workDate,
         amount: amount,
-        totalEarned: amount, // Coi như giải ngân hết số amount, không có tiền thừa
-        candidateAmounts: proportionalAmounts,
+        totalEarned: allocation.totalEarned,
+        candidateAmounts: allocation.candidateAmounts,
         jobTitle: _group.jobTitle,
       );
     } catch (e) {

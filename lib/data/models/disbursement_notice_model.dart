@@ -18,7 +18,7 @@ class DisbursementNoticeModel {
   final bool adminAck;
   final DateTime createdAt;
 
-  /// Số tiền mỗi ứng viên nhận (chia đều)
+  /// Số tiền thực tế mỗi ứng viên nhận.
   /// { candidateId: amount }
   final Map<String, double> candidateAmounts;
 
