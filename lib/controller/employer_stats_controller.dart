@@ -14,7 +14,9 @@ class EmployerStatsController extends GetxController {
 
   final isLoading = false.obs;
   final summary = EmployerStatsSummary.empty().obs;
+  final prevSummary = EmployerStatsSummary.empty().obs;
   final chartData = <EmployerChartPoint>[].obs;
+  final prevChartData = <EmployerChartPoint>[].obs;
   final insightMessage = ''.obs;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -29,6 +31,46 @@ class EmployerStatsController extends GetxController {
   }
 
   // ── Public methods ─────────────────────────────────────────────────────
+
+  Map<String, DateTime> getPreviousPeriodRange() {
+    final start = startDate.value;
+    final end = endDate.value;
+    final diff = end.difference(start);
+    
+    if (isCustomRange.value) {
+      return {
+        'start': start.subtract(diff),
+        'end': start.subtract(const Duration(seconds: 1)),
+      };
+    }
+
+    switch (period.value) {
+      case StatsPeriod.day:
+        return {
+          'start': start.subtract(const Duration(days: 1)),
+          'end': end.subtract(const Duration(days: 1)),
+        };
+      case StatsPeriod.week:
+        return {
+          'start': start.subtract(const Duration(days: 7)),
+          'end': end.subtract(const Duration(days: 7)),
+        };
+      case StatsPeriod.month:
+        final prevStart = DateTime(start.year, start.month - 1, 1);
+        final prevEnd = DateTime(start.year, start.month, 0, 23, 59, 59);
+        return {
+          'start': prevStart,
+          'end': prevEnd,
+        };
+      case StatsPeriod.year:
+        final prevStart = DateTime(start.year - 1, 1, 1);
+        final prevEnd = DateTime(start.year - 1, 12, 31, 23, 59, 59);
+        return {
+          'start': prevStart,
+          'end': prevEnd,
+        };
+    }
+  }
 
   void applyFilter(StatsPeriod p, DateTime date) {
     isCustomRange.value = false;
@@ -94,6 +136,7 @@ class EmployerStatsController extends GetxController {
 
     isLoading.value = true;
     try {
+      final prevRange = getPreviousPeriodRange();
       final results = await Future.wait([
         _service.fetchSummary(
           employerId: uid,
@@ -106,9 +149,22 @@ class EmployerStatsController extends GetxController {
           end: endDate.value,
           period: period.value,
         ),
+        _service.fetchSummary(
+          employerId: uid,
+          start: prevRange['start']!,
+          end: prevRange['end']!,
+        ),
+        _service.fetchChartData(
+          employerId: uid,
+          start: prevRange['start']!,
+          end: prevRange['end']!,
+          period: period.value,
+        ),
       ]);
       summary.value = results[0] as EmployerStatsSummary;
       chartData.value = results[1] as List<EmployerChartPoint>;
+      prevSummary.value = results[2] as EmployerStatsSummary;
+      prevChartData.value = results[3] as List<EmployerChartPoint>;
       _generateInsight(summary.value);
     } finally {
       isLoading.value = false;

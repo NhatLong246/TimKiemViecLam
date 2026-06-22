@@ -282,6 +282,8 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
   late DateTime _selectedDate;
   late DateTime _customStart;
   late DateTime _customEnd;
+  late TextEditingController _startController;
+  late TextEditingController _endController;
 
   @override
   void initState() {
@@ -310,6 +312,15 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       _customStart = DateTime.now().subtract(const Duration(days: 7));
       _customEnd = DateTime.now();
     }
+    _startController = TextEditingController(text: DateFormat('dd/MM/yyyy').format(_customStart));
+    _endController = TextEditingController(text: DateFormat('dd/MM/yyyy').format(_customEnd));
+  }
+
+  @override
+  void dispose() {
+    _startController.dispose();
+    _endController.dispose();
+    super.dispose();
   }
 
   void _onPeriodChanged(FilterMode mode) {
@@ -321,6 +332,8 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       if (mode == FilterMode.custom) {
         _customStart = now.subtract(const Duration(days: 7));
         _customEnd = now;
+        _startController.text = DateFormat('dd/MM/yyyy').format(_customStart);
+        _endController.text = DateFormat('dd/MM/yyyy').format(_customEnd);
       }
     });
   }
@@ -669,68 +682,120 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       setState(() {
         if (isStart) {
           _customStart = picked;
+          _startController.text = DateFormat('dd/MM/yyyy').format(picked);
           if (_customStart.isAfter(_customEnd)) {
             _customEnd = _customStart;
+            _endController.text = DateFormat('dd/MM/yyyy').format(_customEnd);
           }
         } else {
           _customEnd = picked;
+          _endController.text = DateFormat('dd/MM/yyyy').format(picked);
           if (_customEnd.isBefore(_customStart)) {
             _customStart = _customEnd;
+            _startController.text = DateFormat('dd/MM/yyyy').format(_customStart);
           }
         }
       });
     }
   }
 
-  Widget _buildCustomDateButton({
+  void _onStartTextChanged(String val) {
+    try {
+      final parsed = DateFormat('dd/MM/yyyy').parseStrict(val);
+      if (parsed.year >= 2020 && parsed.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+        setState(() {
+          _customStart = parsed;
+          if (_customStart.isAfter(_customEnd)) {
+            _customEnd = _customStart;
+            _endController.text = DateFormat('dd/MM/yyyy').format(_customEnd);
+          }
+        });
+      }
+    } catch (_) {
+      // Ignore format exception during typing
+    }
+  }
+
+  void _onEndTextChanged(String val) {
+    try {
+      final parsed = DateFormat('dd/MM/yyyy').parseStrict(val);
+      if (parsed.year >= 2020 && parsed.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+        setState(() {
+          _customEnd = parsed;
+          if (_customEnd.isBefore(_customStart)) {
+            _customStart = _customEnd;
+            _startController.text = DateFormat('dd/MM/yyyy').format(_customStart);
+          }
+        });
+      }
+    } catch (_) {
+      // Ignore format exception during typing
+    }
+  }
+
+  Widget _buildCustomDateField({
     required String label,
-    required DateTime date,
-    required VoidCallback onTap,
+    required TextEditingController controller,
+    required VoidCallback onIconTap,
+    required ValueChanged<String> onChanged,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+    final primaryColor = AppColors.employerPrimary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.grey.shade400 : Colors.black54,
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? Colors.grey.shade400 : Colors.black54,
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.datetime,
+          onChanged: onChanged,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            hintText: 'dd/MM/yyyy',
+            hintStyle: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.normal,
+              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+            ),
+            filled: true,
+            fillColor: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+            suffixIcon: IconButton(
+              icon: Icon(Icons.calendar_today_outlined, size: 16, color: primaryColor),
+              onPressed: onIconTap,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  DateFormat('dd/MM/yyyy').format(date),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 14,
-                  color: AppColors.employerPrimary,
-                ),
-              ],
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: primaryColor,
+                width: 1.5,
+              ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -831,18 +896,20 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
             Row(
               children: [
                 Expanded(
-                  child: _buildCustomDateButton(
+                  child: _buildCustomDateField(
                     label: 'Từ ngày',
-                    date: _customStart,
-                    onTap: () => _pickCustomDate(true),
+                    controller: _startController,
+                    onIconTap: () => _pickCustomDate(true),
+                    onChanged: _onStartTextChanged,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildCustomDateButton(
+                  child: _buildCustomDateField(
                     label: 'Đến ngày',
-                    date: _customEnd,
-                    onTap: () => _pickCustomDate(false),
+                    controller: _endController,
+                    onIconTap: () => _pickCustomDate(false),
+                    onChanged: _onEndTextChanged,
                   ),
                 ),
               ],
@@ -997,6 +1064,8 @@ class _SummaryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = ctrl.summary.value;
+    final prevS = ctrl.prevSummary.value;
+
     return Column(
       children: [
         Row(
@@ -1008,6 +1077,7 @@ class _SummaryGrid extends StatelessWidget {
                 iconBg: const Color(0xFFE8F5E9),
                 label: 'Bài đăng đã duyệt',
                 value: s.approvedPosts.toDouble(),
+                previousValue: prevS.approvedPosts.toDouble(),
                 format: (v) => v.toInt().toString(),
               ),
             ),
@@ -1019,6 +1089,7 @@ class _SummaryGrid extends StatelessWidget {
                 iconBg: const Color(0xFFFFEBEE),
                 label: 'Bài đăng quá hạn',
                 value: s.cancelledPosts.toDouble(),
+                previousValue: prevS.cancelledPosts.toDouble(),
                 format: (v) => v.toInt().toString(),
               ),
             ),
@@ -1034,6 +1105,7 @@ class _SummaryGrid extends StatelessWidget {
                 iconBg: const Color(0xFFF3E5F5),
                 label: 'Số người đã thuê',
                 value: s.totalHired.toDouble(),
+                previousValue: prevS.totalHired.toDouble(),
                 format: (v) => v.toInt().toString(),
               ),
             ),
@@ -1045,6 +1117,7 @@ class _SummaryGrid extends StatelessWidget {
                 iconBg: const Color(0xFFE3F2FD),
                 label: 'Tổng tiền đã chi',
                 value: s.totalSpent,
+                previousValue: prevS.totalSpent,
                 format: (v) => ctrl.formatVnd(v),
                 valueSize: 18,
               ),
@@ -1061,6 +1134,7 @@ class _SummaryGrid extends StatelessWidget {
                 iconBg: const Color(0xFFE0F2F1),
                 label: 'Tổng tiền đã nạp',
                 value: s.totalDeposited,
+                previousValue: prevS.totalDeposited,
                 format: (v) => ctrl.formatVnd(v),
                 valueSize: 18,
               ),
@@ -1073,7 +1147,9 @@ class _SummaryGrid extends StatelessWidget {
                 iconBg: const Color(0xFFFFF3E0),
                 label: 'Hiệu suất chi',
                 value: s.totalDeposited > 0 ? (s.totalSpent / s.totalDeposited * 100) : 0,
+                previousValue: prevS.totalDeposited > 0 ? (prevS.totalSpent / prevS.totalDeposited * 100) : 0,
                 format: (v) => s.totalDeposited > 0 ? '${v.toStringAsFixed(0)}%' : '—',
+                isPercentageDiff: true,
               ),
             ),
           ],
@@ -1153,7 +1229,9 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.format,
+    this.previousValue,
     this.valueSize = 22,
+    this.isPercentageDiff = false,
   });
   final IconData icon;
   final Color iconColor;
@@ -1161,10 +1239,48 @@ class _StatCard extends StatelessWidget {
   final String label;
   final double value;
   final String Function(double) format;
+  final double? previousValue;
   final double valueSize;
+  final bool isPercentageDiff;
 
   @override
   Widget build(BuildContext context) {
+    Widget? diffWidget;
+    if (previousValue != null) {
+      if (isPercentageDiff) {
+        final diff = value - previousValue!;
+        if (diff != 0) {
+          final isInc = diff > 0;
+          final sign = isInc ? '+' : '';
+          final textCol = isInc ? Colors.green : Colors.red;
+          diffWidget = Text(
+            '$sign${diff.toStringAsFixed(0)}%',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textCol),
+          );
+        }
+      } else {
+        if (previousValue == 0) {
+          if (value > 0) {
+            diffWidget = const Text(
+              'Tăng',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
+            );
+          }
+        } else {
+          final diffPct = ((value - previousValue!) / previousValue!) * 100;
+          if (diffPct != 0) {
+            final isInc = diffPct > 0;
+            final sign = isInc ? '+' : '';
+            final textCol = isInc ? Colors.green : Colors.red;
+            diffWidget = Text(
+              '$sign${diffPct.toStringAsFixed(0)}%',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textCol),
+            );
+          }
+        }
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1203,14 +1319,26 @@ class _StatCard extends StatelessWidget {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 4),
-                AnimatedNumberText(
-                  value,
-                  format: format,
-                  style: TextStyle(
-                    fontSize: valueSize,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.dark,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Expanded(
+                      child: AnimatedNumberText(
+                        value,
+                        format: format,
+                        style: TextStyle(
+                          fontSize: valueSize,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.dark,
+                        ),
+                      ),
+                    ),
+                    if (diffWidget != null) ...[
+                      const SizedBox(width: 4),
+                      diffWidget,
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -1283,105 +1411,148 @@ class _SpendingHiringChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = ctrl.chartData;
+    final prevData = ctrl.prevChartData;
     if (data.isEmpty) return _emptyChart();
 
     final maxHired = data.map((e) => e.hired.toDouble()).reduce((a, b) => a > b ? a : b);
+    final maxPrevHired = prevData.isNotEmpty ? prevData.map((e) => e.hired.toDouble()).reduce((a, b) => a > b ? a : b) : 0.0;
+    final maxHiredOverall = maxHired > maxPrevHired ? maxHired : maxPrevHired;
+
     final maxSpent = data.map((e) => e.spent).reduce((a, b) => a > b ? a : b);
-    final spentScale = maxHired > 0 && maxSpent > 0 ? maxHired / maxSpent : 1.0;
+    final maxPrevSpent = prevData.isNotEmpty ? prevData.map((e) => e.spent).reduce((a, b) => a > b ? a : b) : 0.0;
+    final maxSpentOverall = maxSpent > maxPrevSpent ? maxSpent : maxPrevSpent;
 
-    return SizedBox(
-      height: 200,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: (maxHired * 1.3).clamp(5, double.infinity),
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => AppColors.dark.withOpacity(0.85),
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final pt = data[groupIndex];
-                if (rodIndex == 0) {
-                  return BarTooltipItem(
-                    '${pt.label}\nThuê: ${pt.hired} người\nChi: ${ctrl.formatVnd(pt.spent)}',
-                    const TextStyle(color: Colors.white, fontSize: 11),
-                  );
-                }
-                return null;
-              },
-            ),
-          ),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 24,
-                interval: _xInterval(data.length),
-                getTitlesWidget: (val, meta) {
-                  final i = val.toInt();
-                  if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                  
-                  final interval = _xInterval(data.length).toInt();
-                  if (i % interval != 0) return const SizedBox.shrink();
+    final spentScale = maxHiredOverall > 0 && maxSpentOverall > 0 ? maxHiredOverall / maxSpentOverall : 1.0;
 
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      data[i].label,
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            _buildLegendItem('Thuê (Kỳ này)', const Color(0xFF1565C0)),
+            const SizedBox(width: 8),
+            _buildLegendItem('Thuê (Kỳ trước)', Colors.grey.shade400),
+            const SizedBox(width: 12),
+            _buildLegendItem('Chi (Kỳ này)', AppColors.employerPrimary),
+            const SizedBox(width: 8),
+            _buildLegendItem('Chi (Kỳ trước)', Colors.grey.shade300),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: (maxHiredOverall * 1.3).clamp(5, double.infinity),
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => AppColors.dark.withOpacity(0.85),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final pt = data[groupIndex];
+                    final prevPt = (prevData.length > groupIndex) ? prevData[groupIndex] : null;
+                    String tooltip = '${pt.label}\n';
+                    tooltip += 'Thuê kỳ này: ${pt.hired} người (Kỳ trước: ${prevPt?.hired ?? 0} người)\n';
+                    tooltip += 'Chi kỳ này: ${ctrl.formatVnd(pt.spent)} (Kỳ trước: ${ctrl.formatVnd(prevPt?.spent ?? 0.0)})';
+                    
+                    return BarTooltipItem(
+                      tooltip,
+                      const TextStyle(color: Colors.white, fontSize: 10),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    interval: _xInterval(data.length),
+                    getTitlesWidget: (val, meta) {
+                      final i = val.toInt();
+                      if (i < 0 || i >= data.length) return const SizedBox.shrink();
+                      
+                      final interval = _xInterval(data.length).toInt();
+                      if (i % interval != 0) return const SizedBox.shrink();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          data[i].label,
+                          style: const TextStyle(fontSize: 9, color: AppColors.grey),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    getTitlesWidget: (val, meta) => Text(
+                      val.toInt().toString(),
                       style: const TextStyle(fontSize: 9, color: AppColors.grey),
                     ),
-                  );
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 30,
-                getTitlesWidget: (val, meta) => Text(
-                  val.toInt().toString(),
-                  style: const TextStyle(fontSize: 9, color: AppColors.grey),
-                ),
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) => FlLine(
-              color: Colors.grey.withOpacity(0.12),
-              strokeWidth: 1,
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: List.generate(data.length, (i) {
-            final pt = data[i];
-            final spentBar = maxSpent > 0 ? pt.spent * spentScale : 0.0;
-            return BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: pt.hired.toDouble(),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF42A5F5), Color(0xFF1565C0)],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
                   ),
-                  width: 12,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                 ),
-                BarChartRodData(
-                  toY: spentBar,
-                  color: AppColors.employerPrimary.withOpacity(0.2),
-                  width: 6,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.grey.withOpacity(0.12),
+                  strokeWidth: 1,
                 ),
-              ],
-            );
-          }),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: List.generate(data.length, (i) {
+                final pt = data[i];
+                final spentBar = maxSpentOverall > 0 ? pt.spent * spentScale : 0.0;
+                
+                final prevPt = (prevData.length > i) ? prevData[i] : null;
+                final prevHired = prevPt != null ? prevPt.hired.toDouble() : 0.0;
+                final prevSpentBar = (prevPt != null && maxSpentOverall > 0) ? prevPt.spent * spentScale : 0.0;
+
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: pt.hired.toDouble(),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF42A5F5), Color(0xFF1565C0)],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                      ),
+                      width: 5,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
+                    ),
+                    BarChartRodData(
+                      toY: prevHired,
+                      color: Colors.grey.shade400,
+                      width: 5,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
+                    ),
+                    BarChartRodData(
+                      toY: spentBar,
+                      color: AppColors.employerPrimary.withOpacity(0.5),
+                      width: 3,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(1.5)),
+                    ),
+                    BarChartRodData(
+                      toY: prevSpentBar,
+                      color: Colors.grey.shade300,
+                      width: 3,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(1.5)),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -1396,113 +1567,144 @@ class _DepositAreaChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = ctrl.chartData;
+    final prevData = ctrl.prevChartData;
     if (data.isEmpty) return _emptyChart();
 
     final maxVal = data.map((e) => e.deposited).reduce((a, b) => a > b ? a : b);
+    final maxPrevVal = prevData.isNotEmpty ? prevData.map((e) => e.deposited).reduce((a, b) => a > b ? a : b) : 0.0;
+    final maxOverall = maxVal > maxPrevVal ? maxVal : maxPrevVal;
 
     final spots = List.generate(
       data.length,
       (i) => FlSpot(i.toDouble(), data[i].deposited),
     );
+    final prevSpots = List.generate(
+      prevData.length,
+      (i) => FlSpot(i.toDouble(), prevData[i].deposited),
+    );
 
-    return SizedBox(
-      height: 180,
-      child: LineChart(
-        LineChartData(
-          minX: 0,
-          maxX: (data.length - 1).toDouble(),
-          minY: 0,
-          maxY: maxVal > 0 ? maxVal * 1.3 : 500000,
-          lineTouchData: LineTouchData(
-            touchTooltipData: LineTouchTooltipData(
-              getTooltipColor: (_) => AppColors.dark.withOpacity(0.85),
-              getTooltipItems: (spots) => spots.map((s) {
-                final i = s.x.toInt();
-                final pt = data[i];
-                return LineTooltipItem(
-                  '${pt.label}\n${ctrl.formatVnd(pt.deposited)}',
-                  const TextStyle(color: Colors.white, fontSize: 11),
-                );
-              }).toList(),
-            ),
-          ),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 24,
-                interval: _xInterval(data.length),
-                getTitlesWidget: (val, meta) {
-                  final i = val.toInt();
-                  if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                  
-                  final interval = _xInterval(data.length).toInt();
-                  if (i % interval != 0) return const SizedBox.shrink();
-
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      data[i].label,
-                      style: const TextStyle(fontSize: 9, color: AppColors.grey),
-                    ),
-                  );
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 44,
-                getTitlesWidget: (val, meta) => Text(
-                  _shortNum(val),
-                  style: const TextStyle(fontSize: 9, color: AppColors.grey),
-                ),
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) => FlLine(
-              color: Colors.grey.withOpacity(0.12),
-              strokeWidth: 1,
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              gradient: const LinearGradient(
-                colors: [AppColors.employerPrimary, AppColors.employerSecondary],
-              ),
-              barWidth: 3,
-              dotData: FlDotData(
-                show: true,
-                getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                  radius: 4,
-                  color: AppColors.employerPrimary,
-                  strokeWidth: 2,
-                  strokeColor: Colors.white,
-                ),
-              ),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.employerPrimary.withOpacity(0.3),
-                    AppColors.employerPrimary.withOpacity(0.0),
-                  ],
-                ),
-              ),
-            ),
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            _buildLegendItem('Nạp kỳ này', AppColors.employerPrimary, isLine: true),
+            const SizedBox(width: 12),
+            _buildLegendItem('Nạp kỳ trước', Colors.grey.shade400, isLine: true),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 180,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: (data.length - 1).toDouble(),
+              minY: 0,
+              maxY: maxOverall > 0 ? maxOverall * 1.3 : 500000,
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => AppColors.dark.withOpacity(0.85),
+                  getTooltipItems: (spots) => spots.map((s) {
+                    final i = s.x.toInt();
+                    final pt = data[i];
+                    final prevPt = (prevData.length > i) ? prevData[i] : null;
+                    return LineTooltipItem(
+                      '${pt.label}\nKỳ này: ${ctrl.formatVnd(pt.deposited)}\nKỳ trước: ${ctrl.formatVnd(prevPt?.deposited ?? 0.0)}',
+                      const TextStyle(color: Colors.white, fontSize: 10),
+                    );
+                  }).toList(),
+                ),
+              ),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    interval: _xInterval(data.length),
+                    getTitlesWidget: (val, meta) {
+                      final i = val.toInt();
+                      if (i < 0 || i >= data.length) return const SizedBox.shrink();
+                      
+                      final interval = _xInterval(data.length).toInt();
+                      if (i % interval != 0) return const SizedBox.shrink();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          data[i].label,
+                          style: const TextStyle(fontSize: 9, color: AppColors.grey),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 44,
+                    getTitlesWidget: (val, meta) => Text(
+                      _shortNum(val),
+                      style: const TextStyle(fontSize: 9, color: AppColors.grey),
+                    ),
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.grey.withOpacity(0.12),
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  gradient: const LinearGradient(
+                    colors: [AppColors.employerPrimary, AppColors.employerSecondary],
+                  ),
+                  barWidth: 3,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                      radius: 3,
+                      color: AppColors.employerPrimary,
+                      strokeWidth: 1.5,
+                      strokeColor: Colors.white,
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.employerPrimary.withOpacity(0.2),
+                        AppColors.employerPrimary.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+                if (prevSpots.isNotEmpty)
+                  LineChartBarData(
+                    spots: prevSpots,
+                    isCurved: true,
+                    color: Colors.grey.shade400,
+                    barWidth: 2,
+                    dashArray: [5, 5],
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1517,95 +1719,120 @@ class _PostsBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = ctrl.chartData;
+    final prevData = ctrl.prevChartData;
     if (data.isEmpty) return _emptyChart();
 
     final maxVal = data.map((e) => e.posts.toDouble()).reduce((a, b) => a > b ? a : b);
+    final maxPrevVal = prevData.isNotEmpty ? prevData.map((e) => e.posts.toDouble()).reduce((a, b) => a > b ? a : b) : 0.0;
+    final maxOverall = maxVal > maxPrevVal ? maxVal : maxPrevVal;
 
-    return SizedBox(
-      height: 160,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: (maxVal * 1.4).clamp(5, double.infinity),
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => AppColors.dark.withOpacity(0.85),
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final pt = data[groupIndex];
-                return BarTooltipItem(
-                  '${pt.label}: ${pt.posts} bài',
-                  const TextStyle(color: Colors.white, fontSize: 11),
-                );
-              },
-            ),
-          ),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 24,
-                interval: _xInterval(data.length),
-                getTitlesWidget: (val, meta) {
-                  final i = val.toInt();
-                  if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                  
-                  final interval = _xInterval(data.length).toInt();
-                  if (i % interval != 0) return const SizedBox.shrink();
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            _buildLegendItem('Bài đăng kỳ này', AppColors.employerPrimary),
+            const SizedBox(width: 12),
+            _buildLegendItem('Bài đăng kỳ trước', Colors.grey.shade300),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 160,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: (maxOverall * 1.4).clamp(5, double.infinity),
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => AppColors.dark.withOpacity(0.85),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final pt = data[groupIndex];
+                    final prevPt = (prevData.length > groupIndex) ? prevData[groupIndex] : null;
+                    return BarTooltipItem(
+                      '${pt.label}\nKỳ này: ${pt.posts} bài\nKỳ trước: ${prevPt?.posts ?? 0} bài',
+                      const TextStyle(color: Colors.white, fontSize: 10),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    interval: _xInterval(data.length),
+                    getTitlesWidget: (val, meta) {
+                      final i = val.toInt();
+                      if (i < 0 || i >= data.length) return const SizedBox.shrink();
+                      
+                      final interval = _xInterval(data.length).toInt();
+                      if (i % interval != 0) return const SizedBox.shrink();
 
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      data[i].label,
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          data[i].label,
+                          style: const TextStyle(fontSize: 9, color: AppColors.grey),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    getTitlesWidget: (val, meta) => Text(
+                      val.toInt().toString(),
                       style: const TextStyle(fontSize: 9, color: AppColors.grey),
                     ),
-                  );
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 24,
-                getTitlesWidget: (val, meta) => Text(
-                  val.toInt().toString(),
-                  style: const TextStyle(fontSize: 9, color: AppColors.grey),
-                ),
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) => FlLine(
-              color: Colors.grey.withOpacity(0.12),
-              strokeWidth: 1,
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: List.generate(data.length, (i) {
-            return BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: data[i].posts.toDouble(),
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.employerPrimaryLight.withOpacity(0.7),
-                      AppColors.employerPrimary,
-                    ],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
                   ),
-                  width: 14,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
                 ),
-              ],
-            );
-          }),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.grey.withOpacity(0.12),
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: List.generate(data.length, (i) {
+                final pt = data[i];
+                final prevPt = (prevData.length > i) ? prevData[i] : null;
+                final prevVal = prevPt != null ? prevPt.posts.toDouble() : 0.0;
+                
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: pt.posts.toDouble(),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.employerPrimaryLight.withOpacity(0.7),
+                          AppColors.employerPrimary,
+                        ],
+                      ),
+                      width: 8,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    BarChartRodData(
+                      toY: prevVal,
+                      color: Colors.grey.withOpacity(0.35),
+                      width: 8,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -1623,6 +1850,27 @@ Widget _emptyChart() => const SizedBox(
         ),
       ),
     );
+
+Widget _buildLegendItem(String label, Color color, {bool isLine = false}) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: isLine ? 14 : 10,
+        height: isLine ? 3 : 10,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 4),
+      Text(
+        label,
+        style: const TextStyle(fontSize: 10, color: AppColors.grey),
+      ),
+    ],
+  );
+}
 
 double _xInterval(int count) {
   if (count <= 7) return 1;

@@ -340,6 +340,40 @@ class EmployerMarketRateScreen extends StatelessWidget {
                     )
                   : const SizedBox.shrink(),
             ),
+            if (sel == 'other') ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 6),
+                child: TextField(
+                  controller: c.otherCategoryTextController,
+                  onChanged: (val) => c.setSearchQuery(val),
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Nhập tên công việc khác để tham khảo...',
+                    prefixIcon: const Icon(Icons.edit_note_rounded, size: 20, color: _purplePrimary),
+                    suffixIcon: Obx(() => c.searchQuery.value.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () {
+                              c.otherCategoryTextController.clear();
+                              c.setSearchQuery('');
+                            },
+                          )
+                        : const SizedBox.shrink()),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _purplePrimary, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
           ],
         );
@@ -884,6 +918,8 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
   bool get _rangeAtDefault =>
       _salaryRange.start <= _dMin && _salaryRange.end >= _dMax;
 
+  late TextEditingController _customCategoryController;
+
   @override
   void initState() {
     super.initState();
@@ -899,6 +935,15 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       currentMin > 0 ? currentMin.clamp(dMin, dMax > dMin ? dMax : dMin + 10000.0) : dMin,
       currentMax > 0 ? currentMax.clamp(dMin, dMax > dMin ? dMax : dMin + 10000.0) : (dMax > dMin ? dMax : dMin + 10000.0),
     );
+    _customCategoryController = TextEditingController(
+      text: _category == 'other' ? c.searchQuery.value : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _customCategoryController.dispose();
+    super.dispose();
   }
 
   void _onSalaryTypeChanged(String type) {
@@ -912,6 +957,9 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
 
   void _apply() {
     c.setCategory(_category);     // áp dụng danh mục
+    if (_category == 'other') {
+      c.setSearchQuery(_customCategoryController.text);
+    }
     c.applyAdvancedFilters(
       city: _city,
       salaryType: _salaryType,
@@ -928,6 +976,7 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       _salaryType = 'all';
       _demand = 'all';
       _category = 'all';
+      _customCategoryController.clear();
       final dMin = _getMinForType('all');
       final dMax = _getMaxForType('all');
       _salaryRange = RangeValues(dMin, dMax > dMin ? dMax : dMin + 10000.0);
@@ -1045,10 +1094,41 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        setState(() => _category = val);
+                        setState(() {
+                          _category = val;
+                          if (val != 'other') {
+                            _customCategoryController.clear();
+                          }
+                        });
                       }
                     },
                   ),
+                  if (_category == 'other') ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _customCategoryController,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                        hintText: 'Nhập tên công việc khác...',
+                        hintStyle: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.normal),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF7B1FA2), width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   // ── Khu vực ──
                   _sectionTitle(Icons.location_on_outlined, 'Khu vực'),

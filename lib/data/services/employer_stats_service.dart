@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/employer_stats_model.dart';
 
+enum EmployerBucketInterval { hour, day, week, month }
+
 class EmployerStatsService {
   final _db = FirebaseFirestore.instance;
 
@@ -82,7 +84,17 @@ class EmployerStatsService {
     }
   }
 
-  /// Lấy dữ liệu biểu đồ, nhóm theo [period]
+
+
+  EmployerBucketInterval _getInterval(DateTime start, DateTime end) {
+    final diffDays = end.difference(start).inDays;
+    if (diffDays <= 2) return EmployerBucketInterval.hour;
+    if (diffDays <= 31) return EmployerBucketInterval.day;
+    if (diffDays <= 120) return EmployerBucketInterval.week;
+    return EmployerBucketInterval.month;
+  }
+
+  /// Lấy dữ liệu biểu đồ, nhóm theo [period] (được chuyển đổi thành interval động)
   Future<List<EmployerChartPoint>> fetchChartData({
     required String employerId,
     required DateTime start,
@@ -106,14 +118,15 @@ class EmployerStatsService {
           .where('status', isEqualTo: 'completed')
           .get();
 
-      // Build bucket map
-      final buckets = _buildBuckets(start, end, period);
+      // Build bucket map based on dynamic interval
+      final interval = _getInterval(start, end);
+      final buckets = _buildBuckets(start, end, interval);
 
       for (final doc in jobsSnap.docs) {
         final data = doc.data();
         final ts = (data['createdAt'] as Timestamp?)?.toDate();
         if (ts == null || ts.isBefore(start) || ts.isAfter(end)) continue;
-        final key = _bucketKey(ts, period);
+        final key = _bucketKey(ts, interval);
         if (buckets.containsKey(key)) {
           final status = data['status'] as String? ?? '';
           final filled = (data['filledSlots'] as num?)?.toInt() ?? 0;
@@ -130,7 +143,7 @@ class EmployerStatsService {
         final data = doc.data();
         final ts = (data['createdAt'] as Timestamp?)?.toDate();
         if (ts == null || ts.isBefore(start) || ts.isAfter(end)) continue;
-        final key = _bucketKey(ts, period);
+        final key = _bucketKey(ts, interval);
         if (buckets.containsKey(key)) {
           final type = data['type'] as String? ?? '';
           final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
@@ -147,7 +160,7 @@ class EmployerStatsService {
       return buckets.entries
           .map(
             (e) => EmployerChartPoint(
-              label: e.key,
+              label: _bucketLabel(e.key, interval),
               spent: e.value.spent,
               deposited: e.value.deposited,
               hired: e.value.hired,
@@ -166,56 +179,84 @@ class EmployerStatsService {
   Map<String, _Bucket> _buildBuckets(
     DateTime start,
     DateTime end,
-    StatsPeriod period,
+    EmployerBucketInterval interval,
   ) {
     final map = <String, _Bucket>{};
-    DateTime cursor = _normalize(start, period);
+    DateTime cursor = _normalize(start, interval);
     final limit = end.add(const Duration(days: 1));
     while (cursor.isBefore(limit)) {
-      final key = _bucketKey(cursor, period);
-      map[key] = _Bucket();
-      cursor = _advance(cursor, period);
+      final key = _bucketKey(cursor, interval);
+      if (!map.containsKey(key)) {
+        map[key] = _Bucket();
+      }
+      cursor = _advance(cursor, interval);
     }
     return map;
   }
 
-  DateTime _normalize(DateTime dt, StatsPeriod period) {
-    switch (period) {
-      case StatsPeriod.day:
+  DateTime _normalize(DateTime dt, EmployerBucketInterval interval) {
+    switch (interval) {
+      case EmployerBucketInterval.hour:
         return DateTime(dt.year, dt.month, dt.day, dt.hour);
-      case StatsPeriod.week:
-      case StatsPeriod.month:
+      case EmployerBucketInterval.day:
+      case EmployerBucketInterval.week:
         return DateTime(dt.year, dt.month, dt.day);
-      case StatsPeriod.year:
+      case EmployerBucketInterval.month:
         return DateTime(dt.year, dt.month);
     }
   }
 
-  DateTime _advance(DateTime dt, StatsPeriod period) {
-    switch (period) {
-      case StatsPeriod.day:
+  DateTime _advance(DateTime dt, EmployerBucketInterval interval) {
+    switch (interval) {
+      case EmployerBucketInterval.hour:
         return dt.add(const Duration(hours: 1));
-      case StatsPeriod.week:
+      case EmployerBucketInterval.day:
         return dt.add(const Duration(days: 1));
-      case StatsPeriod.month:
+      case EmployerBucketInterval.week:
         return dt.add(const Duration(days: 7));
-      case StatsPeriod.year:
+      case EmployerBucketInterval.month:
         return DateTime(dt.year, dt.month + 1);
     }
   }
 
-  String _bucketKey(DateTime dt, StatsPeriod period) {
-    switch (period) {
-      case StatsPeriod.day:
-        return DateFormat('HH:mm').format(dt);
-      case StatsPeriod.week:
-        return DateFormat('EEE', 'vi').format(dt);
-      case StatsPeriod.month:
-        return DateFormat('dd/MM').format(dt);
-      case StatsPeriod.year:
-        return DateFormat('MMM', 'vi').format(dt);
+  String _bucketKey(DateTime dt, EmployerBucketInterval interval) {
+    switch (interval) {
+      case EmployerBucketInterval.hour:
+        return DateFormat('yyyy-MM-dd HH:mm').format(dt);
+      case EmployerBucketInterval.day:
+        return DateFormat('yyyy-MM-dd').format(dt);
+      case EmployerBucketInterval.week:
+        final w = ((dt.day - 1) / 7).floor() + 1;
+        return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-W$w';
+      case EmployerBucketInterval.month:
+        return DateFormat('yyyy-MM').format(dt);
     }
   }
+
+  String _bucketLabel(String key, EmployerBucketInterval interval) {
+    // We parse the key back or format it directly. 
+    // Wait, the key itself is sortable string. Let's just create the label during map creation instead.
+    // Actually, in fetchChartData we iterate buckets.entries, the order of entries is preserved in Dart!
+    try {
+      switch (interval) {
+        case EmployerBucketInterval.hour:
+          final parts = key.split(' ');
+          return parts[1]; // HH:mm
+        case EmployerBucketInterval.day:
+          final parts = key.split('-');
+          return '${parts[2]}/${parts[1]}'; // dd/MM
+        case EmployerBucketInterval.week:
+          final parts = key.split('-');
+          return 'Tuần ${parts[2].replaceAll('W', '')} T${int.parse(parts[1])}';
+        case EmployerBucketInterval.month:
+          final parts = key.split('-');
+          return 'T${int.parse(parts[1])}';
+      }
+    } catch (_) {
+      return key;
+    }
+  }
+
 }
 
 class _Bucket {

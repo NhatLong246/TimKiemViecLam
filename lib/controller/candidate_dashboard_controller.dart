@@ -14,6 +14,7 @@ class CandidateDashboardController extends GetxController {
   final reviewableJobs = <ReviewableJob>[].obs;
   final groups = <WorkGroup>[].obs;
   final summary = Rxn<CandidateEarningsSummary>();
+  final prevSummary = Rxn<CandidateEarningsSummary>();
   final isLoading = false.obs;
   final isWithdrawing = false.obs;
   final errorMessage = ''.obs;
@@ -23,6 +24,7 @@ class CandidateDashboardController extends GetxController {
   final startDate = Rx<DateTime>(DateTime.now().subtract(const Duration(days: 30)));
   final endDate = Rx<DateTime>(DateTime.now());
   final chartData = <CandidateChartPoint>[].obs;
+  final prevChartData = <CandidateChartPoint>[].obs;
   final isCustomRange = false.obs;
 
   @override
@@ -36,6 +38,46 @@ class CandidateDashboardController extends GetxController {
     return user?.averageRating ?? 0;
   }
 
+  Map<String, DateTime> getPreviousPeriodRange() {
+    final start = startDate.value;
+    final end = endDate.value;
+    final diff = end.difference(start);
+    
+    if (isCustomRange.value) {
+      return {
+        'start': start.subtract(diff),
+        'end': start.subtract(const Duration(seconds: 1)),
+      };
+    }
+
+    switch (period.value) {
+      case StatsPeriod.day:
+        return {
+          'start': start.subtract(const Duration(days: 1)),
+          'end': end.subtract(const Duration(days: 1)),
+        };
+      case StatsPeriod.week:
+        return {
+          'start': start.subtract(const Duration(days: 7)),
+          'end': end.subtract(const Duration(days: 7)),
+        };
+      case StatsPeriod.month:
+        final prevStart = DateTime(start.year, start.month - 1, 1);
+        final prevEnd = DateTime(start.year, start.month, 0, 23, 59, 59);
+        return {
+          'start': prevStart,
+          'end': prevEnd,
+        };
+      case StatsPeriod.year:
+        final prevStart = DateTime(start.year - 1, 1, 1);
+        final prevEnd = DateTime(start.year - 1, 12, 31, 23, 59, 59);
+        return {
+          'start': prevStart,
+          'end': prevEnd,
+        };
+    }
+  }
+
   Future<void> loadBenefits() async {
     await _load(() async {
       payments.assignAll(await _service.fetchPayments());
@@ -47,11 +89,28 @@ class CandidateDashboardController extends GetxController {
       );
       summary.value = s;
       _generateInsight(s);
+
+      // Fetch previous period summary
+      final prevRange = getPreviousPeriodRange();
+      final prevS = await _service.fetchSummary(
+        payments: payments,
+        profileRating: profileRating,
+        start: prevRange['start']!,
+        end: prevRange['end']!,
+      );
+      prevSummary.value = prevS;
       
       chartData.assignAll(await _service.fetchChartData(
         payments: payments,
         start: startDate.value,
         end: endDate.value,
+        period: period.value,
+      ));
+
+      prevChartData.assignAll(await _service.fetchChartData(
+        payments: payments,
+        start: prevRange['start']!,
+        end: prevRange['end']!,
         period: period.value,
       ));
     });

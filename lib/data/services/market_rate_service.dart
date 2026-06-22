@@ -288,7 +288,16 @@ class MarketRateService {
     required String category, // "all" hoặc category value
   }) {
     return items.where((item) {
-      final matchCat = category == 'all' || item.category == category;
+      bool matchCat;
+      if (category == 'all') {
+        matchCat = true;
+      } else if (category == 'other') {
+        const definedCats = {'boc_vac', 'lau_don', 'bung_be', 'phuc_vu', 'pha_che', 'tiep_thi', 'van_chuyen', 'bao_ve'};
+        matchCat = !definedCats.contains(item.category);
+      } else {
+        matchCat = item.category == category;
+      }
+
       final q = query.toLowerCase().trim();
       final matchQuery = q.isEmpty ||
           item.categoryLabel.toLowerCase().contains(q) ||
