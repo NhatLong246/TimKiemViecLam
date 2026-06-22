@@ -12,6 +12,8 @@ import 'attendance_service.dart';
 import 'notification_service.dart';
 import 'candidate_earnings_service.dart';
 
+enum BucketInterval { hour, day, week, month }
+
 class CandidateDashboardService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -131,6 +133,7 @@ class CandidateDashboardService {
     DisbursementNoticeModel? notice,
     DateTime? completedAt,
     bool isDisputed = false,
+    double? actualEarnings,
   }) {
     final completed = notice?.status == 'completed';
 
@@ -143,9 +146,9 @@ class CandidateDashboardService {
       status = 'pending';
     }
 
-    final amountVnd = completed && notice != null
-        ? notice.amount.round()
-        : row.job.salary.round();
+    final amountVnd = completed
+        ? (actualEarnings?.round() ?? (notice != null ? notice.amount.round() : row.job.salary.round()))
+        : (notice != null ? notice.amount.round() : row.job.salary.round());
 
     return CandidatePayment(
       id: row.application.appId,
@@ -296,6 +299,21 @@ class CandidateDashboardService {
     final completedAtByJob = await _fetchCompletedAtByJob(jobIds);
     final disputedJobs = await _fetchDisputedJobIds(uid);
 
+    final earningsSnap = await _firestore
+        .collection('candidateEarnings')
+        .where('candidateId', isEqualTo: uid)
+        .get();
+    
+    final earningsByJob = <String, double>{};
+    for (final doc in earningsSnap.docs) {
+      final data = doc.data();
+      final jobId = data['jobId'] as String? ?? '';
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+      if (jobId.isNotEmpty) {
+        earningsByJob[jobId] = (earningsByJob[jobId] ?? 0.0) + amount;
+      }
+    }
+
     return rows
         .map(
           (row) => _rowToPayment(
@@ -303,6 +321,7 @@ class CandidateDashboardService {
             notice: notices[row.job.jobId],
             completedAt: completedAtByJob[row.job.jobId],
             isDisputed: disputedJobs.contains(row.job.jobId),
+            actualEarnings: earningsByJob[row.job.jobId],
           ),
         )
         .toList();
@@ -525,6 +544,14 @@ class CandidateDashboardService {
     );
   }
 
+  BucketInterval _getInterval(DateTime start, DateTime end) {
+    final diffDays = end.difference(start).inDays;
+    if (diffDays <= 2) return BucketInterval.hour;
+    if (diffDays <= 31) return BucketInterval.day;
+    if (diffDays <= 120) return BucketInterval.week;
+    return BucketInterval.month;
+  }
+
   Future<List<CandidateChartPoint>> fetchChartData({
     required List<CandidatePayment> payments,
     required DateTime start,
@@ -534,13 +561,14 @@ class CandidateDashboardService {
     final uid = _uid;
     if (uid == null) return [];
 
-    final buckets = _buildBuckets(start, end, period);
+    final interval = _getInterval(start, end);
+    final buckets = _buildBuckets(start, end, interval);
     
     for (final p in payments) {
       final date = p.paidAt ?? DateTime.now();
       if (date.isBefore(start) || date.isAfter(end)) continue;
 
-      final key = _bucketKey(date, period);
+      final key = _bucketKey(date, interval);
       if (buckets.containsKey(key)) {
         if (p.status == 'paid') {
           buckets[key] = CandidateChartPoint(
@@ -570,7 +598,7 @@ class CandidateDashboardService {
         final sessionDate = DateTime.tryParse(session.date);
         if (sessionDate == null) continue;
         if (sessionDate.isBefore(start) || sessionDate.isAfter(end)) continue;
-        final key = _bucketKey(sessionDate, period);
+        final key = _bucketKey(sessionDate, interval);
         if (buckets.containsKey(key)) {
           for (final rec in session.records) {
             if (rec.candidateId != uid) continue;
@@ -594,50 +622,77 @@ class CandidateDashboardService {
   }
 
   Map<String, CandidateChartPoint> _buildBuckets(
-      DateTime start, DateTime end, StatsPeriod period) {
+      DateTime start, DateTime end, BucketInterval interval) {
     final map = <String, CandidateChartPoint>{};
-    var current = start;
-    while (!current.isAfter(end)) {
-      final key = _bucketKey(current, period);
+    var current = _normalize(start, interval);
+    final limit = end.add(const Duration(days: 1));
+    
+    while (current.isBefore(limit)) {
+      final key = _bucketKey(current, interval);
       if (!map.containsKey(key)) {
         map[key] = CandidateChartPoint(
-          label: _bucketLabel(current, period),
+          label: _bucketLabel(current, interval),
           paidVnd: 0,
           pendingVnd: 0,
           completedJobs: 0,
           hoursWorked: 0,
         );
       }
-      current = current.add(const Duration(days: 1));
+      current = _advance(current, interval);
     }
     return map;
   }
 
-  String _bucketKey(DateTime date, StatsPeriod period) {
-    switch (period) {
-      case StatsPeriod.day:
-        return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      case StatsPeriod.week:
-        final w = ((date.day - 1) / 7).floor() + 1;
-        return '${date.year}-${date.month.toString().padLeft(2, '0')}-W$w';
-      case StatsPeriod.month:
-        return '${date.year}-${date.month.toString().padLeft(2, '0')}';
-      case StatsPeriod.year:
-        return '${date.year}';
+  DateTime _normalize(DateTime dt, BucketInterval interval) {
+    switch (interval) {
+      case BucketInterval.hour:
+        return DateTime(dt.year, dt.month, dt.day, dt.hour);
+      case BucketInterval.day:
+      case BucketInterval.week:
+        return DateTime(dt.year, dt.month, dt.day);
+      case BucketInterval.month:
+        return DateTime(dt.year, dt.month);
     }
   }
 
-  String _bucketLabel(DateTime date, StatsPeriod period) {
-    switch (period) {
-      case StatsPeriod.day:
+  DateTime _advance(DateTime dt, BucketInterval interval) {
+    switch (interval) {
+      case BucketInterval.hour:
+        return dt.add(const Duration(hours: 1));
+      case BucketInterval.day:
+        return dt.add(const Duration(days: 1));
+      case BucketInterval.week:
+        return dt.add(const Duration(days: 7));
+      case BucketInterval.month:
+        return DateTime(dt.year, dt.month + 1);
+    }
+  }
+
+  String _bucketKey(DateTime date, BucketInterval interval) {
+    switch (interval) {
+      case BucketInterval.hour:
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:00';
+      case BucketInterval.day:
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      case BucketInterval.week:
+        final w = ((date.day - 1) / 7).floor() + 1;
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}-W$w';
+      case BucketInterval.month:
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+    }
+  }
+
+  String _bucketLabel(DateTime date, BucketInterval interval) {
+    switch (interval) {
+      case BucketInterval.hour:
+        return '${date.hour.toString().padLeft(2, '0')}:00';
+      case BucketInterval.day:
         return '${date.day}/${date.month}';
-      case StatsPeriod.week:
+      case BucketInterval.week:
         final w = ((date.day - 1) / 7).floor() + 1;
         return 'Tuần $w T${date.month}';
-      case StatsPeriod.month:
+      case BucketInterval.month:
         return 'T${date.month}';
-      case StatsPeriod.year:
-        return '${date.year}';
     }
   }
 

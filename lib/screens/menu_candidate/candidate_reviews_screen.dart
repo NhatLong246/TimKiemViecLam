@@ -342,6 +342,7 @@ class _CandidateReviewsScreenState extends State<CandidateReviewsScreen> {
                   const SizedBox(height: 16),
                   DropdownButtonFormField<ReviewableJob>(
                     value: selected,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Công việc đã nhận',
                       border: OutlineInputBorder(),

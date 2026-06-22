@@ -123,6 +123,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     },
   ];
 
+  static const List<String> _vietnamProvinces = [
+    'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh', 
+    'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau', 
+    'Cần Thơ', 'Cao Bằng', 'Đà Nẵng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai', 
+    'Đồng Tháp', 'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Nội', 'Hà Tĩnh', 'Hải Dương', 
+    'Hải Phòng', 'Hậu Giang', 'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang', 
+    'Kon Tum', 'Lai Châu', 'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định', 
+    'Nghệ An', 'Ninh Bình', 'Ninh Thuận', 'Phú Thọ', 'Phú Yên', 'Quảng Bình', 
+    'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị', 'Sóc Trăng', 'Sơn La', 
+    'Tây Ninh', 'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang', 
+    'TP.HCM', 'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
+  ];
+
   bool get _isEdit => _editing != null;
   bool get _isFullTimeScreen => widget.initialJobType == 'full_time';
 
@@ -1175,14 +1188,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: _buildTextField(
-                                  controller: _cityCtrl,
+                                child: _buildDropdown<String>(
                                   label: 'Tỉnh/Thành phố *',
-                                  hint: 'TP.HCM',
+                                  value: _vietnamProvinces.contains(_cityCtrl.text.trim())
+                                      ? _cityCtrl.text.trim()
+                                      : null,
                                   prefixIcon: Icons.location_city_outlined,
+                                  items: _vietnamProvinces.map((p) {
+                                    return DropdownMenuItem<String>(
+                                      value: p,
+                                      child: Text(
+                                        p,
+                                        style: const TextStyle(fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (v) {
+                                    if (v != null) {
+                                      _cityCtrl.text = v;
+                                    }
+                                  },
                                   validator: (v) =>
                                       (v == null || v.trim().isEmpty)
-                                      ? 'Nhập tỉnh/thành'
+                                      ? 'Chọn tỉnh/thành'
                                       : null,
                                 ),
                               ),
@@ -2139,12 +2168,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               items: const [
                 DropdownMenuItem(
                   value: 'no_exp',
-                  child: Text('Không yêu cầu - chấp nhận người mới'),
+                  child: Text('Không yêu cầu - chấp nhận người mới', overflow: TextOverflow.ellipsis),
                 ),
-                DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
-                DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
-                DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
-                DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
+                DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm', overflow: TextOverflow.ellipsis)),
+                DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm', overflow: TextOverflow.ellipsis)),
               ],
               onChanged: (value) =>
                   setState(() => _requiredExperience = value ?? 'no_exp'),
@@ -2973,15 +3002,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   // ── DROPDOWN ───────────────────────────────────────────────────────────────
   Widget _buildDropdown<T>({
     required String label,
-    required T value,
+    required T? value,
     required List<DropdownMenuItem<T>> items,
     required void Function(T?) onChanged,
     IconData? prefixIcon,
+    String? Function(T?)? validator,
   }) {
     return DropdownButtonFormField<T>(
-      initialValue: value,
+      value: value,
       items: items,
       onChanged: onChanged,
+      validator: validator,
+      isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: prefixIcon == null

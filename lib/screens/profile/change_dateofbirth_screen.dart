@@ -106,6 +106,17 @@ class _ChangeDateOfBirthScreenState extends State<ChangeDateOfBirthScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Vui lòng chọn ngày sinh';
                         }
+                        if (_selectedDate != null) {
+                          final now = DateTime.now();
+                          int age = now.year - _selectedDate!.year;
+                          if (now.month < _selectedDate!.month ||
+                              (now.month == _selectedDate!.month && now.day < _selectedDate!.day)) {
+                            age--;
+                          }
+                          if (age < 18) {
+                            return 'Bạn phải từ 18 tuổi trở lên';
+                          }
+                        }
                         return null;
                       },
                     ),
@@ -197,11 +208,20 @@ class _ChangeDateOfBirthScreenState extends State<ChangeDateOfBirthScreen> {
   /// ===== Date Picker =====
   Future<void> _pickDate() async {
     final DateTime now = DateTime.now();
+    final DateTime maxDate = DateTime(now.year - 18, now.month, now.day);
+    
+    // Nếu _selectedDate lớn hơn maxDate (người dùng chưa đủ 18 tuổi, do dữ liệu cũ),
+    // chúng ta sẽ dùng maxDate làm initialDate để tránh lỗi date picker.
+    DateTime initial = _selectedDate ?? maxDate;
+    if (initial.isAfter(maxDate)) {
+      initial = maxDate;
+    }
+
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime(now.year - 18),
+      initialDate: initial,
       firstDate: DateTime(1900),
-      lastDate: now,
+      lastDate: maxDate,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

@@ -192,7 +192,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _buildDateSelector() {
-    if (_readiness == null || _readiness!.mandatoryDates.isEmpty) {
+    if (_readiness == null || _readiness!.displayDates.isEmpty) {
       return const SizedBox.shrink();
     }
     return Container(
@@ -210,9 +210,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _readiness!.mandatoryDates.length,
+              itemCount: _readiness!.displayDates.length,
               itemBuilder: (context, index) {
-                final dateStr = _readiness!.mandatoryDates[index];
+                final dateStr = _readiness!.displayDates[index];
                 final dt = DateTime.parse(dateStr);
                 final isSelected = _targetDate == dateStr;
                 final isCompleted = _readiness!.incompleteDates.contains(dateStr) == false;

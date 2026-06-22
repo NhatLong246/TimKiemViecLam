@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:viecnow/data/models/market_rate_model.dart';
 import 'package:viecnow/data/services/market_rate_service.dart';
@@ -18,6 +19,8 @@ class EmployerReferenceController extends GetxController {
   final searchQuery = ''.obs;
   final selectedCategory = 'all'.obs;
   final selectedSortType = 'demand'.obs; // "demand" | "salary_asc" | "salary_desc"
+  
+  final otherCategoryTextController = TextEditingController();
 
   // ── Advanced filters (filter bottom sheet) ─────────────────────────────────
   final filterCity = 'all'.obs;
@@ -134,10 +137,22 @@ class EmployerReferenceController extends GetxController {
   }
 
   // ── Public mutators ────────────────────────────────────────────────────────
-  void setCategory(String cat) => selectedCategory.value = cat;
+  void setCategory(String cat) {
+    selectedCategory.value = cat;
+    if (cat != 'other') {
+      otherCategoryTextController.clear();
+      searchQuery.value = '';
+    }
+  }
   void setSearchQuery(String q) => searchQuery.value = q;
   void setSortType(String sort) => selectedSortType.value = sort;
   void toggleOtherCat() => isOtherCatExpanded.value = !isOtherCatExpanded.value;
+
+  @override
+  void onClose() {
+    otherCategoryTextController.dispose();
+    super.onClose();
+  }
 
   void applyAdvancedFilters({
     required String city,

@@ -108,7 +108,8 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                 _buildMainStats(summary),
                 _buildSubStats(summary),
                 const SizedBox(height: 16),
-                _buildChartSection(),
+                _buildIncomeChart(),
+                _buildHoursChart(),
                 _buildHistorySection(_dashCtrl.payments),
               ],
             ),
@@ -140,7 +141,82 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
     );
   }
 
+  String _getPeriodLabel() {
+    if (_dashCtrl.isCustomRange.value) return 'kỳ';
+    switch (_dashCtrl.period.value) {
+      case StatsPeriod.day:
+        return 'ngày';
+      case StatsPeriod.week:
+        return 'tuần';
+      case StatsPeriod.month:
+        return 'tháng';
+      case StatsPeriod.year:
+        return 'năm';
+    }
+  }
+
+  Widget _buildComparisonWidget({
+    required double current,
+    required double previous,
+    required String periodLabel,
+    bool isOnDarkBackground = false,
+  }) {
+    if (previous == 0) {
+      if (current == 0) {
+        return Text(
+          'Không thay đổi so với $periodLabel trước',
+          style: TextStyle(
+            fontSize: 12,
+            color: isOnDarkBackground ? Colors.white70 : Colors.grey.shade600,
+          ),
+        );
+      }
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.trending_up, size: 14, color: isOnDarkBackground ? Colors.lightGreenAccent : Colors.green),
+          const SizedBox(width: 4),
+          Text(
+            'Tăng so với $periodLabel trước',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isOnDarkBackground ? Colors.lightGreenAccent : Colors.green,
+            ),
+          ),
+        ],
+      );
+    }
+
+    final diffPct = ((current - previous) / previous) * 100;
+    final isIncrease = diffPct >= 0;
+    final sign = isIncrease ? '+' : '';
+    final color = isIncrease 
+        ? (isOnDarkBackground ? Colors.lightGreenAccent : Colors.green)
+        : (isOnDarkBackground ? Colors.redAccent : Colors.red);
+    final icon = isIncrease ? Icons.trending_up : Icons.trending_down;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(
+          '$sign${diffPct.toStringAsFixed(1)}% so với $periodLabel trước',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMainStats(CandidateEarningsSummary summary) {
+    final prev = _dashCtrl.prevSummary.value;
+    final periodLbl = _getPeriodLabel();
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Container(
@@ -190,22 +266,31 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 6),
+            _buildComparisonWidget(
+              current: summary.periodPaidVnd.toDouble(),
+              previous: prev?.periodPaidVnd.toDouble() ?? 0.0,
+              periodLabel: periodLbl,
+              isOnDarkBackground: true,
+            ),
+            if (summary.totalPaidVnd != summary.periodPaidVnd || summary.pendingVnd > 0 || summary.walletBalanceVnd > 0) ...[
+              const Divider(height: 24, color: Colors.white24),
+            ],
             if (summary.totalPaidVnd != summary.periodPaidVnd) ...[
-              const SizedBox(height: 8),
               Text(
                 'Tổng đã giải ngân: ${summary.formatVnd(summary.totalPaidVnd)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
+              const SizedBox(height: 4),
             ],
             if (summary.pendingVnd > 0) ...[
-              const SizedBox(height: 12),
               Text(
                 'Chờ giải ngân: ${summary.formatVnd(summary.pendingVnd)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
+              const SizedBox(height: 4),
             ],
             if (summary.walletBalanceVnd > 0) ...[
-              const SizedBox(height: 8),
               Text(
                 'Số dư ví: ${summary.formatVnd(summary.walletBalanceVnd)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
@@ -218,6 +303,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
   }
 
   Widget _buildSubStats(CandidateEarningsSummary summary) {
+    final prev = _dashCtrl.prevSummary.value;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -226,6 +312,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
             child: _buildStatCard(
               title: 'Ca đã GN',
               value: summary.jobCount.toDouble(),
+              previousValue: prev?.jobCount.toDouble(),
               format: (v) => v.toInt().toString(),
               icon: Icons.work_outline,
               color: Colors.blue,
@@ -236,6 +323,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
             child: _buildStatCard(
               title: 'Giờ làm',
               value: summary.hoursWorked.toDouble(),
+              previousValue: prev?.hoursWorked.toDouble(),
               format: (v) => '${v.toInt()}h',
               icon: Icons.timer_outlined,
               color: Colors.orange,
@@ -246,9 +334,11 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
             child: _buildStatCard(
               title: 'Đánh giá',
               value: summary.avgRating,
+              previousValue: prev?.avgRating,
               format: (v) => v > 0 ? '${v.toStringAsFixed(1)} ⭐' : '—',
               icon: Icons.star_outline,
               color: Colors.amber,
+              isRating: true,
             ),
           ),
         ],
@@ -259,10 +349,49 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
   Widget _buildStatCard({
     required String title,
     required double value,
+    double? previousValue,
     required String Function(double) format,
     required IconData icon,
     required Color color,
+    bool isRating = false,
   }) {
+    // calculate diff
+    Widget? diffWidget;
+    if (previousValue != null) {
+      if (isRating) {
+        final diff = value - previousValue;
+        if (diff != 0) {
+          final isInc = diff > 0;
+          final sign = isInc ? '+' : '';
+          final textCol = isInc ? Colors.green : Colors.red;
+          diffWidget = Text(
+            '$sign${diff.toStringAsFixed(1)}⭐',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textCol),
+          );
+        }
+      } else {
+        if (previousValue == 0) {
+          if (value > 0) {
+            diffWidget = const Text(
+              'Tăng',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green),
+            );
+          }
+        } else {
+          final diffPct = ((value - previousValue) / previousValue) * 100;
+          if (diffPct != 0) {
+            final isInc = diffPct > 0;
+            final sign = isInc ? '+' : '';
+            final textCol = isInc ? Colors.green : Colors.red;
+            diffWidget = Text(
+              '$sign${diffPct.toStringAsFixed(0)}%',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textCol),
+            );
+          }
+        }
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
@@ -297,20 +426,99 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (diffWidget != null) ...[
+                const SizedBox(width: 4),
+                diffWidget,
+              ],
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildChartSection() {
+  double _xInterval(int length) {
+    if (length <= 7) return 1;
+    if (length <= 15) return 2;
+    return (length / 5).ceilToDouble();
+  }
+
+  String _formatYAxisVnd(double val) {
+    if (val >= 1000000) {
+      return '${(val / 1000000).toStringAsFixed(1).replaceFirst('.0', '')}tr';
+    } else if (val >= 1000) {
+      return '${(val / 1000).toStringAsFixed(0)}k';
+    }
+    return val.toInt().toString();
+  }
+
+  Widget _buildLegendItem({required String label, required Color color, bool isDashed = false}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 3,
+          decoration: BoxDecoration(
+            color: isDashed ? null : color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: isDashed 
+              ? Row(
+                  children: List.generate(
+                    3,
+                    (index) => Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        color: color,
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBarLegendItem({required String label, required Color color}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIncomeChart() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
@@ -320,7 +528,7 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -329,73 +537,275 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Biểu đồ thu nhập & Giờ làm',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                const Icon(Icons.show_chart, color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Biểu đồ thu nhập',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _buildLegendItem(label: 'Kỳ này', color: Colors.green),
+                const SizedBox(width: 12),
+                _buildLegendItem(label: 'Kỳ trước', color: Colors.grey.shade400, isDashed: true),
+              ],
             ),
             const SizedBox(height: 4),
             const Text(
-              'Cột: Giờ làm  •  Đường: Thu nhập (VNĐ)',
+              'Thu nhập thực tế (VNĐ) nhận được theo thời gian',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 24),
             SizedBox(
-              height: 220,
+              height: 200,
               child: Obx(() {
                 final data = _dashCtrl.chartData;
+                final prevData = _dashCtrl.prevChartData;
                 if (data.isEmpty) {
-                  return const Center(child: Text('Không có dữ liệu', style: TextStyle(color: Colors.grey)));
+                  return const Center(
+                    child: Text('Không có dữ liệu', style: TextStyle(color: Colors.grey)),
+                  );
                 }
 
-                double maxPaid = 0;
-                double maxHours = 0;
+                double maxPaid = 100000;
                 for (final p in data) {
                   if (p.paidVnd > maxPaid) maxPaid = p.paidVnd;
-                  if (p.hoursWorked > maxHours) maxHours = p.hoursWorked;
                 }
-                if (maxPaid == 0) maxPaid = 100000;
-                if (maxHours == 0) maxHours = 10;
+                for (final p in prevData) {
+                  if (p.paidVnd > maxPaid) maxPaid = p.paidVnd;
+                }
 
-                return BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: maxHours * 1.2,
-                    barTouchData: BarTouchData(enabled: false),
+                return LineChart(
+                  LineChartData(
+                    maxY: maxPaid * 1.25,
+                    minY: 0,
                     titlesData: FlTitlesData(
                       show: true,
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          reservedSize: 30,
+                          interval: _xInterval(data.length),
                           getTitlesWidget: (value, meta) {
                             final idx = value.toInt();
                             if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+                            
+                            final interval = _xInterval(data.length).toInt();
+                            if (idx % interval != 0) return const SizedBox.shrink();
+
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
                                 data[idx].label,
-                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                style: const TextStyle(fontSize: 9, color: Colors.grey),
                               ),
                             );
                           },
                         ),
                       ),
-                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 42,
+                          getTitlesWidget: (val, meta) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Text(
+                                _formatYAxisVnd(val),
+                                style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                textAlign: TextAlign.right,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                       rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    gridData: const FlGridData(show: false),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: Colors.grey.withOpacity(0.08),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: data.asMap().entries.map((e) {
+                          return FlSpot(e.key.toDouble(), e.value.paidVnd);
+                        }).toList(),
+                        isCurved: true,
+                        color: Colors.green,
+                        barWidth: 3.5,
+                        isStrokeCapRound: true,
+                        dotData: const FlDotData(show: true),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: Colors.green.withOpacity(0.12),
+                        ),
+                      ),
+                      if (prevData.isNotEmpty)
+                        LineChartBarData(
+                          spots: prevData.asMap().entries.map((e) {
+                            return FlSpot(e.key.toDouble(), e.value.paidVnd);
+                          }).toList(),
+                          isCurved: true,
+                          color: Colors.grey.withOpacity(0.4),
+                          barWidth: 2,
+                          dashArray: [5, 5],
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(show: false),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHoursChart() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.bar_chart, color: Colors.orange, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Biểu đồ giờ làm',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _buildBarLegendItem(label: 'Kỳ này', color: Colors.orange),
+                const SizedBox(width: 12),
+                _buildBarLegendItem(label: 'Kỳ trước', color: Colors.grey.shade300),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Tổng số giờ làm việc (Giờ) theo thời gian',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 200,
+              child: Obx(() {
+                final data = _dashCtrl.chartData;
+                final prevData = _dashCtrl.prevChartData;
+                if (data.isEmpty) {
+                  return const Center(
+                    child: Text('Không có dữ liệu', style: TextStyle(color: Colors.grey)),
+                  );
+                }
+
+                double maxHours = 8;
+                for (final p in data) {
+                  if (p.hoursWorked > maxHours) maxHours = p.hoursWorked;
+                }
+                for (final p in prevData) {
+                  if (p.hoursWorked > maxHours) maxHours = p.hoursWorked;
+                }
+
+                return BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxHours * 1.25,
+                    barTouchData: BarTouchData(enabled: true),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 30,
+                          interval: _xInterval(data.length),
+                          getTitlesWidget: (value, meta) {
+                            final idx = value.toInt();
+                            if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+                            
+                            final interval = _xInterval(data.length).toInt();
+                            if (idx % interval != 0) return const SizedBox.shrink();
+
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                data[idx].label,
+                                style: const TextStyle(fontSize: 9, color: Colors.grey),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 30,
+                          getTitlesWidget: (val, meta) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Text(
+                                '${val.toInt()}h',
+                                style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                textAlign: TextAlign.right,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      getDrawingHorizontalLine: (value) => FlLine(
+                        color: Colors.grey.withOpacity(0.08),
+                        strokeWidth: 1,
+                      ),
+                    ),
                     borderData: FlBorderData(show: false),
                     barGroups: data.asMap().entries.map((e) {
                       final idx = e.key;
                       final p = e.value;
+                      final prevVal = (prevData.length > idx) ? prevData[idx].hoursWorked : 0.0;
                       return BarChartGroupData(
                         x: idx,
                         barRods: [
                           BarChartRodData(
                             toY: p.hoursWorked,
-                            color: Colors.orange.withOpacity(0.6),
-                            width: 12,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                            color: Colors.orange.withOpacity(0.85),
+                            width: 8,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                          ),
+                          BarChartRodData(
+                            toY: prevVal,
+                            color: Colors.grey.withOpacity(0.4),
+                            width: 8,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                           ),
                         ],
                       );
@@ -403,49 +813,6 @@ class _CandidateStatsScreenState extends State<CandidateStatsScreen> {
                   ),
                 );
               }),
-            ),
-            // Layer Line Chart on top
-            Transform.translate(
-              offset: const Offset(0, -220),
-              child: SizedBox(
-                height: 220,
-                child: Obx(() {
-                  final data = _dashCtrl.chartData;
-                  if (data.isEmpty) return const SizedBox.shrink();
-
-                  double maxPaid = 0;
-                  for (final p in data) {
-                    if (p.paidVnd > maxPaid) maxPaid = p.paidVnd;
-                  }
-                  if (maxPaid == 0) maxPaid = 100000;
-
-                  return LineChart(
-                    LineChartData(
-                      maxY: maxPaid * 1.2,
-                      minY: 0,
-                      titlesData: const FlTitlesData(show: false),
-                      gridData: const FlGridData(show: false),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: data.asMap().entries.map((e) {
-                            return FlSpot(e.key.toDouble(), e.value.paidVnd);
-                          }).toList(),
-                          isCurved: true,
-                          color: Colors.green,
-                          barWidth: 3,
-                          isStrokeCapRound: true,
-                          dotData: const FlDotData(show: true),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            color: Colors.green.withOpacity(0.1),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ),
             ),
           ],
         ),
@@ -810,6 +1177,8 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
   late DateTime _selectedDate;
   late DateTime _customStart;
   late DateTime _customEnd;
+  late TextEditingController _startController;
+  late TextEditingController _endController;
 
   @override
   void initState() {
@@ -838,6 +1207,15 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       _customStart = DateTime.now().subtract(const Duration(days: 7));
       _customEnd = DateTime.now();
     }
+    _startController = TextEditingController(text: DateFormat('dd/MM/yyyy').format(_customStart));
+    _endController = TextEditingController(text: DateFormat('dd/MM/yyyy').format(_customEnd));
+  }
+
+  @override
+  void dispose() {
+    _startController.dispose();
+    _endController.dispose();
+    super.dispose();
   }
 
   void _onPeriodChanged(FilterMode mode) {
@@ -849,6 +1227,8 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       if (mode == FilterMode.custom) {
         _customStart = now.subtract(const Duration(days: 7));
         _customEnd = now;
+        _startController.text = DateFormat('dd/MM/yyyy').format(_customStart);
+        _endController.text = DateFormat('dd/MM/yyyy').format(_customEnd);
       }
     });
   }
@@ -1197,68 +1577,120 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
       setState(() {
         if (isStart) {
           _customStart = picked;
+          _startController.text = DateFormat('dd/MM/yyyy').format(picked);
           if (_customStart.isAfter(_customEnd)) {
             _customEnd = _customStart;
+            _endController.text = DateFormat('dd/MM/yyyy').format(_customEnd);
           }
         } else {
           _customEnd = picked;
+          _endController.text = DateFormat('dd/MM/yyyy').format(picked);
           if (_customEnd.isBefore(_customStart)) {
             _customStart = _customEnd;
+            _startController.text = DateFormat('dd/MM/yyyy').format(_customStart);
           }
         }
       });
     }
   }
 
-  Widget _buildCustomDateButton({
+  void _onStartTextChanged(String val) {
+    try {
+      final parsed = DateFormat('dd/MM/yyyy').parseStrict(val);
+      if (parsed.year >= 2020 && parsed.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+        setState(() {
+          _customStart = parsed;
+          if (_customStart.isAfter(_customEnd)) {
+            _customEnd = _customStart;
+            _endController.text = DateFormat('dd/MM/yyyy').format(_customEnd);
+          }
+        });
+      }
+    } catch (_) {
+      // Ignore format exception during typing
+    }
+  }
+
+  void _onEndTextChanged(String val) {
+    try {
+      final parsed = DateFormat('dd/MM/yyyy').parseStrict(val);
+      if (parsed.year >= 2020 && parsed.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+        setState(() {
+          _customEnd = parsed;
+          if (_customEnd.isBefore(_customStart)) {
+            _customStart = _customEnd;
+            _startController.text = DateFormat('dd/MM/yyyy').format(_customStart);
+          }
+        });
+      }
+    } catch (_) {
+      // Ignore format exception during typing
+    }
+  }
+
+  Widget _buildCustomDateField({
     required String label,
-    required DateTime date,
-    required VoidCallback onTap,
+    required TextEditingController controller,
+    required VoidCallback onIconTap,
+    required ValueChanged<String> onChanged,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+    final primaryColor = AppColors.candidatePrimary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.grey.shade400 : Colors.black54,
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? Colors.grey.shade400 : Colors.black54,
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.datetime,
+          onChanged: onChanged,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            hintText: 'dd/MM/yyyy',
+            hintStyle: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.normal,
+              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+            ),
+            filled: true,
+            fillColor: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+            suffixIcon: IconButton(
+              icon: Icon(Icons.calendar_today_outlined, size: 16, color: primaryColor),
+              onPressed: onIconTap,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  DateFormat('dd/MM/yyyy').format(date),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 14,
-                  color: AppColors.candidatePrimary,
-                ),
-              ],
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: primaryColor,
+                width: 1.5,
+              ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1359,18 +1791,20 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
             Row(
               children: [
                 Expanded(
-                  child: _buildCustomDateButton(
+                  child: _buildCustomDateField(
                     label: 'Từ ngày',
-                    date: _customStart,
-                    onTap: () => _pickCustomDate(true),
+                    controller: _startController,
+                    onIconTap: () => _pickCustomDate(true),
+                    onChanged: _onStartTextChanged,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildCustomDateButton(
+                  child: _buildCustomDateField(
                     label: 'Đến ngày',
-                    date: _customEnd,
-                    onTap: () => _pickCustomDate(false),
+                    controller: _endController,
+                    onIconTap: () => _pickCustomDate(false),
+                    onChanged: _onEndTextChanged,
                   ),
                 ),
               ],
