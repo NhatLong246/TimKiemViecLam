@@ -13,6 +13,7 @@ import '../../widgets/dynamic_weather_header.dart';
 import '../../data/models/job_post_model.dart';
 import '../../routes/app_routes.dart';
 import '../../data/constants/job_categories.dart' as job_cats;
+import '../../data/constants/language_proficiency_levels.dart';
 
 const Color _primary = Color(0xFF2E7D32);
 const Color _primaryDark = Color(0xFF1B5E20);
@@ -497,20 +498,15 @@ class _HomeScreenState extends State<HomeScreen> {
     String tempJobType = _homeController.filterJobType.value;
     String tempCategory = _homeController.filterCategory.value;
     String tempGender = _homeController.filterGender.value;
-    double? tempHeight = _homeController.filterHeight.value;
-    double? tempWeight = _homeController.filterWeight.value;
+    String tempLanguage = _homeController.filterLanguage.value;
+    String tempLanguageLevel = _homeController.filterLanguageLevel.value;
+    String tempExperience = _homeController.filterExperience.value;
 
     final minCtrl = TextEditingController(
       text: tempMinSalary?.toInt().toString() ?? '',
     );
     final maxCtrl = TextEditingController(
       text: tempMaxSalary?.toInt().toString() ?? '',
-    );
-    final heightCtrl = TextEditingController(
-      text: tempHeight != null ? tempHeight.toInt().toString() : '',
-    );
-    final weightCtrl = TextEditingController(
-      text: tempWeight != null ? tempWeight.toInt().toString() : '',
     );
 
     showModalBottomSheet(
@@ -810,108 +806,136 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Chiều cao của bạn (cm)',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: heightCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    hintText: 'Ví dụ: 165',
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.green.shade200,
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.green.shade200,
-                                      ),
-                                    ),
-                                  ),
-                                  onChanged: (val) =>
-                                      tempHeight = double.tryParse(val),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Cân nặng của bạn (kg)',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: weightCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    hintText: 'Ví dụ: 55',
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.green.shade200,
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Colors.green.shade200,
-                                      ),
-                                    ),
-                                  ),
-                                  onChanged: (val) =>
-                                      tempWeight = double.tryParse(val),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    const Text('Kinh nghiệm yêu cầu', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: tempExperience,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
                       ),
-                      const SizedBox(height: 32),
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(value: 'Tất cả', child: Text('Tất cả')),
+                        DropdownMenuItem(value: 'no_exp', child: Text('Chưa có kinh nghiệm')),
+                        DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
+                        DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
+                        DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
+                        DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => tempExperience = val);
+                      },
+                    ),
+                    const SizedBox(height: 24),
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            _homeController.applyAdvancedFilter(
-                              minSalary: tempMinSalary,
-                              maxSalary: tempMaxSalary,
-                              location: tempLocation,
-                              jobType: tempJobType,
-                              category: tempCategory,
-                              gender: tempGender,
-                              height: tempHeight,
-                              weight: tempWeight,
-                            );
-                            Navigator.pop(ctx);
-                          },
+                    const Text('Yêu cầu ngoại ngữ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: tempLanguage,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isExpanded: true,
+                      items: ['Tất cả', ...LanguageProficiencyLevels.languageOptions].map((lang) {
+                        return DropdownMenuItem<String>(
+                          value: lang,
+                          child: Text(lang),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            tempLanguage = val;
+                            tempLanguageLevel = 'Tất cả';
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text('Trình độ ngoại ngữ yêu cầu', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: tempLanguageLevel,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isExpanded: true,
+                      items: () {
+                        final List<String> levels = ['Tất cả'];
+                        if (tempLanguage != 'Tất cả') {
+                          if (tempLanguage == 'Tiếng Anh') {
+                            levels.addAll(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'TOEIC']);
+                          } else {
+                            levels.addAll(LanguageProficiencyLevels.forLanguage(tempLanguage));
+                          }
+                        }
+                        return levels.map((lvl) {
+                          return DropdownMenuItem<String>(
+                            value: lvl,
+                            child: Text(lvl),
+                          );
+                        }).toList();
+                      }(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => tempLanguageLevel = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _homeController.applyAdvancedFilter(
+                            minSalary: tempMinSalary,
+                            maxSalary: tempMaxSalary,
+                            location: tempLocation,
+                            jobType: tempJobType,
+                            category: tempCategory,
+                            gender: tempGender,
+                            language: tempLanguage,
+                            languageLevel: tempLanguageLevel,
+                            experience: tempExperience,
+                          );
+                          Navigator.pop(ctx);
+                        },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _primary,
                             shape: RoundedRectangleBorder(

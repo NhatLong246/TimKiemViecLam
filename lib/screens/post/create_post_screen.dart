@@ -14,6 +14,7 @@ import '../../data/models/job_post_model.dart';
 import '../../data/services/job_pricing_service.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme_colors.dart';
+import '../../data/constants/language_proficiency_levels.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key, this.initialJobType = 'part_time'});
@@ -66,6 +67,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final Set<String> _workingDays = {'mon', 'tue', 'wed', 'thu', 'fri'};
   final List<String> _imageBase64s = [];
   JobPostModel? _editing;
+
+  String _requiredLanguage = 'Tất cả';
+  String _requiredLanguageLevel = 'Tất cả';
+  String _requiredExperience = 'Tất cả';
 
   bool get _isEdit => _editing != null;
   bool get _isFullTimeScreen => widget.initialJobType == 'full_time';
@@ -191,6 +196,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ..clear()
         ..addAll(ft.workingDays);
     }
+    _requiredLanguage = p.requiredLanguage ?? 'Tất cả';
+    _requiredLanguageLevel = p.requiredLanguageLevel ?? 'Tất cả';
+    _requiredExperience = p.requiredExperience ?? 'Tất cả';
   }
 
   @override
@@ -523,6 +531,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
+    if (_isFullTimeScreen) {
+      _requiredExperience = switch (_minExperience) {
+        'none' => 'Tất cả',
+        'under_1' => 'under_1',
+        '1_2' => '1_to_3',
+        '2_5' => '3_to_5',
+        'over_5' => 'over_5',
+        _ => 'Tất cả',
+      };
+    }
+
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final salary =
         double.tryParse(
@@ -578,13 +597,39 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               _startMinCtrl.text.trim().isEmpty
           ? null
           : '${_startHourCtrl.text.trim().padLeft(2, '0')}:${_startMinCtrl.text.trim().padLeft(2, '0')}',
-      requirements: _requirementsCtrl.text.trim().isEmpty
-          ? null
-          : _requirementsCtrl.text.trim(),
+      requirements: () {
+        final List<String> reqs = [];
+        if (_requiredExperience != 'Tất cả') {
+          final expStr = switch (_requiredExperience) {
+            'no_exp' => 'Chưa có kinh nghiệm',
+            'under_1' => 'Dưới 1 năm kinh nghiệm',
+            '1_to_3' => '1 - 3 năm kinh nghiệm',
+            '3_to_5' => '3 - 5 năm kinh nghiệm',
+            'over_5' => 'Trên 5 năm kinh nghiệm',
+            _ => 'Kinh nghiệm: $_requiredExperience',
+          };
+          reqs.add(expStr);
+        }
+        if (_requiredLanguage != 'Tất cả') {
+          if (_requiredLanguageLevel != 'Tất cả') {
+            reqs.add('Yêu cầu ngoại ngữ: $_requiredLanguage (Trình độ: $_requiredLanguageLevel)');
+          } else {
+            reqs.add('Yêu cầu ngoại ngữ: $_requiredLanguage');
+          }
+        }
+        final customReq = _requirementsCtrl.text.trim();
+        if (customReq.isNotEmpty) {
+          reqs.add(customReq);
+        }
+        return reqs.isEmpty ? null : reqs.join('\n');
+      }(),
       status: _isEdit ? newStatus : (isDraft ? 'draft' : 'pending'),
       totalBudget: salary * slots,
       imageUrls: List.from(_imageBase64s),
       fullTimeDetails: _isFullTimeScreen ? _buildFullTimeDetails() : null,
+      requiredLanguage: _requiredLanguage,
+      requiredLanguageLevel: _requiredLanguageLevel,
+      requiredExperience: _requiredExperience,
       groupChatId: _editing?.groupChatId,
       createdAt: _editing?.createdAt,
     );
@@ -919,10 +964,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ]),
                     const SizedBox(height: 16),
                     _buildSection('Yêu cầu ứng viên (tùy chọn)', [
+                      _buildDropdown<String>(
+                        label: 'Kinh nghiệm yêu cầu',
+                        value: _requiredExperience,
+                        items: const [
+                          DropdownMenuItem(value: 'Tất cả', child: Text('Không yêu cầu kinh nghiệm')),
+                          DropdownMenuItem(value: 'no_exp', child: Text('Chưa có kinh nghiệm')),
+                          DropdownMenuItem(value: 'under_1', child: Text('Dưới 1 năm')),
+                          DropdownMenuItem(value: '1_to_3', child: Text('1 - 3 năm')),
+                          DropdownMenuItem(value: '3_to_5', child: Text('3 - 5 năm')),
+                          DropdownMenuItem(value: 'over_5', child: Text('Trên 5 năm')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _requiredExperience = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      ..._buildLanguageRequirementDropdowns(),
+                      const SizedBox(height: 12),
                       _buildTextField(
                         controller: _requirementsCtrl,
-                        label: 'Yêu cầu',
-                        hint: 'Ví dụ: Có kinh nghiệm, biết tiếng Anh...',
+                        label: 'Yêu cầu khác',
+                        hint: 'Ví dụ: Có phương tiện đi lại, nhanh nhẹn...',
                         maxLines: 3,
                       ),
                     ]),
@@ -1126,6 +1191,55 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     ]);
   }
 
+  List<Widget> _buildLanguageRequirementDropdowns() {
+    return [
+      _buildDropdown<String>(
+        label: 'Yêu cầu ngoại ngữ',
+        value: _requiredLanguage,
+        items: ['Tất cả', ...LanguageProficiencyLevels.languageOptions].map((lang) {
+          return DropdownMenuItem<String>(
+            value: lang,
+            child: Text(lang == 'Tất cả' ? 'Không yêu cầu ngoại ngữ' : lang),
+          );
+        }).toList(),
+        onChanged: (val) {
+          if (val != null) {
+            setState(() {
+              _requiredLanguage = val;
+              _requiredLanguageLevel = 'Tất cả';
+            });
+          }
+        },
+      ),
+      if (_requiredLanguage != 'Tất cả') ...[
+        const SizedBox(height: 12),
+        _buildDropdown<String>(
+          label: 'Trình độ ngoại ngữ yêu cầu',
+          value: _requiredLanguageLevel,
+          items: () {
+            final List<String> levels = ['Tất cả'];
+            if (_requiredLanguage == 'Tiếng Anh') {
+              levels.addAll(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'TOEIC']);
+            } else {
+              levels.addAll(LanguageProficiencyLevels.forLanguage(_requiredLanguage));
+            }
+            return levels.map((lvl) {
+              return DropdownMenuItem<String>(
+                value: lvl,
+                child: Text(lvl == 'Tất cả' ? 'Không yêu cầu chứng chỉ' : lvl),
+              );
+            }).toList();
+          }(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _requiredLanguageLevel = val);
+            }
+          },
+        ),
+      ],
+    ];
+  }
+
   Widget _buildFullTimeRequirementsSection() {
     return _buildSection('Yêu cầu ứng viên', [
       _buildDropdown(
@@ -1151,6 +1265,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             .toList(),
         onChanged: (v) => setState(() => _minExperience = v!),
       ),
+      const SizedBox(height: 12),
+      ..._buildLanguageRequirementDropdowns(),
       const SizedBox(height: 12),
       _buildTextField(
         controller: _requirementsCtrl,
