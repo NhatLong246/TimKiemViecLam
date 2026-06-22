@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:viecnow/data/models/candidate_profile_models.dart';
 import 'package:viecnow/data/models/work_experience_model.dart';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
+import 'package:get/get.dart';
+import 'package:viecnow/controller/cv_controller.dart';
+
+enum MainSection { intro, experience, education, project }
+enum SidebarSection { contact, skill, language }
 
 /// Enum định nghĩa các bố cục CV
 enum CvLayoutType {
@@ -121,6 +133,135 @@ class CvPreviewScreen extends StatefulWidget {
 class _CvPreviewScreenState extends State<CvPreviewScreen> {
   final TransformationController _transformationController = TransformationController();
   int _selectedThemeIndex = 0; // Mặc định Ngọc Bích Cổ Điển
+  final GlobalKey _printKey = GlobalKey();
+
+  bool _isFreeMode = false;
+  bool _isDirty = false;
+  Map<String, CvBlockElement> _freeBlocks = {};
+
+  void _onBoundsCaptured(String id, Rect bounds, Widget child) {
+    _freeBlocks[id] = CvBlockElement(
+      id: id,
+      child: child,
+      x: bounds.left,
+      y: bounds.top,
+      width: bounds.width,
+      height: bounds.height,
+    );
+  }
+
+  List<MainSection> _mainSections = [
+    MainSection.intro,
+    MainSection.experience,
+    MainSection.education,
+    MainSection.project,
+  ];
+
+  List<SidebarSection> _sidebarSections = [
+    SidebarSection.contact,
+    SidebarSection.skill,
+    SidebarSection.language,
+  ];
+
+  Future<File?> _generatePdfFile() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đang tạo PDF, vui lòng đợi...')),
+      );
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      final boundary = _printKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Không tìm thấy giao diện để chụp');
+      
+      if (boundary.debugNeedsPaint) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData!.buffer.asUint8List();
+
+      final pdf = pw.Document();
+      final imagePdf = pw.MemoryImage(pngBytes);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.zero,
+          build: (pw.Context context) {
+            return pw.FullPage(
+              ignoreMargins: true,
+              child: pw.Image(imagePdf, fit: pw.BoxFit.contain),
+            );
+          },
+        ),
+      );
+
+      final output = await getTemporaryDirectory();
+      final file = File('${output.path}/CV_${widget.userData['firstName'] ?? 'Ung_Vien'}.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+      return file;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tạo PDF: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<void> _exportToPdf() async {
+    final file = await _generatePdfFile();
+    if (file != null) {
+      await Share.shareXFiles([XFile(file.path)], text: 'CV của tôi');
+    }
+  }
+
+  Future<void> _saveCvToSystem() async {
+    final file = await _generatePdfFile();
+    if (file == null) return;
+    
+    // Xuất file về máy (chia sẻ/lưu)
+    await Share.shareXFiles([XFile(file.path)], text: 'CV của tôi');
+
+    if (!mounted) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đẩy lên Hồ sơ đính kèm?'),
+        content: const Text('Bạn có muốn đẩy bản CV vừa lưu này lên phần Quản lý CV đính kèm không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Không'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Đồng ý'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final cvController = Get.find<CvController>();
+        await cvController.uploadGeneratedCv(file, 'CV_${widget.userData['firstName'] ?? 'VIP'}.pdf');
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Không tìm thấy bộ điều khiển tải lên: $e')),
+          );
+        }
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -195,7 +336,11 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
                       final isSelected = index == _selectedThemeIndex;
                       return GestureDetector(
                         onTap: () {
-                          setState(() => _selectedThemeIndex = index);
+                          setState(() {
+                            _selectedThemeIndex = index;
+                            _isDirty = true;
+                            _freeBlocks.clear();
+                          });
                           Navigator.pop(context);
                         },
                         child: Container(
@@ -287,28 +432,39 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+
           IconButton(
             tooltip: 'Thu phóng vừa màn hình',
             icon: const Icon(Icons.fit_screen_rounded, color: Colors.white),
             onPressed: _fitToScreen,
           ),
           IconButton(
-            tooltip: 'Lưu PDF (Sắp ra mắt)',
+            tooltip: 'Lưu PDF',
             icon: Icon(Icons.picture_as_pdf_outlined, color: theme.primaryAccent),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Tính năng xuất PDF đang được phát triển.')),
-              );
-            },
+            onPressed: _exportToPdf,
           ),
           const SizedBox(width: 8),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showTemplatePicker,
-        backgroundColor: theme.primaryAccent,
-        icon: const Icon(Icons.palette_outlined, color: Colors.white),
-        label: const Text('Đổi Mẫu CV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'change_template',
+            onPressed: _showTemplatePicker,
+            backgroundColor: theme.primaryAccent,
+            icon: const Icon(Icons.palette_outlined, color: Colors.white),
+            label: const Text('Đổi Mẫu CV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 16),
+          FloatingActionButton.extended(
+            heroTag: 'save_cv',
+            onPressed: _saveCvToSystem,
+            backgroundColor: Colors.green,
+            icon: const Icon(Icons.save_alt, color: Colors.white),
+            label: const Text('Lưu CV', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
       body: InteractiveViewer(
         transformationController: _transformationController,
@@ -319,22 +475,65 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
         child: Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: _CvA4Paper(
-            child: _buildLayout(theme),
+          child: RepaintBoundary(
+            key: _printKey,
+            child: _CvA4Paper(
+              child: _isFreeMode ? _buildFreeModeLayout(theme) : _buildLayout(theme),
+            ),
           ),
         ),
       ),
     );
   }
 
-  // --- ENGINE CHÍNH: XÂY DỰNG LAYOUT DỰA TRÊN THEME ---
+  Widget _buildFreeModeLayout(CvTheme theme) {
+    return Container(
+      width: 794,
+      height: 1123,
+      color: theme.mainBg,
+      child: Stack(
+        children: [
+          ..._freeBlocks.values.map((block) {
+            return Positioned(
+              left: block.x,
+              top: block.y,
+              width: block.width,
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  setState(() {
+                    block.x += details.delta.dx;
+                    block.y += details.delta.dy;
+                    
+                    // Đảm bảo không kéo vượt ra ngoài khổ A4
+                    if (block.x < 0) block.x = 0;
+                    if (block.y < 0) block.y = 0;
+                    if (block.x + block.width > 794) block.x = 794 - block.width;
+                    if (block.y + block.height > 1123) block.y = 1123 - block.height;
+                    
+                    _isDirty = true;
+                  });
+                },
+                child: block.child,
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
 
   Widget _buildLayout(CvTheme theme) {
     switch (theme.layout) {
       case CvLayoutType.sidebarLeft:
-        return IntrinsicHeight(
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [theme.sidebarBg, theme.sidebarBg, theme.mainBg, theme.mainBg],
+              stops: const [0.0, 260 / 794, 260 / 794, 1.0],
+            ),
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildSidebar(theme, 260),
               Expanded(child: _buildMainContent(theme)),
@@ -342,9 +541,15 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
           ),
         );
       case CvLayoutType.sidebarRight:
-        return IntrinsicHeight(
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [theme.mainBg, theme.mainBg, theme.sidebarBg, theme.sidebarBg],
+              stops: const [0.0, (794 - 260) / 794, (794 - 260) / 794, 1.0],
+            ),
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: _buildMainContent(theme)),
               _buildSidebar(theme, 260),
@@ -355,9 +560,10 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
         return Column(
           children: [
             _buildTopHeader(theme),
-            IntrinsicHeight(
+            Container(
+              color: theme.mainBg,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildTopHeaderLeftCol(theme, 260),
                   Expanded(child: _buildMainContent(theme, isTopHeader: true)),
@@ -390,37 +596,83 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.primaryAccent, width: 3),
-                image: avatar.isNotEmpty ? DecorationImage(image: NetworkImage(avatar), fit: BoxFit.cover) : null,
+          CaptureBounds(
+            id: 'sidebar_avatar',
+            onBoundsCaptured: _onBoundsCaptured,
+            child: Center(
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: theme.primaryAccent, width: 3),
+                  image: avatar.isNotEmpty ? DecorationImage(image: NetworkImage(avatar), fit: BoxFit.cover) : null,
+                ),
+                child: avatar.isEmpty ? Icon(Icons.person, size: 80, color: theme.sidebarText.withValues(alpha: 0.3)) : null,
               ),
-              child: avatar.isEmpty ? Icon(Icons.person, size: 80, color: theme.sidebarText.withValues(alpha: 0.3)) : null,
             ),
           ),
           const SizedBox(height: 32),
-          _sidebarTitle('THÔNG TIN LIÊN HỆ', theme),
-          const SizedBox(height: 16),
-          if (phone.isNotEmpty) _contactItem(Icons.phone, phone, theme),
-          if (email.isNotEmpty) _contactItem(Icons.email, email, theme),
-          if (dob.isNotEmpty) _contactItem(Icons.cake, dob, theme),
-          if (address.isNotEmpty) _contactItem(Icons.location_on, address, theme),
-          const SizedBox(height: 32),
-          if (skills.isNotEmpty) ...[
-            _sidebarTitle('KỸ NĂNG', theme),
-            const SizedBox(height: 16),
-            ...skills.map((s) => _skillItem(s, theme)),
-          ],
-          const SizedBox(height: 32),
-          if (languages.isNotEmpty) ...[
-            _sidebarTitle('NGOẠI NGỮ', theme),
-            const SizedBox(height: 16),
-            ...languages.map((l) => _languageItem(l, theme)),
-          ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _sidebarSections.map((section) {
+                Widget childWidget = const SizedBox.shrink();
+                switch (section) {
+                  case SidebarSection.contact:
+                    final hasContact = phone.isNotEmpty || email.isNotEmpty || dob.isNotEmpty || address.isNotEmpty;
+                    childWidget = Container(
+                      key: const ValueKey('contact'),
+                      padding: hasContact ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                      child: hasContact ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sidebarTitle('THÔNG TIN LIÊN HỆ', theme),
+                          const SizedBox(height: 16),
+                          if (phone.isNotEmpty) _contactItem(Icons.phone, phone, theme),
+                          if (email.isNotEmpty) _contactItem(Icons.email, email, theme),
+                          if (dob.isNotEmpty) _contactItem(Icons.cake, dob, theme),
+                          if (address.isNotEmpty) _contactItem(Icons.location_on, address, theme),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case SidebarSection.skill:
+                    childWidget = Container(
+                      key: const ValueKey('skill'),
+                      padding: skills.isNotEmpty ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                      child: skills.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sidebarTitle('KỸ NĂNG', theme),
+                          const SizedBox(height: 16),
+                          ...skills.map((s) => _skillItem(s, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case SidebarSection.language:
+                    childWidget = Container(
+                      key: const ValueKey('language'),
+                      padding: languages.isNotEmpty ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                      child: languages.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sidebarTitle('NGOẠI NGỮ', theme),
+                          const SizedBox(height: 16),
+                          ...languages.map((l) => _languageItem(l, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                }
+                return CaptureBounds(
+                  key: ValueKey('sidebar_${section.name}'),
+                  id: 'sidebar_${section.name}',
+                  onBoundsCaptured: _onBoundsCaptured,
+                  child: childWidget,
+                );
+              }).toList(),
+          ),
         ],
       ),
     );
@@ -441,36 +693,91 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isTopHeader) ...[
-            Text(
-              fullName.isEmpty ? 'TÊN ỨNG VIÊN' : fullName.toUpperCase(),
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: theme.mainText, letterSpacing: 1.5),
+          if (!isTopHeader) CaptureBounds(
+            id: 'main_header',
+            onBoundsCaptured: _onBoundsCaptured,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fullName.isEmpty ? 'TÊN ỨNG VIÊN' : fullName.toUpperCase(),
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: theme.mainText, letterSpacing: 1.5),
+                ),
+                if (headline.isNotEmpty)
+                  Text(
+                    headline.toUpperCase(),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: theme.primaryAccent, letterSpacing: 1.2),
+                  ),
+                const SizedBox(height: 36),
+              ],
             ),
-            if (headline.isNotEmpty)
-              Text(
-                headline.toUpperCase(),
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: theme.primaryAccent, letterSpacing: 1.2),
-              ),
-            const SizedBox(height: 36),
-          ],
-          if (intro.isNotEmpty) ...[
-            _mainSectionTitle('MỤC TIÊU NGHỀ NGHIỆP', Icons.track_changes, theme),
-            Text(intro, style: TextStyle(fontSize: 14, color: theme.mainText, height: 1.6)),
-            const SizedBox(height: 32),
-          ],
-          if (experiences.isNotEmpty) ...[
-            _mainSectionTitle('KINH NGHIỆM', Icons.work, theme),
-            ...experiences.map((e) => _timelineExperienceItem(e, theme)),
-            const SizedBox(height: 16),
-          ],
-          if (educations.isNotEmpty) ...[
-            _mainSectionTitle('HỌC VẤN', Icons.school, theme),
-            ...educations.map((e) => _timelineEducationItem(e, theme)),
-          ],
-          if (projects.isNotEmpty) ...[
-            _mainSectionTitle('DỰ ÁN', Icons.folder, theme),
-            ...projects.map((p) => _timelineProjectItem(p, theme)),
-          ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _mainSections.map((section) {
+                Widget childWidget = const SizedBox.shrink();
+                switch (section) {
+                  case MainSection.intro:
+                    childWidget = Container(
+                      key: const ValueKey('intro'),
+                      padding: intro.isNotEmpty ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                      child: intro.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _mainSectionTitle('MỤC TIÊU NGHỀ NGHIỆP', Icons.track_changes, theme),
+                          Text(intro, style: TextStyle(fontSize: 14, color: theme.mainText, height: 1.6)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case MainSection.experience:
+                    childWidget = Container(
+                      key: const ValueKey('experience'),
+                      padding: experiences.isNotEmpty ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+                      child: experiences.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _mainSectionTitle('KINH NGHIỆM', Icons.work, theme),
+                          ...experiences.map((e) => _timelineExperienceItem(e, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case MainSection.education:
+                    childWidget = Container(
+                      key: const ValueKey('education'),
+                      padding: educations.isNotEmpty ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+                      child: educations.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _mainSectionTitle('HỌC VẤN', Icons.school, theme),
+                          ...educations.map((e) => _timelineEducationItem(e, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case MainSection.project:
+                    childWidget = Container(
+                      key: const ValueKey('project'),
+                      padding: projects.isNotEmpty ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+                      child: projects.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _mainSectionTitle('DỰ ÁN', Icons.folder, theme),
+                          ...projects.map((p) => _timelineProjectItem(p, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                }
+                return CaptureBounds(
+                  key: ValueKey('main_${section.name}'),
+                  id: 'main_${section.name}',
+                  onBoundsCaptured: _onBoundsCaptured,
+                  child: childWidget,
+                );
+              }).toList(),
+          ),
         ],
       ),
     );
@@ -484,22 +791,25 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
     final phone = (userData['phone'] ?? '').toString().trim();
     final email = (userData['email'] ?? '').toString().trim();
 
-    return Container(
-      color: theme.sidebarBg,
-      padding: const EdgeInsets.all(40),
-      child: Row(
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.circular(16),
-              image: avatar.isNotEmpty ? DecorationImage(image: NetworkImage(avatar), fit: BoxFit.cover) : null,
-              color: Colors.white24,
+    return CaptureBounds(
+      id: 'top_header_content',
+      onBoundsCaptured: _onBoundsCaptured,
+      child: Container(
+        color: theme.sidebarBg,
+        padding: const EdgeInsets.all(40),
+        child: Row(
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(16),
+                image: avatar.isNotEmpty ? DecorationImage(image: NetworkImage(avatar), fit: BoxFit.cover) : null,
+                color: Colors.white24,
+              ),
             ),
-          ),
-          const SizedBox(width: 32),
+            const SizedBox(width: 32),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,6 +833,7 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -539,27 +850,64 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
       padding: const EdgeInsets.fromLTRB(36, 40, 16, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _mainSectionTitle('THÔNG TIN', Icons.person, theme),
-          if (dob.isNotEmpty) _contactMainItem('Ngày sinh', dob, theme),
-          if (address.isNotEmpty) _contactMainItem('Địa chỉ', address, theme),
-          const SizedBox(height: 32),
-          if (skills.isNotEmpty) ...[
-            _mainSectionTitle('KỸ NĂNG', Icons.star, theme),
-            ...skills.map((s) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('• $s', style: TextStyle(fontSize: 14, color: theme.mainText, fontWeight: FontWeight.w600)),
-                )),
-          ],
-          const SizedBox(height: 32),
-          if (languages.isNotEmpty) ...[
-            _mainSectionTitle('NGOẠI NGỮ', Icons.translate, theme),
-            ...languages.map((l) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('• ${l.language}', style: TextStyle(fontSize: 14, color: theme.mainText, fontWeight: FontWeight.w600)),
-                )),
-          ],
-        ],
+        children: _sidebarSections.map((section) {
+            Widget childWidget = const SizedBox.shrink();
+            switch (section) {
+              case SidebarSection.contact:
+                final hasContact = dob.isNotEmpty || address.isNotEmpty;
+                childWidget = Container(
+                  key: const ValueKey('contact'),
+                  padding: hasContact ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                  child: hasContact ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _mainSectionTitle('THÔNG TIN', Icons.person, theme),
+                      if (dob.isNotEmpty) _contactMainItem('Ngày sinh', dob, theme),
+                      if (address.isNotEmpty) _contactMainItem('Địa chỉ', address, theme),
+                    ],
+                  ) : const SizedBox.shrink(),
+                );
+                break;
+              case SidebarSection.skill:
+                childWidget = Container(
+                  key: const ValueKey('skill'),
+                  padding: skills.isNotEmpty ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                  child: skills.isNotEmpty ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _mainSectionTitle('KỸ NĂNG', Icons.star, theme),
+                      ...skills.map((s) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text('• $s', style: TextStyle(fontSize: 14, color: theme.mainText, fontWeight: FontWeight.w600)),
+                          )),
+                    ],
+                  ) : const SizedBox.shrink(),
+                );
+                break;
+              case SidebarSection.language:
+                childWidget = Container(
+                  key: const ValueKey('language'),
+                  padding: languages.isNotEmpty ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                  child: languages.isNotEmpty ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _mainSectionTitle('NGOẠI NGỮ', Icons.translate, theme),
+                      ...languages.map((l) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text('• ${l.language}', style: TextStyle(fontSize: 14, color: theme.mainText, fontWeight: FontWeight.w600)),
+                          )),
+                    ],
+                  ) : const SizedBox.shrink(),
+                );
+                break;
+            }
+            return CaptureBounds(
+              key: ValueKey('topheaderleft_${section.name}'),
+              id: 'topheaderleft_${section.name}',
+              onBoundsCaptured: _onBoundsCaptured,
+              child: childWidget,
+            );
+          }).toList(),
       ),
     );
   }
@@ -582,39 +930,91 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            fullName.toUpperCase(),
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: theme.mainText),
+          CaptureBounds(
+            id: 'minimal_header',
+            onBoundsCaptured: _onBoundsCaptured,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  fullName.toUpperCase(),
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: theme.mainText),
+                ),
+                if (headline.isNotEmpty)
+                  Text(headline.toUpperCase(), style: TextStyle(fontSize: 16, color: theme.mutedText, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (phone.isNotEmpty) Text(phone, style: TextStyle(fontSize: 13, color: theme.mainText)),
+                    if (phone.isNotEmpty && email.isNotEmpty) const Text('  |  '),
+                    if (email.isNotEmpty) Text(email, style: TextStyle(fontSize: 13, color: theme.mainText)),
+                    if (address.isNotEmpty) const Text('  |  '),
+                    if (address.isNotEmpty) Text(address, style: TextStyle(fontSize: 13, color: theme.mainText)),
+                  ],
+                ),
+                const SizedBox(height: 36),
+              ],
+            ),
           ),
-          if (headline.isNotEmpty)
-            Text(headline.toUpperCase(), style: TextStyle(fontSize: 16, color: theme.mutedText, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (phone.isNotEmpty) Text(phone, style: TextStyle(fontSize: 13, color: theme.mainText)),
-              if (phone.isNotEmpty && email.isNotEmpty) const Text('  |  '),
-              if (email.isNotEmpty) Text(email, style: TextStyle(fontSize: 13, color: theme.mainText)),
-              if (address.isNotEmpty) const Text('  |  '),
-              if (address.isNotEmpty) Text(address, style: TextStyle(fontSize: 13, color: theme.mainText)),
-            ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _mainSections.map((section) {
+                Widget childWidget = const SizedBox.shrink();
+                switch (section) {
+                  case MainSection.intro:
+                    childWidget = Container(
+                      key: const ValueKey('intro'),
+                      padding: intro.isNotEmpty ? const EdgeInsets.only(bottom: 32) : EdgeInsets.zero,
+                      child: intro.isNotEmpty ? Column(
+                        children: [
+                          _minimalTitle('TÓM TẮT', theme),
+                          Text(intro, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: theme.mainText, height: 1.6)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case MainSection.experience:
+                    childWidget = Container(
+                      key: const ValueKey('experience'),
+                      padding: experiences.isNotEmpty ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+                      child: experiences.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(child: _minimalTitle('KINH NGHIỆM LÀM VIỆC', theme)),
+                          ...experiences.map((e) => _minimalExperience(e, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case MainSection.education:
+                    childWidget = Container(
+                      key: const ValueKey('education'),
+                      padding: educations.isNotEmpty ? const EdgeInsets.only(bottom: 16) : EdgeInsets.zero,
+                      child: educations.isNotEmpty ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(child: _minimalTitle('HỌC VẤN', theme)),
+                          ...educations.map((e) => _minimalEducation(e, theme)),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    );
+                    break;
+                  case MainSection.project:
+                    childWidget = Container(
+                      key: const ValueKey('project'),
+                      child: const SizedBox.shrink(),
+                    );
+                    break;
+                }
+                return CaptureBounds(
+                  key: ValueKey('minimal_${section.name}'),
+                  id: 'minimal_${section.name}',
+                  onBoundsCaptured: _onBoundsCaptured,
+                  child: childWidget,
+                );
+              }).toList(),
           ),
-          const SizedBox(height: 36),
-          if (intro.isNotEmpty) ...[
-            _minimalTitle('TÓM TẮT', theme),
-            Text(intro, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: theme.mainText, height: 1.6)),
-            const SizedBox(height: 32),
-          ],
-          if (experiences.isNotEmpty) ...[
-            _minimalTitle('KINH NGHIỆM LÀM VIỆC', theme),
-            ...experiences.map((e) => _minimalExperience(e, theme)),
-            const SizedBox(height: 16),
-          ],
-          if (educations.isNotEmpty) ...[
-            _minimalTitle('HỌC VẤN', theme),
-            ...educations.map((e) => _minimalEducation(e, theme)),
-            const SizedBox(height: 16),
-          ],
           if (skills.isNotEmpty) ...[
             _minimalTitle('KỸ NĂNG CHUYÊN MÔN', theme),
             Wrap(
@@ -938,5 +1338,45 @@ class _CvA4Paper extends StatelessWidget {
       ),
       child: child,
     );
+  }
+}
+
+class CvBlockElement {
+  final String id;
+  Widget child;
+  double x;
+  double y;
+  double width;
+  double height;
+
+  CvBlockElement({required this.id, required this.child, required this.x, required this.y, required this.width, required this.height});
+}
+
+class CaptureBounds extends StatefulWidget {
+  final String id;
+  final Widget child;
+  final Function(String, Rect, Widget) onBoundsCaptured;
+
+  const CaptureBounds({Key? key, required this.id, required this.child, required this.onBoundsCaptured}) : super(key: key);
+
+  @override
+  State<CaptureBounds> createState() => _CaptureBoundsState();
+}
+
+class _CaptureBoundsState extends State<CaptureBounds> {
+  final GlobalKey _key = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final renderBox = _key.currentContext?.findRenderObject() as RenderBox?;
+      final parentRenderObject = context.findAncestorRenderObjectOfType<RenderRepaintBoundary>();
+      if (renderBox != null && parentRenderObject != null) {
+        final position = renderBox.localToGlobal(Offset.zero, ancestor: parentRenderObject);
+        widget.onBoundsCaptured(widget.id, Rect.fromLTWH(position.dx, position.dy, renderBox.size.width, renderBox.size.height), widget.child);
+      }
+    });
+    return Container(key: _key, child: widget.child);
   }
 }

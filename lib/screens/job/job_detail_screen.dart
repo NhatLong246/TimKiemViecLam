@@ -340,83 +340,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                 ),
 
-                // Deadline VIP Banner
-                if (job.applicationDeadline != null)
-                  Transform.translate(
-                    offset: const Offset(0, -15),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isExpired
-                            ? Colors.red.shade50
-                            : Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isExpired
-                              ? Colors.red.shade200
-                              : Colors.blue.shade200,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isExpired ? Icons.timer_off : Icons.timer,
-                            color: isExpired
-                                ? Colors.red.shade600
-                                : Colors.blue.shade700,
-                            size: 26,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hạn ứng tuyển: $deadlineStr',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: isExpired
-                                        ? Colors.red.shade800
-                                        : Colors.blue.shade900,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isExpired
-                                      ? 'Đã hết hạn ứng tuyển'
-                                      : (daysLeft != null && daysLeft == 0
-                                            ? 'Hết hạn trong hôm nay'
-                                            : 'Còn $daysLeft ngày để ứng tuyển'),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isExpired
-                                        ? Colors.red.shade700
-                                        : Colors.blue.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
                 // Location info
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Material(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -535,41 +461,105 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 2.2,
+                      Column(
                         children: [
-                          _buildGridCard(
-                            Icons.calendar_today,
-                            dateLabel,
-                            dateValue,
-                            Colors.blue,
+                          Row(
+                            children: [
+                              Expanded(child: _buildGridCard(
+                                Icons.calendar_today,
+                                dateLabel,
+                                dateValue,
+                                Colors.blue,
+                              )),
+                              const SizedBox(width: 12),
+                              Expanded(child: _buildGridCard(
+                                Icons.access_time,
+                                timeLabel,
+                                timeValue,
+                                Colors.orange,
+                              )),
+                            ],
                           ),
-                          _buildGridCard(
-                            Icons.access_time,
-                            timeLabel,
-                            timeValue,
-                            Colors.orange,
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildGridCard(
+                                Icons.people_alt_outlined,
+                                'Số lượng tuyển',
+                                slotsStr,
+                                Colors.purple,
+                              )),
+                              const SizedBox(width: 12),
+                              const Expanded(child: SizedBox()),
+                            ],
                           ),
-                          _buildGridCard(
-                            Icons.people_alt_outlined,
-                            'Số lượng tuyển',
-                            slotsStr,
-                            Colors.purple,
-                          ),
-                          if (job.applicationDeadline != null)
-                            _buildGridCard(
-                              Icons.event_busy,
-                              'Hạn nộp',
-                              deadlineStr,
-                              Colors.red,
-                            ),
                         ],
                       ),
+                      
+                      // Hạn ứng tuyển
+                      if (job.applicationDeadline != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isExpired
+                                ? Colors.red.shade50
+                                : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isExpired
+                                  ? Colors.red.shade200
+                                  : Colors.blue.shade200,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isExpired ? Icons.timer_off : Icons.timer,
+                                color: isExpired
+                                    ? Colors.red.shade600
+                                    : Colors.blue.shade700,
+                                size: 26,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Hạn ứng tuyển: $deadlineStr',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: isExpired
+                                            ? Colors.red.shade800
+                                            : Colors.blue.shade900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isExpired
+                                          ? 'Đã hết hạn ứng tuyển'
+                                          : (daysLeft != null && daysLeft == 0
+                                                ? 'Hết hạn trong hôm nay'
+                                                : 'Còn $daysLeft ngày để ứng tuyển'),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isExpired
+                                            ? Colors.red.shade700
+                                            : Colors.blue.shade800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                       if (job.jobType == 'full_time' &&
                           job.fullTimeDetails != null) ...[
                         const SizedBox(height: 12),

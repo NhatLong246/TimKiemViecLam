@@ -107,10 +107,8 @@ class JobAttendanceCompletionService {
     }
 
     final n = mandatory.length;
-    completed = n; // Bypassed for testing
-    final can = true; // completed == n;
-    final canRequest =
-        true; // can; // Yêu cầu phải điểm danh xong mới được giải ngân
+    final can = completed == n;
+    final canRequest = can;
 
     return JobDisbursementReadiness(
       canDisburse: can,

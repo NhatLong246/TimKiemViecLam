@@ -243,7 +243,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                     ),
                   ),
                   if (thread.isClosed)
-                    _buildClosedNotice()
+                    _buildClosedNotice(thread)
                   else if (_actionMessage == null)
                     (isRecording ? buildRecordingBar() : _buildComposer(thread))
                   else
@@ -1138,7 +1138,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
   }
 
-  Widget _buildClosedNotice() {
+  Widget _buildClosedNotice(ConversationThread thread) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -1154,7 +1154,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
           Icon(Icons.lock_outline_rounded, color: Colors.grey.shade600, size: 20),
           const SizedBox(width: 8),
           Text(
-            'Nhóm chat này đã kết thúc',
+            thread.isGroupChat ? 'Nhóm chat này đã kết thúc' : 'Cuộc trò chuyện này đã kết thúc',
             style: TextStyle(
               color: Colors.grey.shade700,
               fontWeight: FontWeight.w600,

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:viecnow/controller/update_account_controller.dart';
 import 'package:viecnow/data/models/candidate_profile_models.dart';
 import 'package:viecnow/data/models/work_experience_model.dart';
+import 'package:viecnow/data/models/cv_completion_model.dart';
 import 'certificate_screen.dart';
 import 'education_screen.dart';
 import 'foreign_language_screen.dart';
@@ -79,6 +80,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
             final projects = ProjectModel.listFromUserData(data);
             final certificates = CertificateModel.listFromUserData(data);
             final languages = LanguageModel.listFromUserData(data);
+            final completion = CvCompletionModel.fromUserData(data);
 
             return RefreshIndicator(
               color: _primary,
@@ -90,6 +92,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
                 child: Column(
                 children: [
+                  _buildCompletionProgressBar(completion),
                   _buildProfileInfoCard(context, data),
                   const SizedBox(height: 22),
                   _buildSelfIntroSection(context, selfIntro),
@@ -111,6 +114,71 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildCompletionProgressBar(CvCompletionModel completion) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      margin: const EdgeInsets.only(bottom: 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1F2937), Color(0xFF111827)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF111827).withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Độ hoàn thiện hồ sơ',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600),
+              ),
+              Text(
+                '${completion.percent}%',
+                style: const TextStyle(
+                  color: Color(0xFF10B981),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: completion.percent / 100,
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+            ),
+          ),
+          if (completion.percent < 100) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Cập nhật thêm thông tin để thu hút nhà tuyển dụng hơn.',
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+            ),
+          ]
+        ],
       ),
     );
   }
