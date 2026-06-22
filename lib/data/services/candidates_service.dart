@@ -297,9 +297,23 @@ class CandidatesService {
       });
     });
 
-    final jobType = (jobData['jobType'] ?? 'part_time').toString();
-    final isFullTimeReferral =
-        acceptedJob.isFullTimeReferral || jobType == 'full_time';
+    return completeAcceptedApplication(
+      appId: appId,
+      acceptedJob: acceptedJob,
+      candidateId: candidateId,
+      employerId: employerId,
+    );
+  }
+
+  /// Chạy các hiệu ứng sau khi một đơn đã được chấp nhận thành công.
+  /// Dùng chung cho luồng NTD duyệt đơn và ứng viên nhận lời mời trực tiếp.
+  Future<AcceptApplicationResult> completeAcceptedApplication({
+    required String appId,
+    required JobPostModel acceptedJob,
+    required String candidateId,
+    required String employerId,
+  }) async {
+    final isFullTimeReferral = acceptedJob.isFullTimeReferral;
     Set<String> autoRejectedAppIds = const <String>{};
     if (!isFullTimeReferral) {
       try {
@@ -314,15 +328,15 @@ class CandidatesService {
     if (candidateId.isNotEmpty && employerId.isNotEmpty) {
       if (!isFullTimeReferral) {
         await _groupChat.ensureJobGroup(
-          jobId: jobId,
-          jobTitle: jobTitle,
+          jobId: acceptedJob.jobId,
+          jobTitle: acceptedJob.title,
           employerId: employerId,
           candidateId: candidateId,
         );
       }
       await NotificationService.notifyApplicationAccepted(
         candidateId: candidateId,
-        jobTitle: jobTitle,
+        jobTitle: acceptedJob.title,
         isFullTimeReferral: isFullTimeReferral,
         interviewAt: isFullTimeReferral ? _interviewAtFor(acceptedJob) : null,
         interviewRequired:

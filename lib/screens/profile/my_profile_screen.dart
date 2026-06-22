@@ -190,7 +190,17 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     final fullName = _joinValues([data['firstName'], data['lastName']]);
     final phone = _stringValue(data['phone']);
     final email = _stringValue(data['email']);
-    final gender = _stringValue(data['gender']);
+    final rawGender = _stringValue(data['gender']);
+    String gender = '';
+    if (rawGender == 'male') {
+      gender = 'Nam';
+    } else if (rawGender == 'female') {
+      gender = 'Nữ';
+    } else if (rawGender == 'other') {
+      gender = 'Khác';
+    } else if (rawGender.isNotEmpty) {
+      gender = rawGender;
+    }
     final dateOfBirth = _dateValue(data['dateOfBirth']);
     final address = _joinValues([data['companyAddress'], data['address']]);
     final items = <Widget>[

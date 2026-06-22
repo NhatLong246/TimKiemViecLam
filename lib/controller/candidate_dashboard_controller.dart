@@ -23,6 +23,7 @@ class CandidateDashboardController extends GetxController {
   final startDate = Rx<DateTime>(DateTime.now().subtract(const Duration(days: 30)));
   final endDate = Rx<DateTime>(DateTime.now());
   final chartData = <CandidateChartPoint>[].obs;
+  final isCustomRange = false.obs;
 
   @override
   void onInit() {
@@ -150,48 +151,67 @@ class CandidateDashboardController extends GetxController {
     final now = DateTime.now();
     switch (p) {
       case StatsPeriod.day:
-        startDate.value = now.subtract(const Duration(days: 7));
-        endDate.value = now;
+        startDate.value = DateTime(now.year, now.month, now.day);
+        endDate.value = DateTime(now.year, now.month, now.day, 23, 59, 59);
         break;
       case StatsPeriod.week:
-        startDate.value = now.subtract(const Duration(days: 28));
-        endDate.value = now;
+        final start = now.subtract(Duration(days: now.weekday - 1));
+        startDate.value = DateTime(start.year, start.month, start.day);
+        final end = start.add(const Duration(days: 6));
+        endDate.value = DateTime(end.year, end.month, end.day, 23, 59, 59);
         break;
       case StatsPeriod.month:
-        startDate.value = DateTime(now.year, now.month - 5, 1);
-        endDate.value = DateTime(now.year, now.month + 1, 0);
+        startDate.value = DateTime(now.year, now.month, 1);
+        endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
         break;
       case StatsPeriod.year:
-        startDate.value = DateTime(now.year - 4, 1, 1);
-        endDate.value = DateTime(now.year, 12, 31);
+        startDate.value = DateTime(now.year, 1, 1);
+        endDate.value = DateTime(now.year, 12, 31, 23, 59, 59);
         break;
     }
   }
 
-  Future<void> pickDateRange(BuildContext context) async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-        start: startDate.value,
-        end: endDate.value,
-      ),
-    );
-    if (picked != null) {
-      startDate.value = picked.start;
-      endDate.value = picked.end;
-      final diff = picked.end.difference(picked.start).inDays;
-      if (diff <= 14) {
-        period.value = StatsPeriod.day;
-      } else if (diff <= 90) {
-        period.value = StatsPeriod.week;
-      } else if (diff <= 365 * 2) {
-        period.value = StatsPeriod.month;
-      } else {
-        period.value = StatsPeriod.year;
-      }
-      loadBenefits();
+  void applyFilter(StatsPeriod p, DateTime date) {
+    isCustomRange.value = false;
+    period.value = p;
+    switch (p) {
+      case StatsPeriod.day:
+        startDate.value = DateTime(date.year, date.month, date.day);
+        endDate.value = DateTime(date.year, date.month, date.day, 23, 59, 59);
+        break;
+      case StatsPeriod.week:
+        final start = date.subtract(Duration(days: date.weekday - 1));
+        startDate.value = DateTime(start.year, start.month, start.day);
+        final end = start.add(const Duration(days: 6));
+        endDate.value = DateTime(end.year, end.month, end.day, 23, 59, 59);
+        break;
+      case StatsPeriod.month:
+        startDate.value = DateTime(date.year, date.month, 1);
+        endDate.value = DateTime(date.year, date.month + 1, 0, 23, 59, 59);
+        break;
+      case StatsPeriod.year:
+        startDate.value = DateTime(date.year, 1, 1);
+        endDate.value = DateTime(date.year, 12, 31, 23, 59, 59);
+        break;
     }
+    loadBenefits();
+  }
+
+  void applyCustomRange(DateTime start, DateTime end) {
+    isCustomRange.value = true;
+    startDate.value = DateTime(start.year, start.month, start.day);
+    endDate.value = DateTime(end.year, end.month, end.day, 23, 59, 59);
+
+    final diff = end.difference(start).inDays;
+    if (diff <= 14) {
+      period.value = StatsPeriod.day;
+    } else if (diff <= 90) {
+      period.value = StatsPeriod.week;
+    } else if (diff <= 365 * 2) {
+      period.value = StatsPeriod.month;
+    } else {
+      period.value = StatsPeriod.year;
+    }
+    loadBenefits();
   }
 }

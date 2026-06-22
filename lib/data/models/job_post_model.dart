@@ -90,6 +90,62 @@ class JobPostModel {
   int get remainingSlots => (slots - filledSlots).clamp(0, slots);
   bool get isFull => remainingSlots == 0;
 
+  /// Yêu cầu có cấu trúc dùng để kiểm tra điều kiện ứng tuyển.
+  ///
+  /// Các bài đăng cũ chưa có `candidateRequirements` vẫn được bảo vệ bằng
+  /// những trường yêu cầu riêng đã lưu từ phiên bản trước.
+  List<Map<String, dynamic>> get effectiveCandidateRequirements {
+    final effective = candidateRequirements
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final availableTypes = effective
+        .map((item) => item['type']?.toString() ?? '')
+        .toSet();
+    final language = requiredLanguage?.trim() ?? '';
+    var languageMinimum = requiredLanguageLevel?.trim() ?? '';
+    if (!availableTypes.contains('languages') &&
+        language.isNotEmpty &&
+        language != 'Tất cả' &&
+        languageMinimum.isNotEmpty &&
+        languageMinimum != 'Tất cả') {
+      var levelType = language == 'Tiếng Anh' ? 'CEFR' : 'certificate';
+      final scoreMatch = RegExp(
+        r'^(IELTS|TOEIC)\s+(.+)$',
+        caseSensitive: false,
+      ).firstMatch(languageMinimum);
+      if (scoreMatch != null) {
+        levelType = scoreMatch.group(1)!.toUpperCase();
+        languageMinimum = scoreMatch.group(2)!.trim();
+      }
+      effective.add({
+        'type': 'languages',
+        'language': language,
+        'levelType': levelType,
+        'minimum': languageMinimum,
+      });
+    }
+
+    final minimumEducation = fullTimeDetails?.minEducation?.trim() ?? '';
+    if (!availableTypes.contains('education') &&
+        minimumEducation.isNotEmpty &&
+        minimumEducation != 'none') {
+      effective.add({
+        'type': 'education',
+        'minimum': minimumEducation,
+      });
+    }
+
+    final experience = requiredExperience?.trim() ?? '';
+    if (!availableTypes.contains('experience') &&
+        experience.isNotEmpty &&
+        experience != 'Tất cả' &&
+        experience != 'no_exp' &&
+        experience != 'none') {
+      effective.add({'type': 'experience', 'minimum': experience});
+    }
+    return List<Map<String, dynamic>>.unmodifiable(effective);
+  }
+
   /// Part-time: ViecNow quản lý điểm danh, giải ngân… Full-time: chỉ giới thiệu tin.
   bool get isPartTimeManaged => jobType == 'part_time';
   bool get isFullTimeReferral => jobType == 'full_time';

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/application_model.dart';
 import '../models/job_post_model.dart';
 import '../../utils/job_time_helper.dart';
+import 'candidate_eligibility_service.dart';
 import 'notification_service.dart';
 import 'schedule_service.dart';
 
@@ -9,7 +10,13 @@ class ApplicationService {
   final _db = FirebaseFirestore.instance;
 
   Future<Map<String, dynamic>> _loadCandidateData(String userId) async {
-    final userDoc = await _db.collection('users').doc(userId).get();
+    final userDoc = await _db
+        .collection('users')
+        .doc(userId)
+        .get(const GetOptions(source: Source.server));
+    if (!userDoc.exists) {
+      throw Exception('Không tìm thấy hồ sơ ứng viên.');
+    }
     final role = (userDoc.data()?['role'] ?? 'candidate').toString();
     if (role != 'candidate') {
       throw Exception('Chỉ tài khoản ứng viên mới được ứng tuyển.');
@@ -27,7 +34,10 @@ class ApplicationService {
   }) async {
     final candidateData = await _loadCandidateData(candidateId);
 
-    final jobDoc = await _db.collection('jobPosts').doc(jobId).get();
+    final jobDoc = await _db
+        .collection('jobPosts')
+        .doc(jobId)
+        .get(const GetOptions(source: Source.server));
     if (!jobDoc.exists) {
       throw Exception('Công việc không tồn tại.');
     }
@@ -78,6 +88,12 @@ class ApplicationService {
 
     jobData['jobId'] = jobDoc.id;
     final jobModel = JobPostModel.fromMap(jobData);
+
+    CandidateEligibilityService.ensureEligible(
+      candidateData: candidateData,
+      requirements: jobModel.effectiveCandidateRequirements,
+      now: now,
+    );
 
     final fullTimeRaw = jobData['fullTimeDetails'];
     final fullTimeDetails = fullTimeRaw is Map
