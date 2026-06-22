@@ -243,6 +243,53 @@ class WalletService {
     await batch.commit();
   }
 
+  /// Hoàn tiền cho Nhà tuyển dụng khi Admin xử lý khiếu nại
+  Future<void> processComplaintRefund({
+    required String employerId,
+    required String jobId,
+    required double amount,
+    required String description,
+  }) async {
+    if (employerId.isEmpty || amount <= 0) return;
+
+    final refundKey = 'complaint_refund_${jobId}_$employerId';
+    final existingRefund = await _firestore
+        .collection('walletTransactions')
+        .where('idempotencyKey', isEqualTo: refundKey)
+        .limit(1)
+        .get();
+    
+    // Nếu có thể Admin hoàn nhiều lần, ta sẽ dùng timestamp để làm key thay vì fix cứng.
+    // Ở đây ta dùng một key unique cho mỗi lần gọi để đảm bảo không gọi trùng lặp nếu fail giữa chừng.
+    // Nếu logic Admin chỉ hoàn 1 lần, refundKey cố định là được. Ở đây ta tạm bỏ check idempotencyKey cố định
+    // vì admin có thể tạo nhiều giao dịch hoàn nếu muốn. Tuy nhiên, nếu workflow chỉ hoàn 1 cục khi kết thúc:
+    if (existingRefund.docs.isNotEmpty) return;
+
+    final batch = _firestore.batch();
+    
+    final employerRef = _firestore.collection('users').doc(employerId);
+    batch.set(employerRef, {
+      'walletBalance': FieldValue.increment(amount),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    final txRef = _firestore.collection('walletTransactions').doc();
+    batch.set(txRef, {
+      'userId': employerId,
+      'type': 'refund',
+      'amount': amount,
+      'description': description,
+      'status': 'completed',
+      'paymentMethod': 'wallet',
+      'jobId': jobId,
+      'idempotencyKey': refundKey,
+      'createdAt': FieldValue.serverTimestamp(),
+      'completedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+  }
+
   String buildStatementText({
     required String userId,
     required WalletSummaryModel summary,

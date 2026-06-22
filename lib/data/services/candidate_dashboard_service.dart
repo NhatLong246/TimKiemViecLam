@@ -131,6 +131,7 @@ class CandidateDashboardService {
     DisbursementNoticeModel? notice,
     DateTime? completedAt,
     bool isDisputed = false,
+    double? actualEarnings,
   }) {
     final completed = notice?.status == 'completed';
 
@@ -143,9 +144,9 @@ class CandidateDashboardService {
       status = 'pending';
     }
 
-    final amountVnd = completed && notice != null
-        ? notice.amount.round()
-        : row.job.salary.round();
+    final amountVnd = completed
+        ? (actualEarnings?.round() ?? (notice != null ? notice.amount.round() : row.job.salary.round()))
+        : (notice != null ? notice.amount.round() : row.job.salary.round());
 
     return CandidatePayment(
       id: row.application.appId,
@@ -296,6 +297,21 @@ class CandidateDashboardService {
     final completedAtByJob = await _fetchCompletedAtByJob(jobIds);
     final disputedJobs = await _fetchDisputedJobIds(uid);
 
+    final earningsSnap = await _firestore
+        .collection('candidateEarnings')
+        .where('candidateId', isEqualTo: uid)
+        .get();
+    
+    final earningsByJob = <String, double>{};
+    for (final doc in earningsSnap.docs) {
+      final data = doc.data();
+      final jobId = data['jobId'] as String? ?? '';
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+      if (jobId.isNotEmpty) {
+        earningsByJob[jobId] = (earningsByJob[jobId] ?? 0.0) + amount;
+      }
+    }
+
     return rows
         .map(
           (row) => _rowToPayment(
@@ -303,6 +319,7 @@ class CandidateDashboardService {
             notice: notices[row.job.jobId],
             completedAt: completedAtByJob[row.job.jobId],
             isDisputed: disputedJobs.contains(row.job.jobId),
+            actualEarnings: earningsByJob[row.job.jobId],
           ),
         )
         .toList();
